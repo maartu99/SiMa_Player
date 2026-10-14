@@ -151,6 +151,8 @@ svg{flex:none}
 .readText .s{border-radius:3px;-webkit-box-decoration-break:clone;box-decoration-break:clone;cursor:pointer}
 .readText .s.on{background:var(--mark);color:var(--bg)}
 .hint{font-size:14px;color:var(--muted);line-height:1.5;margin:4px 0 12px}
+.keyRow{display:flex;gap:8px;margin:0 0 12px}
+.keyIn{flex:1;min-width:0;height:44px;border-radius:12px;border:1px solid var(--line2);background:var(--bg);color:var(--ink);padding:0 12px;font:inherit;font-size:16px}
 
 /* ---------- avvisi ---------- */
 #toast{position:fixed;left:16px;right:16px;z-index:50;max-width:520px;margin:0 auto;bottom:calc(env(safe-area-inset-bottom) + 100px);padding:12px 14px;border-radius:12px;background:#2A3540;color:var(--ink);font-size:14px;line-height:1.4;box-shadow:0 8px 24px rgba(0,0,0,.4)}
@@ -287,8 +289,32 @@ const PIPER_VOICES = [
   { id: 'kokoro-if_sara', name: 'Sara', engine: 'Kokoro', size: 'circa 130 MB' },
   { id: 'kokoro-im_nicola', name: 'Nicola', engine: 'Kokoro', size: 'circa 130 MB' },
   { id: 'it_IT-paola-medium', name: 'Paola', engine: 'Piper', size: 'circa 60 MB' },
-  { id: 'it_IT-riccardo-x_low', name: 'Riccardo', engine: 'Piper', size: 'circa 20 MB' }
+  { id: 'it_IT-riccardo-x_low', name: 'Riccardo', engine: 'Piper', size: 'circa 20 MB' },
+  { id: 'st-F1', name: 'Donna 1', engine: 'Supertonic, sperimentale', size: 'circa 400 MB' },
+  { id: 'st-F2', name: 'Donna 2', engine: 'Supertonic, sperimentale', size: 'circa 400 MB' },
+  { id: 'st-M1', name: 'Uomo 1', engine: 'Supertonic, sperimentale', size: 'circa 400 MB' },
+  { id: 'st-M2', name: 'Uomo 2', engine: 'Supertonic, sperimentale', size: 'circa 400 MB' }
 ];
+// voci Google Gemini (online, chiave gratuita personale)
+const GEM_VOICES = [
+  { id: 'gem-Sulafat', name: 'Sulafat', desc: 'calda' },
+  { id: 'gem-Achernar', name: 'Achernar', desc: 'morbida' },
+  { id: 'gem-Vindemiatrix', name: 'Vindemiatrix', desc: 'gentile' },
+  { id: 'gem-Aoede', name: 'Aoede', desc: 'leggera' },
+  { id: 'gem-Kore', name: 'Kore', desc: 'decisa' },
+  { id: 'gem-Algieba', name: 'Algieba', desc: 'vellutata' },
+  { id: 'gem-Charon', name: 'Charon', desc: 'informativa' },
+  { id: 'gem-Gacrux', name: 'Gacrux', desc: 'matura' },
+  { id: 'gem-Iapetus', name: 'Iapetus', desc: 'chiara' },
+  { id: 'gem-Puck', name: 'Puck', desc: 'vivace' }
+];
+const GEM_STYLES = {
+  narrativa: { label: 'Narrativa', text: 'Lettura di un audiolibro in italiano: tono naturale e coinvolgente, ritmo pacato, intonazione che segue il senso del testo, le domande e i dialoghi.' },
+  calma: { label: 'Calma', text: 'Lettura calma e rilassata di un audiolibro in italiano, voce morbida, ritmo lento e pause naturali.' },
+  espressiva: { label: 'Espressiva', text: 'Lettura espressiva di un audiolibro in italiano, che interpreta con vivacità emozioni, tensione e dialoghi tra i personaggi.' }
+};
+const isGemId = id => !!id && id.startsWith('gem-');
+const isGem = () => state.engine === 'piper' && isGemId(state.piperVoice);
 const state = {
   key: null, meta: null, sections: [], offsets: [], total: 0, isPdf: false,
   sec: 0, idx: 0, playing: false, gen: 0,
@@ -461,10 +487,13 @@ audio.preservesPitch = true; audio.webkitPreservesPitch = true;
 
 const workers = {};
 const isKokoro = id => id.startsWith('kokoro-');
+const familyOf = id => isKokoro(id) ? 'kokoro' : id.startsWith('st-') ? 'supertonic' : isGemId(id) ? 'gemini' : 'piper';
 function wk(voiceId){
-  const k = isKokoro(voiceId) ? 'kokoro' : 'piper';
+  const k = familyOf(voiceId);
   if(!workers[k]){
-    const w = k === 'kokoro' ? new Worker('kokoro-worker.js', { type: 'module' }) : new Worker('tts-worker.js');
+    const w = k === 'kokoro' ? new Worker('kokoro-worker.js', { type: 'module' })
+      : k === 'supertonic' ? new Worker('supertonic-worker.js')
+      : new Worker('tts-worker.js');
     w.onmessage = onWorkerMessage;
     w.onerror = () => { busy = false; setStatus('Il motore vocale si è fermato. Riapri l\'app o scegli un\'altra voce.', true); };
     workers[k] = w;
@@ -477,7 +506,11 @@ let wanted = [];
 let busy = false;
 let reqId = 0;
 let readyVoices = new Set(store.get('readyVoices') || []);
-function voiceReady(id){ return readyVoices.has(id) || (isKokoro(id) && [...readyVoices].some(isKokoro)); }
+function voiceReady(id){
+  if(isGemId(id)) return !!store.get('gemKey');
+  const f = familyOf(id);
+  return readyVoices.has(id) || ((f === 'kokoro' || f === 'supertonic') && [...readyVoices].some(v => familyOf(v) === f));
+}
 const MEM_AHEAD = 40;        // frasi tenute pronte in memoria
 // velocità di generazione misurata su questo telefono: secondi per generare 1 secondo di audio
 function rtfOf(v){ return store.get('rtf:' + v); }
@@ -569,6 +602,12 @@ async function pump(){
   }
   const id = ++reqId; inflight.set(id, { key: next.key, t: performance.now() });
   const vid = next.key.split('|')[0];
+  if(isGemId(vid)){
+    geminiTTS(en.text, vid)
+      .then(blob => onWorkerMessage({ data: { type: 'result', id, blob } }))
+      .catch(err => onWorkerMessage({ data: { type: 'error', id, message: String(err && err.message || err) } }));
+    return;
+  }
   wk(vid).postMessage({ type: 'predict', id, voiceId: vid, text: en.text });
 }
 function waitFor(key){
@@ -602,7 +641,8 @@ function updateBuf(){
       b.textContent = done >= wanted.length ? 'Preparazione completata: le prossime frasi sono pronte.' : `Preparo in anticipo: ${done} di ${Math.min(wanted.length, tot + 1)} frasi pronte`;
       if(done >= wanted.length) state.prepareTo = null;
     } else {
-      b.textContent = n ? `${n} ${n === 1 ? 'frase pronta' : 'frasi pronte'} in anticipo` : (busy ? 'Preparo le prossime frasi...' : '');
+      if(isGem()) b.textContent = n ? `${n} ${n === 1 ? 'parte pronta' : 'parti pronte'} in anticipo` : (busy ? 'Gemini sta preparando la prossima parte...' : '');
+      else b.textContent = n ? `${n} ${n === 1 ? 'frase pronta' : 'frasi pronte'} in anticipo` : (busy ? 'Preparo le prossime frasi...' : '');
     }
   }, 250);
 }
@@ -627,12 +667,126 @@ function unlockAudio(){
   audio.play().catch(() => {});
 }
 
+/* ---------- Google Gemini ---------- */
+const GEM_MODELS = ['gemini-3.8-flash-tts', 'gemini-3.8-flash-lite-tts'];
+function findAudio(o){
+  // cerca nella risposta l'ultimo blocco audio in base64
+  let found = null;
+  (function walk(x){
+    if(!x || typeof x !== 'object') return;
+    if(Array.isArray(x)){ x.forEach(walk); return; }
+    if(x.type === 'audio' && typeof x.data === 'string') found = x;
+    if(x.inlineData && typeof x.inlineData.data === 'string') found = { data: x.inlineData.data, mime_type: x.inlineData.mimeType };
+    Object.values(x).forEach(walk);
+  })(o);
+  return found;
+}
+function pcmToWav(bytes, sr){
+  const buf = new ArrayBuffer(44 + bytes.length), v = new DataView(buf);
+  const w = (o, s) => { for(let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  w(0, 'RIFF'); v.setUint32(4, 36 + bytes.length, true); w(8, 'WAVE'); w(12, 'fmt ');
+  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+  w(36, 'data'); v.setUint32(40, bytes.length, true);
+  new Uint8Array(buf, 44).set(bytes);
+  return new Blob([buf], { type: 'audio/wav' });
+}
+async function geminiTTS(text, voiceId){
+  const key = store.get('gemKey');
+  if(!key) throw new Error('chiave mancante');
+  const style = (GEM_STYLES[prefs.gemStyle] || GEM_STYLES.narrativa).text;
+  let lastErr = null;
+  for(const model of GEM_MODELS){
+    const body = {
+      model,
+      input: [{ type: 'user_input', content: [{ type: 'text', text, annotations: [{ type: 'speech_metadata', style }] }] }],
+      response_format: { type: 'audio' },
+      generation_config: { speech_config: [{ voice: voiceId.slice(4) }] }
+    };
+    let r;
+    try{
+      r = await fetch('https://generativelanguage.googleapis.com/v1beta/interactions', {
+        method: 'POST', headers: { 'x-goog-api-key': key, 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+      });
+    }catch(e){ throw new Error('rete'); }
+    if(r.status === 429){ lastErr = new Error('limite'); continue; } // provo il modello lite, che ha un limite separato
+    if(r.status === 400 || r.status === 401 || r.status === 403){
+      const t = await r.text().catch(() => '');
+      throw new Error(/api key|API_KEY|permission|unauth/i.test(t) || r.status !== 400 ? 'chiave' : 'richiesta: ' + t.slice(0, 160));
+    }
+    if(!r.ok){ lastErr = new Error('servizio ' + r.status); continue; }
+    const j = await r.json();
+    const a = findAudio(j);
+    if(!a) throw new Error('nessun audio nella risposta');
+    const bin = atob(a.data); const bytes = new Uint8Array(bin.length);
+    for(let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    if(bin.slice(0, 4) === 'RIFF') return new Blob([bytes], { type: 'audio/wav' });
+    const m = /rate=(\d+)/.exec(a.mime_type || a.mimeType || '');
+    return pcmToWav(bytes, m ? +m[1] : 24000);
+  }
+  throw lastErr || new Error('servizio');
+}
+function gemErrorText(msg){
+  if(/limite/.test(msg)) return 'Hai raggiunto il limite gratuito di Gemini per adesso. Riprova più tardi, oppure scegli un\'altra voce: le frasi già preparate restano salvate.';
+  if(/chiave/.test(msg)) return 'La chiave Gemini non funziona. Controllala in Voce > Google Gemini.';
+  if(/rete/.test(msg)) return 'Gemini non risponde: serve la connessione a internet.';
+  return 'Gemini non è riuscito a generare la voce (' + msg + ').';
+}
+// Gemini legge a blocchi di più frasi: meno richieste, intonazione più naturale
+const chunkCache = new Map();
+function chunksFor(sec){
+  const ck = state.key + '|' + sec;
+  if(chunkCache.has(ck)) return chunkCache.get(ck);
+  const ss = state.sections[sec].sentences, out = [];
+  let cur = null;
+  ss.forEach((x, i) => {
+    const len = x.t.length + 1;
+    if(cur && (cur.len >= 1100 || (cur.len >= 600 && x.p))){ out.push(cur); cur = null; }
+    if(!cur) cur = { sec, start: i, end: i, cum: [], len: 0 };
+    cur.cum.push(cur.len); cur.len += len; cur.end = i;
+  });
+  if(cur) out.push(cur);
+  chunkCache.set(ck, out);
+  return out;
+}
+function chunkAt(sec, idx){ return chunksFor(sec).find(c => idx >= c.start && idx <= c.end); }
+function chunkKey(c){ return `${state.piperVoice}|${state.key}|${c.sec}|c${c.start}-${c.end}`; }
+function chunkText(c){ return state.sections[c.sec].sentences.slice(c.start, c.end + 1).map(x => x.t).join(' '); }
+function upcomingChunks(n){
+  const list = []; let c = chunkAt(state.sec, state.idx);
+  while(c && list.length < n){
+    list.push({ key: chunkKey(c), text: chunkText(c), chunk: c });
+    const arr = chunksFor(c.sec), i = arr.indexOf(c);
+    c = i < arr.length - 1 ? arr[i + 1] : (c.sec < state.sections.length - 1 ? chunksFor(c.sec + 1)[0] : null);
+  }
+  return list;
+}
+function seekInChunk(c){
+  if(!audio.duration || !isFinite(audio.duration)) return;
+  const j = state.idx - c.start;
+  audio.currentTime = j > 0 ? audio.duration * (c.cum[j] / c.len) : 0;
+}
+// durante l'ascolto segue l'audio ed evidenzia la frase giusta
+audio.addEventListener('timeupdate', () => {
+  const c = state.curChunk;
+  if(!isGem() || !c || audio.dataset.key !== chunkKey(c) || !audio.duration) return;
+  const pos = audio.currentTime / audio.duration * c.len;
+  let j = 0; while(j + 1 < c.cum.length && c.cum[j + 1] <= pos) j++;
+  if(c.start + j !== state.idx && c.sec === state.sec){ state.idx = c.start + j; refreshPosition(false); savePos(); }
+});
+
 function lookahead(){
   const g = gIndex();
   if(state.prepareTo != null && state.prepareTo > g) return Math.min(3000, state.prepareTo - g + 1);
   return MEM_AHEAD;
 }
 function upcoming(n){
+  if(isGem()){
+    // blocchi: 4 in anticipo, o fino al punto da preparare
+    let k = 4;
+    if(state.prepareTo != null){ const p = fromG(state.prepareTo); const u = upcomingChunks(400); const i = u.findIndex(x => x.chunk.sec === p.sec && p.idx <= x.chunk.end); k = i >= 0 ? i + 1 : u.length; }
+    return upcomingChunks(k);
+  }
   const list = []; let sec = state.sec, idx = state.idx;
   for(let i = 0; i < n; i++){
     const s = state.sections[sec]; if(!s) break;
@@ -649,6 +803,16 @@ async function piperSpeakCurrent(fromAdvance){
   if(!list.length){ stop(); return; }
   const key = list[0].key;
   want(list);
+  if(isGem()){
+    state.curChunk = list[0].chunk;
+    // stessa parte già caricata: mi sposto solo al punto giusto
+    if(audio.dataset.key === key && audio.duration){
+      seekInChunk(state.curChunk); refreshPosition(true); savePos(); updateMedia();
+      audio.playbackRate = state.rate;
+      if(state.playing) audio.play().catch(() => {});
+      return;
+    }
+  }
   refreshPosition(true); savePos(); updateMedia();
   const en = entries.get(key);
   const stalled = !!(en && en.st !== 'ready' && en.st !== 'stored');
@@ -666,24 +830,31 @@ async function piperSpeakCurrent(fromAdvance){
     const url = await waitFor(key);
     // dopo un'interruzione riparto solo con qualche frase già pronta, così non si ferma a ogni frase
     if(stalled && fromAdvance && list.length > 1){
-      try{ await waitFor(list[Math.min(3, list.length - 1)].key); }catch(e){}
+      try{ await waitFor(list[Math.min(isGem() ? 1 : 3, list.length - 1)].key); }catch(e){}
     }
     if(g !== state.gen || !state.playing) return;
     setStatus('');
     audio.src = url; audio.dataset.key = key;
     audio.playbackRate = state.rate;
     audio.preservesPitch = true; audio.webkitPreservesPitch = true;
+    if(isGem() && state.idx > state.curChunk.start){
+      await new Promise(res => { if(audio.readyState >= 1) res(); else { audio.addEventListener('loadedmetadata', res, { once: true }); setTimeout(res, 3000); } });
+      seekInChunk(state.curChunk);
+    }
     await audio.play();
   }catch(err){
     if(g !== state.gen || err.message === 'skip') return;
     if(err.name === 'NotAllowedError'){ stop(); setStatus('Tocca play per continuare.'); return; }
     stop();
-    setStatus('Non riesco a generare la voce. Controlla la connessione per il primo download, oppure scegli una voce dell\'iPhone.', true);
+    if(isGem()) setStatus(gemErrorText(err.message || ''), true);
+    else setStatus('Non riesco a generare la voce. Controlla la connessione per il primo download, oppure scegli una voce dell\'iPhone.', true);
   }
 }
 audio.onended = () => {
   if(audio.src === silenceUrl) return;
-  if(state.playing && state.engine === 'piper') advance();
+  if(!state.playing || state.engine !== 'piper') return;
+  if(isGem() && state.curChunk){ state.sec = state.curChunk.sec; state.idx = state.curChunk.end; }
+  advance();
 };
 
 /* ---------- voci di sistema ---------- */
@@ -727,8 +898,10 @@ function stop(){
 function play(){
   if(!state.total) return;
   state.playing = true; updatePlay(); requestWake();
-  const key = `${state.piperVoice}|${state.key}|${state.sec}|${state.idx}`;
+  const ch = isGem() ? chunkAt(state.sec, state.idx) : null;
+  const key = ch ? chunkKey(ch) : `${state.piperVoice}|${state.key}|${state.sec}|${state.idx}`;
   if(state.engine === 'piper' && audio.dataset.key === key && audio.currentTime > 0 && !audio.ended){
+    if(ch) state.curChunk = ch;
     state.gen++;
     audio.playbackRate = state.rate;
     audio.play().catch(() => piperSpeakCurrent());
@@ -794,7 +967,7 @@ function updatePlay(){
   updateRowButtons();
 }
 function voiceName(){
-  if(state.engine === 'piper'){ const v = PIPER_VOICES.find(x => x.id === state.piperVoice); return v ? v.name : ''; }
+  if(state.engine === 'piper'){ const v = PIPER_VOICES.find(x => x.id === state.piperVoice) || GEM_VOICES.find(x => x.id === state.piperVoice); return v ? v.name : ''; }
   return state.sysVoice ? state.sysVoice.name.replace(/\s*\(.*\)\s*/, '') : 'iPhone';
 }
 function refreshPosition(scrollText){
@@ -1222,6 +1395,7 @@ async function previewVoice(kind, id){
     speechSynthesis.speak(u);
     return;
   }
+  if(isGemId(id) && !store.get('gemKey')){ setStatus('Per le voci Gemini inserisci prima la chiave gratuita, qui sopra.', true); return; }
   unlockAudio();
   const g = state.gen;
   const key = `${id}|anteprima|0|0`;
@@ -1234,17 +1408,18 @@ async function previewVoice(kind, id){
     audio.src = url; audio.dataset.key = key; audio.playbackRate = state.rate;
     await audio.play();
   }catch(e){
-    if(e.message !== 'skip') setStatus('Anteprima non riuscita. Controlla la connessione per il primo download.', true);
+    if(e.message !== 'skip') setStatus(isGemId(id) ? gemErrorText(e.message || '') : 'Anteprima non riuscita. Controlla la connessione per il primo download.', true);
   }
 }
 function selectVoice(kind, id){
   const wasPlaying = state.playing;
   if(wasPlaying) stop();
   state.prepareTo = null;
+  if(kind === 'piper' && isGemId(id) && !store.get('gemKey')){ setStatus('Per le voci Gemini inserisci prima la chiave gratuita.', true); if(wasPlaying){ unlockAudio(); play(); } return; }
   if(kind === 'piper'){
     state.engine = 'piper'; state.piperVoice = id;
     audio.removeAttribute('data-key');
-    if(!voiceReady(id)){
+    if(!isGemId(id) && !voiceReady(id)){
       const v = PIPER_VOICES.find(x => x.id === id);
       setStatus(`La voce ${v.name} va scaricata una volta (${v.size}). Il download parte ora.`, false, true);
       wk(id).postMessage({ type: 'prepare', voiceId: id });
@@ -1270,8 +1445,44 @@ function voiceRow(label, sub, selected, onPick, onTry){
 function openVoiceSheet(){
   const body = sheetKind === 'voice' ? $('sheetBody') : openSheet('voice', 'Voce', true);
   const scroll = body.scrollTop; body.textContent = '';
-  body.appendChild(el('div', 'groupLabel', 'Voci naturali'));
-  body.appendChild(el('p', 'hint', 'Generate sul telefono, gratis e offline dopo il primo download. Kokoro suona meglio ma è più pesante.'));
+  // Google Gemini
+  body.appendChild(el('div', 'groupLabel', 'Google Gemini'));
+  body.appendChild(el('p', 'hint', 'Le più naturali: capiscono il contesto, le domande e i dialoghi. Gratis con una chiave Google personale, entro un limite giornaliero. Servono internet e l\'invio del testo a Google, che nel piano gratuito può usarlo per migliorare i suoi servizi.'));
+  if(!store.get('gemKey')){
+    const steps = el('p', 'hint');
+    steps.append('Per attivarle: apri ');
+    const a = el('a', null, 'Google AI Studio'); a.href = 'https://aistudio.google.com/apikey'; a.target = '_blank'; a.rel = 'noopener'; a.style.color = 'var(--accent)';
+    steps.append(a, ', accedi con il tuo account Google, tocca Crea chiave API, copiala e incollala qui sotto. La chiave resta solo su questo telefono.');
+    const lab = el('label', 'sr', 'Chiave API di Google Gemini'); lab.htmlFor = 'gemKeyIn';
+    const inp = el('input', 'keyIn'); inp.id = 'gemKeyIn'; inp.type = 'password'; inp.autocomplete = 'off'; inp.placeholder = 'Incolla la chiave API';
+    const save = el('button', 'smallBtn', 'Salva chiave');
+    save.onclick = () => {
+      const v = inp.value.trim();
+      if(v.length < 20){ setStatus('La chiave sembra incompleta: copiala di nuovo per intero.', true); return; }
+      store.set('gemKey', v); setStatus('Chiave salvata. Scegli una voce Gemini e tocca Prova.');
+      openVoiceSheet();
+    };
+    const row = el('div', 'keyRow'); row.append(inp, save);
+    body.append(steps, lab, row);
+  } else {
+    GEM_VOICES.forEach(v => {
+      const sel = state.engine === 'piper' && state.piperVoice === v.id;
+      body.appendChild(voiceRow(v.name, 'Voce ' + v.desc, sel, () => selectVoice('piper', v.id), () => previewVoice('piper', v.id)));
+    });
+    body.appendChild(el('div', 'groupLabel', 'Stile di lettura Gemini'));
+    const pre = el('div', 'presets'); pre.style.gridTemplateColumns = 'repeat(3,minmax(0,1fr))';
+    Object.entries(GEM_STYLES).forEach(([k, st]) => {
+      const b = el('button', null, st.label); b.setAttribute('aria-pressed', (prefs.gemStyle || 'narrativa') === k ? 'true' : 'false');
+      b.onclick = () => { prefs.gemStyle = k; store.set('prefs', prefs); openVoiceSheet(); setStatus('Stile salvato: vale per le parti non ancora preparate.'); };
+      pre.appendChild(b);
+    });
+    body.appendChild(pre);
+    const rm = el('button', 'smallBtn', 'Rimuovi chiave');
+    rm.onclick = () => { if(!confirm('Rimuovere la chiave Gemini da questo telefono?')) return; store.del('gemKey'); if(isGem()) selectVoice('piper', PIPER_VOICES[0].id); openVoiceSheet(); };
+    body.appendChild(rm);
+  }
+  body.appendChild(el('div', 'groupLabel', 'Voci sul telefono'));
+  body.appendChild(el('p', 'hint', 'Generate sul telefono, gratis e offline dopo il primo download. Kokoro suona meglio di Piper ma è più pesante. Supertonic è nuova e sperimentale: file grandi, da provare in Wi-Fi.'));
   PIPER_VOICES.forEach(v => {
     const sel = state.engine === 'piper' && state.piperVoice === v.id;
     const r = rtfOf(v.id);
@@ -1385,7 +1596,7 @@ function restoreVoice(){
   if(pv.startsWith('sys:') && 'speechSynthesis' in window){
     const v = speechSynthesis.getVoices().find(x => x.voiceURI === pv.slice(4));
     if(v){ state.engine = 'sys'; state.sysVoice = v; }
-  } else if(pv.startsWith('piper:') && PIPER_VOICES.some(v => v.id === pv.slice(6))){
+  } else if(pv.startsWith('piper:') && (PIPER_VOICES.some(v => v.id === pv.slice(6)) || (isGemId(pv.slice(6)) && store.get('gemKey')))){
     state.engine = 'piper'; state.piperVoice = pv.slice(6);
   }
   $('voiceLabel').textContent = voiceName();
