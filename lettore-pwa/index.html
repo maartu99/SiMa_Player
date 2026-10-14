@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Lettore</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Lettore">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#EEF1F4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#121921" media="(prefers-color-scheme: dark)">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+:root{
+  --bg:#EEF1F4; --surface:#FFFFFF; --ink:#1E2A3A; --muted:#5E6B7A; --line:#D3DAE2;
+  --accent:#2F6F62; --accent-ink:#FFFFFF; --mark:#F6DC7A; --mark-ink:#1E2A3A; --err:#A23B2C;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#121921; --surface:#1A232E; --ink:#E4E9EE; --muted:#93A0AE; --line:#2A3542;
+    --accent:#7CC0AE; --accent-ink:#0F1A17; --mark:#5E5020; --mark-ink:#FFF4CC; --err:#E58A7B;
+    color-scheme: dark;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink)}
+body{font-family:-apple-system,system-ui,"Segoe UI",Roboto,sans-serif;font-size:16px;padding-bottom:190px}
+button,select,input{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+header{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line);
+  padding:calc(env(safe-area-inset-top) + 12px) 18px 12px;display:flex;gap:12px;align-items:center}
+#bookTitle{flex:1;margin:0;font-family:ui-serif,"New York",Georgia,serif;font-weight:600;font-size:1.15rem;
+  line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ghost{background:transparent;border:1px solid var(--line);border-radius:999px;padding:8px 14px;color:var(--ink)}
+#sectionRow{padding:12px 18px 0;max-width:40rem;margin:0 auto}
+#sectionSel{width:100%;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+
+main{max-width:40rem;margin:0 auto;padding:8px 18px 24px}
+#text p{font-family:ui-serif,"New York",Georgia,serif;font-size:1.18rem;line-height:1.75;margin:0 0 1em;hyphens:auto}
+.s{cursor:pointer;border-radius:3px;-webkit-box-decoration-break:clone;box-decoration-break:clone;transition:background .2s}
+.s.on{background:var(--mark);color:var(--mark-ink);padding:1px 0}
+@media (prefers-reduced-motion: reduce){.s{transition:none}}
+
+#empty{max-width:30rem;margin:12vh auto 0;padding:0 24px}
+#empty h2{font-family:ui-serif,"New York",Georgia,serif;font-size:1.9rem;line-height:1.2;font-weight:600;margin:0 0 .6em}
+#empty p{color:var(--muted);line-height:1.55;margin:0 0 1.4em}
+.primary{background:var(--accent);color:var(--accent-ink);border:0;border-radius:999px;padding:13px 22px;font-weight:600}
+
+#status{max-width:40rem;margin:12px auto 0;padding:0 18px;color:var(--muted);font-size:.92rem;min-height:1.2em}
+#status.err{color:var(--err)}
+
+#player{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--surface);border-top:1px solid var(--line);
+  padding:12px 18px calc(env(safe-area-inset-bottom) + 12px)}
+.wrap{max-width:40rem;margin:0 auto}
+#info{font-size:.85rem;color:var(--muted);margin-bottom:10px;display:flex;justify-content:space-between;gap:8px}
+#info span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.controls{display:grid;grid-template-columns:1fr 1.4fr 1fr;gap:10px;align-items:center}
+.controls .ghost{padding:12px 8px}
+#playBtn{padding:14px}
+.settings{display:grid;grid-template-columns:1.5fr 1fr;gap:12px;margin-top:12px;align-items:end}
+.settings label{display:block;font-size:.8rem;color:var(--muted);margin-bottom:4px}
+.voiceRow{display:flex;gap:6px}
+#voiceSel{flex:1;min-width:0;width:100%;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+#previewBtn{padding:8px 10px;border-radius:10px;white-space:nowrap}
+#rate{width:100%;accent-color:var(--accent)}
+button:disabled{opacity:.4;cursor:default}
+.hidden{display:none !important}
+</style>
+</head>
+<body>
+
+<header>
+  <h1 id="bookTitle">Lettore</h1>
+  <button class="ghost" id="openBtn">Apri file</button>
+  <input type="file" id="file" accept=".pdf,.epub,application/pdf,application/epub+zip" hidden>
+</header>
+
+<div id="status" role="status" aria-live="polite"></div>
+
+<section id="empty">
+  <h2>Apri un PDF o un EPUB e ascoltalo.</h2>
+  <p>Il testo viene letto frase per frase. Le voci Paola e Riccardo si scaricano una sola volta, poi funzionano anche offline. Tocca una frase per ripartire da lì: la posizione viene salvata e riaprendo lo stesso file riprendi da dove eri.</p>
+  <button class="primary" id="emptyOpen">Scegli un file</button>
+</section>
+
+<div id="sectionRow" class="hidden">
+  <select id="sectionSel" aria-label="Vai a"></select>
+</div>
+<main id="reader" class="hidden"><div id="text"></div></main>
+
+<div id="player">
+  <div class="wrap">
+    <div id="info"><span id="infoLeft">Nessun file aperto</span><span id="infoRight"></span></div>
+    <div class="controls">
+      <button class="ghost" id="prevBtn" disabled>Indietro</button>
+      <button class="primary" id="playBtn" disabled>Leggi</button>
+      <button class="ghost" id="nextBtn" disabled>Avanti</button>
+    </div>
+    <div class="settings">
+      <div>
+        <label for="voiceSel">Voce</label>
+        <div class="voiceRow">
+          <select id="voiceSel"></select>
+          <button class="ghost" id="previewBtn">Prova</button>
+        </div>
+      </div>
+      <div>
+        <label for="rate">Velocità <span id="rateVal">1.0x</span></label>
+        <input type="range" id="rate" min="0.6" max="2" step="0.1" value="1">
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+}
+
+const $ = id => document.getElementById(id);
+const PIPER_VOICES = [
+  { id: 'it_IT-paola-medium', name: 'Paola (naturale)', size: 'circa 60 MB' },
+  { id: 'it_IT-riccardo-x_low', name: 'Riccardo (naturale, leggera)', size: 'circa 20 MB' }
+];
+const state = {
+  sections: [], sec: 0, idx: 0, playing: false, gen: 0, key: null, isPdf: false,
+  rate: 1, engine: 'piper', piperVoice: PIPER_VOICES[0].id, sysVoice: null,
+  charPos: 0, boundarySeen: false
+};
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+let wakeLock = null;
+
+/* ---------- storage locale ---------- */
+const store = {
+  get(k){ try{ const v = localStorage.getItem('lettore:' + k); return v ? JSON.parse(v) : null; }catch(e){ return null; } },
+  set(k, v){ try{ localStorage.setItem('lettore:' + k, JSON.stringify(v)); }catch(e){} }
+};
+let prefs = store.get('prefs') || {};
+let saveTimer = null;
+function saveSoon(){
+  if(!state.key || saveTimer) return;
+  saveTimer = setTimeout(() => { saveTimer = null; savePos(); }, 3000);
+}
+function savePos(){ if(state.key) store.set('pos:' + state.key, { sec: state.sec, idx: state.idx }); }
+function hash(str){ let h = 0; for(let i = 0; i < str.length; i++){ h = (h * 31 + str.charCodeAt(i)) | 0; } return Math.abs(h).toString(36); }
+function savePrefs(){
+  prefs.rate = state.rate;
+  prefs.voice = state.engine === 'piper' ? 'piper:' + state.piperVoice : 'sys:' + (state.sysVoice ? state.sysVoice.voiceURI : '');
+  store.set('prefs', prefs);
+}
+
+function setStatus(msg, isErr){ const s = $('status'); s.textContent = msg || ''; s.classList.toggle('err', !!isErr); }
+
+/* ---------- motore Piper (worker + audio) ---------- */
+const audio = new Audio();
+audio.preload = 'auto';
+audio.setAttribute('playsinline', '');
+audio.preservesPitch = true; audio.webkitPreservesPitch = true;
+
+const worker = new Worker('tts-worker.js');
+const entries = new Map();   // chiave -> { st, text, url, res: [] }
+const inflight = new Map();  // id richiesta -> chiave
+let wanted = [];
+let busy = false;
+let reqId = 0;
+let readyVoices = new Set(store.get('readyVoices') || []);
+
+worker.onmessage = e => {
+  const m = e.data;
+  if(m.type === 'progress'){
+    const v = PIPER_VOICES.find(x => x.id === m.voiceId);
+    setStatus(`Scarico la voce ${v ? v.name.split(' ')[0] : ''}: ${Math.round(m.loaded * 100 / m.total)}%. Serve solo la prima volta.`);
+    return;
+  }
+  if(m.type === 'ready'){
+    readyVoices.add(m.voiceId); store.set('readyVoices', [...readyVoices]);
+    buildVoiceList();
+    if(!state.playing) setStatus('Voce pronta.');
+    return;
+  }
+  if(m.type === 'result' || m.type === 'error'){
+    busy = false;
+    const key = inflight.get(m.id); inflight.delete(m.id);
+    const en = key && entries.get(key);
+    if(en){
+      if(m.type === 'result'){
+        en.st = 'ready'; en.url = URL.createObjectURL(m.blob);
+        en.res.forEach(r => r.resolve(en.url));
+        const vid = key.split('|')[0];
+        if(!readyVoices.has(vid)){ readyVoices.add(vid); store.set('readyVoices', [...readyVoices]); buildVoiceList(); }
+      } else {
+        en.st = 'error'; en.err = m.message;
+        en.res.forEach(r => r.reject(new Error(m.message)));
+      }
+      en.res = [];
+    }
+    if(m.type === 'error' && !key) setStatus('Non riesco a preparare la voce. Controlla la connessione e riprova.', true);
+    pump();
+  }
+};
+worker.onerror = () => { busy = false; setStatus('Il motore vocale si è fermato. Ricarica l\'app.', true); };
+
+function want(list, keepKey){
+  wanted = list;
+  for(const it of list) if(!entries.has(it.key)) entries.set(it.key, { st: 'queued', text: it.text, res: [] });
+  const keep = new Set(list.map(x => x.key)); if(keepKey) keep.add(keepKey);
+  for(const [k, en] of entries){
+    if(keep.has(k) || en.st === 'working') continue;
+    if(en.url) URL.revokeObjectURL(en.url);
+    en.res.forEach(r => r.reject(new Error('skip')));
+    entries.delete(k);
+  }
+  pump();
+}
+function pump(){
+  if(busy) return;
+  const next = wanted.find(it => { const en = entries.get(it.key); return en && en.st === 'queued'; });
+  if(!next) return;
+  const en = entries.get(next.key); en.st = 'working'; busy = true;
+  const id = ++reqId; inflight.set(id, next.key);
+  worker.postMessage({ type: 'predict', id, voiceId: next.key.split('|')[0], text: en.text });
+}
+function waitFor(key){
+  const en = entries.get(key);
+  if(!en) return Promise.reject(new Error('skip'));
+  if(en.st === 'ready') return Promise.resolve(en.url);
+  if(en.st === 'error') return Promise.reject(new Error(en.err || 'errore'));
+  return new Promise((resolve, reject) => en.res.push({ resolve, reject }));
+}
+
+// iOS permette l'audio solo dopo un tocco: sblocca l'elemento con un istante di silenzio
+let silenceUrl = null;
+function unlockAudio(){
+  if(!silenceUrl){
+    const n = 2400, buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
+    const w = (o, s) => { for(let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+    w(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); w(8, 'WAVE'); w(12, 'fmt ');
+    v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+    v.setUint32(24, 24000, true); v.setUint32(28, 48000, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+    w(36, 'data'); v.setUint32(40, n * 2, true);
+    silenceUrl = URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
+  }
+  if(audio.dataset.key) return; // già sbloccato e in uso
+  audio.src = silenceUrl;
+  audio.play().catch(() => {});
+}
+
+let currentKey = null;
+function upcoming(n){
+  const list = []; let sec = state.sec, idx = state.idx;
+  for(let i = 0; i < n; i++){
+    const s = state.sections[sec]; if(!s) break;
+    const it = s.sentences[idx]; if(!it) break;
+    list.push({ key: `${state.piperVoice}|${sec}|${idx}`, text: it.t });
+    idx++; if(idx >= s.sentences.length){ sec++; idx = 0; }
+  }
+  return list;
+}
+async function piperSpeakCurrent(){
+  const g = ++state.gen;
+  audio.pause();
+  const list = upcoming(4);
+  if(!list.length){ stop(); return; }
+  const key = list[0].key; currentKey = key;
+  want(list);
+  highlight(true); saveSoon(); updateMedia();
+  const en = entries.get(key);
+  if(en && en.st !== 'ready'){
+    setStatus(readyVoices.has(state.piperVoice) ? 'Preparo la voce...' : 'Preparo la voce. La prima volta va scaricata, può richiedere qualche minuto.');
+  }
+  try{
+    const url = await waitFor(key);
+    if(g !== state.gen || !state.playing) return;
+    setStatus('');
+    audio.src = url; audio.dataset.key = key;
+    audio.playbackRate = state.rate;
+    audio.preservesPitch = true; audio.webkitPreservesPitch = true;
+    await audio.play();
+  }catch(err){
+    if(g !== state.gen || err.message === 'skip') return;
+    if(err.name === 'NotAllowedError'){ stop(); setStatus('Tocca Leggi per continuare.'); return; }
+    stop();
+    setStatus('Non riesco a generare la voce. Controlla la connessione per il primo download, oppure scegli una voce dell\'iPhone.', true);
+  }
+}
+audio.onended = () => {
+  if(audio.src === silenceUrl) return;
+  if(state.playing && state.engine === 'piper') advance();
+};
+
+/* ---------- motore voci di sistema ---------- */
+function sysSpeak(offset = 0){
+  const g = ++state.gen;
+  const s = state.sections[state.sec];
+  const item = s && s.sentences[state.idx];
+  if(!item){ stop(); return; }
+  state.charPos = offset; state.boundarySeen = false;
+  const u = new SpeechSynthesisUtterance(item.t.slice(offset));
+  u.onboundary = e => { if(g !== state.gen) return; state.boundarySeen = true; state.charPos = offset + (e.charIndex || 0); };
+  u.lang = state.sysVoice ? state.sysVoice.lang : 'it-IT';
+  if(state.sysVoice) u.voice = state.sysVoice;
+  u.rate = state.rate;
+  u.onend = () => { if(g === state.gen && state.playing) advance(); };
+  u.onerror = e => {
+    if(g !== state.gen || e.error === 'interrupted' || e.error === 'canceled') return;
+    if(state.playing) advance();
+  };
+  const wasBusy = speechSynthesis.speaking || speechSynthesis.pending;
+  speechSynthesis.cancel();
+  if(wasBusy) setTimeout(() => { if(g === state.gen) speechSynthesis.speak(u); }, 80);
+  else speechSynthesis.speak(u);
+  highlight(offset === 0); saveSoon(); updateMedia();
+}
+
+/* ---------- controllo lettura ---------- */
+function speakCurrent(){ if(state.engine === 'piper') piperSpeakCurrent(); else sysSpeak(0); }
+function advance(){
+  const s = state.sections[state.sec];
+  if(state.idx < s.sentences.length - 1){ state.idx++; speakCurrent(); }
+  else if(state.sec < state.sections.length - 1){ state.sec++; state.idx = 0; renderSection(); speakCurrent(); }
+  else { stop(); setStatus('Fine del libro.'); }
+}
+function stop(){
+  state.playing = false; state.gen++;
+  if('speechSynthesis' in window) speechSynthesis.cancel();
+  audio.pause();
+  updatePlay(); savePos(); releaseWake();
+}
+function play(){
+  if(!state.sections.length) return;
+  state.playing = true; updatePlay(); requestWake();
+  const key = `${state.piperVoice}|${state.sec}|${state.idx}`;
+  // ripresa a metà frase con Piper
+  if(state.engine === 'piper' && audio.dataset.key === key && audio.currentTime > 0 && !audio.ended){
+    state.gen++;
+    audio.playbackRate = state.rate;
+    audio.play().catch(() => piperSpeakCurrent());
+    want(upcoming(4), key);
+    setStatus('');
+    return;
+  }
+  setStatus('');
+  speakCurrent();
+}
+function updatePlay(){
+  $('playBtn').textContent = state.playing ? 'Pausa' : 'Leggi';
+  if('mediaSession' in navigator) navigator.mediaSession.playbackState = state.playing ? 'playing' : 'paused';
+}
+async function requestWake(){ try{ if('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); }catch(e){} }
+function releaseWake(){ try{ if(wakeLock){ wakeLock.release(); wakeLock = null; } }catch(e){} }
+
+function move(delta){
+  let { sec, idx } = state;
+  idx += delta;
+  if(idx < 0){
+    if(sec > 0){ sec--; idx = state.sections[sec].sentences.length - 1; } else idx = 0;
+  } else if(idx >= state.sections[sec].sentences.length){
+    if(sec < state.sections.length - 1){ sec++; idx = 0; } else idx = state.sections[sec].sentences.length - 1;
+  }
+  const changed = sec !== state.sec;
+  state.sec = sec; state.idx = idx;
+  if(changed) renderSection();
+  if(state.playing) speakCurrent();
+  else { highlight(true); saveSoon(); if(state.engine === 'piper') want(upcoming(3)); }
+}
+
+/* ---------- schermata blocco e cuffie ---------- */
+function updateMedia(){
+  if(!('mediaSession' in navigator) || !state.sections.length) return;
+  try{
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: state.sections[state.sec].title,
+      artist: $('bookTitle').textContent,
+      artwork: [{ src: 'icon-512.png', sizes: '512x512', type: 'image/png' }]
+    });
+  }catch(e){}
+}
+if('mediaSession' in navigator){
+  const ms = navigator.mediaSession;
+  try{
+    ms.setActionHandler('play', () => { unlockAudio(); play(); });
+    ms.setActionHandler('pause', () => stop());
+    ms.setActionHandler('nexttrack', () => move(1));
+    ms.setActionHandler('previoustrack', () => move(-1));
+  }catch(e){}
+}
+
+/* ---------- estrazione testo ---------- */
+function splitSentences(text){
+  text = text.replace(/\s+/g, ' ').trim();
+  if(!text) return [];
+  let parts = [];
+  if(window.Intl && Intl.Segmenter){
+    const seg = new Intl.Segmenter('it', { granularity: 'sentence' });
+    for(const s of seg.segment(text)) parts.push(s.segment.trim());
+  } else {
+    parts = text.match(/[^.!?…]+(?:[.!?…]+["»”’)]*|$)/g) || [text];
+  }
+  const out = [];
+  for(let p of parts){
+    p = p.trim(); if(!p) continue;
+    while(p.length > 280){
+      let cut = p.lastIndexOf(', ', 280);
+      if(cut < 80) cut = p.lastIndexOf(' ', 280);
+      if(cut < 1) cut = 280;
+      out.push(p.slice(0, cut + 1).trim());
+      p = p.slice(cut + 1).trim();
+    }
+    if(p) out.push(p);
+  }
+  return out;
+}
+function paragraphsToSentences(paras){
+  const out = [];
+  for(const p of paras){
+    splitSentences(p).forEach((t, i) => out.push({ t, p: i === 0 }));
+  }
+  return out;
+}
+
+/* ---------- PDF ---------- */
+async function loadPdf(buf){
+  const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+  const secs = [];
+  for(let i = 1; i <= pdf.numPages; i++){
+    setStatus(`Preparo la pagina ${i} di ${pdf.numPages}...`);
+    const page = await pdf.getPage(i);
+    const tc = await page.getTextContent();
+    const lines = []; let cur = '';
+    for(const it of tc.items){
+      cur += it.str;
+      if(it.hasEOL){ lines.push(cur); cur = ''; }
+    }
+    if(cur) lines.push(cur);
+    // ricostruisce i paragrafi: unisce le righe, toglie numeri di pagina e sillabazioni
+    const paras = []; let buf2 = '';
+    for(let l of lines){
+      l = l.trim();
+      if(!l){ if(buf2){ paras.push(buf2); buf2 = ''; } continue; }
+      if(/^\d{1,4}$/.test(l)) continue;
+      if(buf2.endsWith('-') && /^[a-zà-ÿ]/.test(l)) buf2 = buf2.slice(0, -1) + l;
+      else buf2 += (buf2 ? ' ' : '') + l;
+    }
+    if(buf2) paras.push(buf2);
+    secs.push({ title: `Pagina ${i}`, sentences: paragraphsToSentences(paras) });
+  }
+  return { secs, title: null };
+}
+
+/* ---------- EPUB ---------- */
+function resolvePath(base, href){
+  const out = [];
+  for(const p of (base + href).split('/')){
+    if(p === '..') out.pop(); else if(p !== '.' && p !== '') out.push(p);
+  }
+  return out.join('/');
+}
+async function loadEpub(buf){
+  const zip = await JSZip.loadAsync(buf);
+  const cf = zip.file('META-INF/container.xml');
+  if(!cf) throw new Error('EPUB non valido');
+  const cdoc = new DOMParser().parseFromString(await cf.async('string'), 'application/xml');
+  const opfPath = cdoc.getElementsByTagName('rootfile')[0].getAttribute('full-path');
+  const base = opfPath.includes('/') ? opfPath.slice(0, opfPath.lastIndexOf('/') + 1) : '';
+  const opf = new DOMParser().parseFromString(await zip.file(opfPath).async('string'), 'application/xml');
+  const manifest = {};
+  for(const it of opf.getElementsByTagName('item')) manifest[it.getAttribute('id')] = it.getAttribute('href');
+  const titleEl = opf.getElementsByTagName('dc:title')[0] || opf.getElementsByTagNameNS('*', 'title')[0];
+  const spine = [...opf.getElementsByTagName('itemref')];
+  const secs = []; let n = 0;
+  for(let k = 0; k < spine.length; k++){
+    setStatus(`Preparo la sezione ${k + 1} di ${spine.length}...`);
+    const href = manifest[spine[k].getAttribute('idref')];
+    if(!href) continue;
+    const f = zip.file(resolvePath(base, decodeURIComponent(href.split('#')[0])));
+    if(!f) continue;
+    const doc = new DOMParser().parseFromString(await f.async('string'), 'text/html');
+    if(!doc.body) continue;
+    doc.querySelectorAll('script,style,sup a,nav').forEach(e => e.remove());
+    doc.body.querySelectorAll('p,h1,h2,h3,h4,h5,h6,li,blockquote,div,br,tr,dt,dd')
+      .forEach(e => e.after(doc.createTextNode('\u2029')));
+    const paras = doc.body.textContent.split('\u2029').map(s => s.trim()).filter(Boolean);
+    const sentences = paragraphsToSentences(paras);
+    if(!sentences.length) continue;
+    n++;
+    const h = doc.querySelector('h1,h2,h3');
+    let t = h ? h.textContent.replace(/\s+/g, ' ').trim() : '';
+    if(t.length > 60) t = t.slice(0, 57) + '...';
+    secs.push({ title: t || `Sezione ${n}`, sentences });
+  }
+  return { secs, title: titleEl ? titleEl.textContent.trim() : null };
+}
+
+
+/* ---------- apertura file ---------- */
+async function openFile(file){
+  stop();
+  setStatus('Apro il file...');
+  try{
+    const buf = await file.arrayBuffer();
+    const isPdf = /\.pdf$/i.test(file.name) || file.type === 'application/pdf';
+    const isEpub = /\.epub$/i.test(file.name) || file.type === 'application/epub+zip';
+    if(!isPdf && !isEpub){ setStatus('Formato non supportato. Scegli un file PDF o EPUB.', true); return; }
+    const res = isPdf ? await loadPdf(buf) : await loadEpub(buf);
+    const secs = res.secs.filter(s => s.sentences.length);
+    if(!secs.length){
+      setStatus(isPdf
+        ? 'Questo PDF non contiene testo selezionabile: probabilmente è una scansione. Serve un\'app con riconoscimento del testo (OCR).'
+        : 'Non ho trovato testo leggibile in questo EPUB.', true);
+      return;
+    }
+    state.sections = secs; state.isPdf = isPdf; state.sec = 0; state.idx = 0;
+    state.key = hash(file.name + ':' + file.size);
+    audio.removeAttribute('data-key'); currentKey = null;
+    want([]);
+    $('bookTitle').textContent = res.title || file.name.replace(/\.(pdf|epub)$/i, '');
+    const sel = $('sectionSel'); sel.innerHTML = '';
+    secs.forEach((s, i) => { const o = document.createElement('option'); o.value = i; o.textContent = s.title; sel.appendChild(o); });
+    $('empty').classList.add('hidden');
+    $('reader').classList.remove('hidden');
+    $('sectionRow').classList.remove('hidden');
+    ['prevBtn', 'playBtn', 'nextBtn'].forEach(id => $(id).disabled = false);
+    const pos = store.get('pos:' + state.key);
+    if(pos && secs[pos.sec] && secs[pos.sec].sentences[pos.idx]){
+      state.sec = pos.sec; state.idx = pos.idx;
+      setStatus(`Riprendi da ${secs[pos.sec].title}. Premi Leggi.`);
+    } else {
+      setStatus('Pronto. Premi Leggi o tocca una frase.');
+    }
+    renderSection();
+    updateMedia();
+    if(state.engine === 'piper') want(upcoming(3));
+  }catch(e){
+    console.error(e);
+    setStatus('Non riesco ad aprire questo file. Potrebbe essere protetto o danneggiato.', true);
+  }
+}
+
+/* ---------- visualizzazione ---------- */
+function renderSection(){
+  const s = state.sections[state.sec];
+  const text = $('text'); text.innerHTML = '';
+  let p = null;
+  s.sentences.forEach((x, i) => {
+    if(x.p || !p){ p = document.createElement('p'); text.appendChild(p); }
+    const sp = document.createElement('span');
+    sp.className = 's'; sp.dataset.i = i; sp.textContent = x.t + ' ';
+    p.appendChild(sp);
+  });
+  $('sectionSel').value = state.sec;
+  highlight(true);
+}
+function highlight(scroll){
+  document.querySelectorAll('.s.on').forEach(e => e.classList.remove('on'));
+  const el = document.querySelector(`.s[data-i="${state.idx}"]`);
+  if(el){
+    el.classList.add('on');
+    if(scroll) el.scrollIntoView({ block: 'center', behavior: reduceMotion ? 'auto' : 'smooth' });
+  }
+  const s = state.sections[state.sec];
+  if(!s) return;
+  $('infoLeft').textContent = state.isPdf ? `${s.title} di ${state.sections.length}` : s.title;
+  $('infoRight').textContent = `Frase ${state.idx + 1} di ${s.sentences.length}`;
+}
+
+/* ---------- voci ---------- */
+function buildVoiceList(){
+  const sel = $('voiceSel'); sel.innerHTML = '';
+  const g1 = document.createElement('optgroup'); g1.label = 'Voci naturali';
+  PIPER_VOICES.forEach(v => {
+    const o = document.createElement('option'); o.value = 'piper:' + v.id;
+    o.textContent = v.name + (readyVoices.has(v.id) ? '' : ` - da scaricare, ${v.size}`);
+    g1.appendChild(o);
+  });
+  sel.appendChild(g1);
+  const all = 'speechSynthesis' in window ? speechSynthesis.getVoices() : [];
+  const it = all.filter(v => v.lang && v.lang.toLowerCase().startsWith('it'));
+  if(it.length){
+    const g2 = document.createElement('optgroup'); g2.label = 'Voci dell\'iPhone';
+    it.forEach(v => { const o = document.createElement('option'); o.value = 'sys:' + v.voiceURI; o.textContent = v.name; g2.appendChild(o); });
+    sel.appendChild(g2);
+  }
+  // ripristina la scelta
+  const pv = prefs.voice || 'piper:' + PIPER_VOICES[0].id;
+  if(pv.startsWith('sys:')){
+    const v = it.find(x => x.voiceURI === pv.slice(4));
+    if(v){ state.engine = 'sys'; state.sysVoice = v; sel.value = pv; return; }
+  }
+  if(pv.startsWith('piper:') && PIPER_VOICES.some(v => 'piper:' + v.id === pv)){ state.engine = 'piper'; state.piperVoice = pv.slice(6); sel.value = pv; return; }
+  state.engine = 'piper'; state.piperVoice = PIPER_VOICES[0].id; sel.value = 'piper:' + state.piperVoice;
+}
+function selectVoice(value){
+  const wasPlaying = state.playing;
+  if(wasPlaying) stop();
+  if(value.startsWith('piper:')){
+    state.engine = 'piper'; state.piperVoice = value.slice(6);
+    audio.removeAttribute('data-key');
+    const v = PIPER_VOICES.find(x => x.id === state.piperVoice);
+    if(!readyVoices.has(state.piperVoice)){
+      setStatus(`La voce ${v.name.split(' ')[0]} va scaricata una volta (${v.size}). Il download parte ora.`);
+      worker.postMessage({ type: 'prepare', voiceId: state.piperVoice });
+    }
+  } else {
+    state.engine = 'sys';
+    state.sysVoice = speechSynthesis.getVoices().find(x => x.voiceURI === value.slice(4)) || null;
+  }
+  savePrefs();
+  if(wasPlaying){ unlockAudio(); play(); }
+  else if(state.engine === 'piper' && state.sections.length) want(upcoming(3));
+}
+
+const SAMPLE = 'Ciao, questa è la voce che leggerà il tuo libro. Puoi cambiare la velocità in qualsiasi momento.';
+async function preview(){
+  if(state.playing){ stop(); setStatus('In pausa.'); }
+  state.gen++;
+  if(state.engine === 'sys'){
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(SAMPLE);
+    u.lang = state.sysVoice ? state.sysVoice.lang : 'it-IT';
+    if(state.sysVoice) u.voice = state.sysVoice;
+    u.rate = state.rate;
+    speechSynthesis.speak(u);
+    return;
+  }
+  unlockAudio();
+  const g = state.gen;
+  const key = `${state.piperVoice}|anteprima|0`;
+  want([{ key, text: SAMPLE }]);
+  if(!readyVoices.has(state.piperVoice)) setStatus('Preparo la voce per l\'anteprima...');
+  try{
+    const url = await waitFor(key);
+    if(g !== state.gen) return;
+    setStatus('');
+    audio.src = url; audio.dataset.key = key; audio.playbackRate = state.rate;
+    await audio.play();
+    buildVoiceList();
+  }catch(e){
+    if(e.message !== 'skip') setStatus('Anteprima non riuscita. Controlla la connessione per il primo download.', true);
+  }
+}
+
+/* ---------- eventi ---------- */
+$('openBtn').onclick = () => $('file').click();
+$('emptyOpen').onclick = () => $('file').click();
+$('file').onchange = e => { const f = e.target.files[0]; if(f) openFile(f); e.target.value = ''; };
+$('playBtn').onclick = () => {
+  if(!state.sections.length) return;
+  if(state.playing){ stop(); setStatus('In pausa.'); }
+  else { unlockAudio(); play(); }
+};
+$('prevBtn').onclick = () => move(-1);
+$('nextBtn').onclick = () => move(1);
+$('sectionSel').onchange = e => {
+  state.sec = +e.target.value; state.idx = 0; renderSection();
+  if(state.playing) speakCurrent(); else { saveSoon(); if(state.engine === 'piper') want(upcoming(3)); }
+};
+$('text').onclick = e => {
+  const el = e.target.closest('.s'); if(!el) return;
+  state.idx = +el.dataset.i;
+  if(state.playing) speakCurrent();
+  else { highlight(false); saveSoon(); if(state.engine === 'piper') want(upcoming(3)); }
+};
+$('voiceSel').onchange = e => selectVoice(e.target.value);
+$('previewBtn').onclick = preview;
+$('rate').oninput = e => {
+  state.rate = +e.target.value;
+  $('rateVal').textContent = state.rate.toFixed(1) + 'x';
+  if(state.engine === 'piper') audio.playbackRate = state.rate; // cambia al volo, senza ricominciare
+};
+$('rate').onchange = () => {
+  savePrefs();
+  if(state.engine === 'sys' && state.playing && state.boundarySeen) sysSpeak(state.charPos);
+};
+document.addEventListener('visibilitychange', () => {
+  if(document.visibilityState === 'visible' && state.playing) requestWake();
+  if(document.visibilityState === 'hidden') savePos();
+});
+
+/* ---------- avvio ---------- */
+if(prefs.rate){ state.rate = prefs.rate; $('rate').value = prefs.rate; $('rateVal').textContent = (+prefs.rate).toFixed(1) + 'x'; }
+buildVoiceList();
+if('speechSynthesis' in window) speechSynthesis.onvoiceschanged = buildVoiceList;
+if(state.engine === 'piper' && readyVoices.has(state.piperVoice)) worker.postMessage({ type: 'prepare', voiceId: state.piperVoice });
+</script>
+</body>
+</html>
