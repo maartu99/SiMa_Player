@@ -1,12 +1,12 @@
 {
-  "name": "Lettore ad alta voce",
-  "short_name": "Lettore",
+  "name": "SiMa Player",
+  "short_name": "SiMa Player",
   "lang": "it",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#EEF1F4",
-  "theme_color": "#2F6F62",
+  "background_color": "#10151B",
+  "theme_color": "#10151B",
   "icons": [
     { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
