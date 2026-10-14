@@ -1,6 +1,6 @@
 // Service worker: rende l'app installabile e utilizzabile offline.
 // File dell'app: aggiornati in background. Librerie e voci: salvate dopo il primo download.
-const CORE = 'lettore-core-v1';
+const CORE = 'lettore-core-v2';
 const RUNTIME = 'lettore-runtime-v1';
 const CORE_FILES = ['./', './index.html', './tts-worker.js', './manifest.webmanifest',
   './icon-192.png', './icon-512.png', './apple-touch-icon.png'];

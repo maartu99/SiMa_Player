@@ -72,12 +72,20 @@ main{max-width:40rem;margin:0 auto;padding:8px 18px 24px}
 #rate{width:100%;accent-color:var(--accent)}
 button:disabled{opacity:.4;cursor:default}
 .hidden{display:none !important}
+#library{margin-top:2.2em}
+#library h3{font-family:ui-serif,"New York",Georgia,serif;font-weight:600;font-size:1.2rem;margin:0 0 .7em}
+.book{display:flex;gap:8px;align-items:stretch;margin-bottom:8px}
+.bookOpen{flex:1;min-width:0;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:3px}
+.bookTitle{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bookMeta{font-size:.85rem;color:var(--muted)}
+.bookDel{border-radius:12px;font-size:.85rem}
 </style>
 </head>
 <body>
 
 <header>
   <h1 id="bookTitle">Lettore</h1>
+  <button class="ghost hidden" id="libBtn">Libreria</button>
   <button class="ghost" id="openBtn">Apri file</button>
   <input type="file" id="file" accept=".pdf,.epub,application/pdf,application/epub+zip" hidden>
 </header>
@@ -86,8 +94,9 @@ button:disabled{opacity:.4;cursor:default}
 
 <section id="empty">
   <h2>Apri un PDF o un EPUB e ascoltalo.</h2>
-  <p>Il testo viene letto frase per frase. Le voci Paola e Riccardo si scaricano una sola volta, poi funzionano anche offline. Tocca una frase per ripartire da lì: la posizione viene salvata e riaprendo lo stesso file riprendi da dove eri.</p>
+  <p>Il testo viene letto frase per frase. Le voci Paola e Riccardo si scaricano una sola volta, poi funzionano anche offline. I libri che apri restano salvati qui: riaprendo l'app riprendi dalla frase in cui eri.</p>
   <button class="primary" id="emptyOpen">Scegli un file</button>
+  <div id="library" class="hidden"></div>
 </section>
 
 <div id="sectionRow" class="hidden">
@@ -145,11 +154,39 @@ const store = {
 };
 let prefs = store.get('prefs') || {};
 let saveTimer = null;
-function saveSoon(){
-  if(!state.key || saveTimer) return;
-  saveTimer = setTimeout(() => { saveTimer = null; savePos(); }, 3000);
+function saveSoon(){ savePos(); }
+function savePos(){
+  if(!state.key) return;
+  store.set('pos:' + state.key, { sec: state.sec, idx: state.idx, total: state.sections.length, at: Date.now() });
+  store.set('lastBook', state.key);
 }
-function savePos(){ if(state.key) store.set('pos:' + state.key, { sec: state.sec, idx: state.idx }); }
+
+/* ---------- libreria: i libri restano salvati sul telefono (IndexedDB) ---------- */
+const lib = {
+  db: null,
+  open(){
+    if(this.db) return Promise.resolve(this.db);
+    return new Promise((res, rej) => {
+      const r = indexedDB.open('lettore', 1);
+      r.onupgradeneeded = () => r.result.createObjectStore('books', { keyPath: 'key' });
+      r.onsuccess = () => { this.db = r.result; res(this.db); };
+      r.onerror = () => rej(r.error);
+    });
+  },
+  async tx(mode, fn){
+    const db = await this.open();
+    return new Promise((res, rej) => {
+      const t = db.transaction('books', mode); const st = t.objectStore('books');
+      const out = fn(st);
+      t.oncomplete = () => res(out && out.result !== undefined ? out.result : undefined);
+      t.onerror = () => rej(t.error);
+    });
+  },
+  put(b){ return this.tx('readwrite', st => st.put(b)); },
+  get(k){ return this.tx('readonly', st => st.get(k)); },
+  all(){ return this.tx('readonly', st => st.getAll()); },
+  del(k){ return this.tx('readwrite', st => st.delete(k)); }
+};
 function hash(str){ let h = 0; for(let i = 0; i < str.length; i++){ h = (h * 31 + str.charCodeAt(i)) | 0; } return Math.abs(h).toString(36); }
 function savePrefs(){
   prefs.rate = state.rate;
@@ -501,7 +538,7 @@ async function loadEpub(buf){
 
 
 /* ---------- apertura file ---------- */
-async function openFile(file){
+async function openFile(file, fromLibrary){
   stop();
   setStatus('Apro il file...');
   try{
@@ -519,9 +556,19 @@ async function openFile(file){
     }
     state.sections = secs; state.isPdf = isPdf; state.sec = 0; state.idx = 0;
     state.key = hash(file.name + ':' + file.size);
+    const title = res.title || file.name.replace(/\.(pdf|epub)$/i, '');
+    if(!fromLibrary){
+      try{
+        // salva una copia del file sul telefono, così non va più ricaricato
+        const blob = new Blob([buf], { type: isPdf ? 'application/pdf' : 'application/epub+zip' });
+        await lib.put({ key: state.key, name: file.name, title, blob, added: Date.now() });
+      }catch(e){ console.error(e); setStatus('Non sono riuscito a salvare il libro sul telefono: andrà ricaricato.', true); }
+    }
+    store.set('lastBook', state.key);
     audio.removeAttribute('data-key'); currentKey = null;
     want([]);
-    $('bookTitle').textContent = res.title || file.name.replace(/\.(pdf|epub)$/i, '');
+    $('bookTitle').textContent = title;
+    $('libBtn').classList.remove('hidden');
     const sel = $('sectionSel'); sel.innerHTML = '';
     secs.forEach((s, i) => { const o = document.createElement('option'); o.value = i; o.textContent = s.title; sel.appendChild(o); });
     $('empty').classList.add('hidden');
@@ -689,6 +736,56 @@ if(prefs.rate){ state.rate = prefs.rate; $('rate').value = prefs.rate; $('rateVa
 buildVoiceList();
 if('speechSynthesis' in window) speechSynthesis.onvoiceschanged = buildVoiceList;
 if(state.engine === 'piper' && readyVoices.has(state.piperVoice)) worker.postMessage({ type: 'prepare', voiceId: state.piperVoice });
+try{ if(navigator.storage && navigator.storage.persist) navigator.storage.persist(); }catch(e){}
+
+async function openFromLibrary(key){
+  try{
+    const b = await lib.get(key);
+    if(!b){ setStatus('Questo libro non è più salvato sul telefono. Riaprilo con Apri file.', true); return false; }
+    await openFile(new File([b.blob], b.name, { type: b.blob.type }), true);
+    return true;
+  }catch(e){ console.error(e); return false; }
+}
+async function renderLibrary(){
+  const box = $('library'); box.innerHTML = '';
+  let books = [];
+  try{ books = await lib.all(); }catch(e){}
+  if(!books.length){ box.classList.add('hidden'); return; }
+  box.classList.remove('hidden');
+  const h = document.createElement('h3'); h.textContent = 'I tuoi libri'; box.appendChild(h);
+  books.map(b => ({ b, pos: store.get('pos:' + b.key) }))
+    .sort((x, y) => ((y.pos && y.pos.at) || y.b.added) - ((x.pos && x.pos.at) || x.b.added))
+    .forEach(({ b, pos }) => {
+      const row = document.createElement('div'); row.className = 'book';
+      const open = document.createElement('button'); open.className = 'bookOpen';
+      const t = document.createElement('span'); t.className = 'bookTitle'; t.textContent = b.title;
+      const m = document.createElement('span'); m.className = 'bookMeta';
+      m.textContent = pos && pos.total ? `Arrivato a ${Math.round((pos.sec + 1) * 100 / pos.total)}%` : 'Da iniziare';
+      open.append(t, m);
+      open.onclick = () => openFromLibrary(b.key);
+      const del = document.createElement('button'); del.className = 'ghost bookDel'; del.textContent = 'Rimuovi';
+      del.onclick = async () => {
+        if(!confirm(`Rimuovere "${b.title}" dal telefono?`)) return;
+        await lib.del(b.key);
+        try{ localStorage.removeItem('lettore:pos:' + b.key); }catch(e){}
+        renderLibrary();
+      };
+      row.append(open, del); box.appendChild(row);
+    });
+}
+function showLibrary(){
+  stop();
+  $('reader').classList.add('hidden'); $('sectionRow').classList.add('hidden');
+  $('empty').classList.remove('hidden'); $('libBtn').classList.add('hidden');
+  $('bookTitle').textContent = 'Lettore';
+  setStatus('');
+  renderLibrary();
+}
+$('libBtn').onclick = showLibrary;
+(async () => {
+  const last = store.get('lastBook');
+  if(!(last && await openFromLibrary(last))) renderLibrary();
+})();
 </script>
 </body>
 </html>
