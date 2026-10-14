@@ -94,7 +94,7 @@ button:disabled{opacity:.4;cursor:default}
 
 <section id="empty">
   <h2>Apri un PDF o un EPUB e ascoltalo.</h2>
-  <p>Il testo viene letto frase per frase. Le voci Paola e Riccardo si scaricano una sola volta, poi funzionano anche offline. I libri che apri restano salvati qui: riaprendo l'app riprendi dalla frase in cui eri.</p>
+  <p>Il testo viene letto frase per frase. Le voci Sara, Nicola, Paola e Riccardo si scaricano una sola volta, poi funzionano anche offline. I libri che apri restano salvati qui: riaprendo l'app riprendi dalla frase in cui eri.</p>
   <button class="primary" id="emptyOpen">Scegli un file</button>
   <div id="library" class="hidden"></div>
 </section>
@@ -136,8 +136,10 @@ if('serviceWorker' in navigator){
 
 const $ = id => document.getElementById(id);
 const PIPER_VOICES = [
-  { id: 'it_IT-paola-medium', name: 'Paola (naturale)', size: 'circa 60 MB' },
-  { id: 'it_IT-riccardo-x_low', name: 'Riccardo (naturale, leggera)', size: 'circa 20 MB' }
+  { id: 'kokoro-if_sara', name: 'Sara (Kokoro)', size: 'circa 130 MB' },
+  { id: 'kokoro-im_nicola', name: 'Nicola (Kokoro)', size: 'circa 130 MB' },
+  { id: 'it_IT-paola-medium', name: 'Paola (Piper)', size: 'circa 60 MB' },
+  { id: 'it_IT-riccardo-x_low', name: 'Riccardo (Piper, leggera)', size: 'circa 20 MB' }
 ];
 const state = {
   sections: [], sec: 0, idx: 0, playing: false, gen: 0, key: null, isPdf: false,
@@ -202,7 +204,19 @@ audio.preload = 'auto';
 audio.setAttribute('playsinline', '');
 audio.preservesPitch = true; audio.webkitPreservesPitch = true;
 
-const worker = new Worker('tts-worker.js');
+// due motori: Piper (tts-worker.js) e Kokoro (kokoro-worker.js, caricato solo se serve)
+const workers = {};
+const isKokoro = id => id.startsWith('kokoro-');
+function wk(voiceId){
+  const k = isKokoro(voiceId) ? 'kokoro' : 'piper';
+  if(!workers[k]){
+    const w = k === 'kokoro' ? new Worker('kokoro-worker.js', { type: 'module' }) : new Worker('tts-worker.js');
+    w.onmessage = onWorkerMessage;
+    w.onerror = () => { busy = false; setStatus('Il motore vocale si è fermato. Ricarica l\'app o scegli un\'altra voce.', true); };
+    workers[k] = w;
+  }
+  return workers[k];
+}
 const entries = new Map();   // chiave -> { st, text, url, res: [] }
 const inflight = new Map();  // id richiesta -> chiave
 let wanted = [];
@@ -210,10 +224,10 @@ let busy = false;
 let reqId = 0;
 let readyVoices = new Set(store.get('readyVoices') || []);
 
-worker.onmessage = e => {
+function onWorkerMessage(e){
   const m = e.data;
   if(m.type === 'progress'){
-    const v = PIPER_VOICES.find(x => x.id === m.voiceId);
+    const v = PIPER_VOICES.find(x => x.id === (m.voiceId || state.piperVoice));
     setStatus(`Scarico la voce ${v ? v.name.split(' ')[0] : ''}: ${Math.round(m.loaded * 100 / m.total)}%. Serve solo la prima volta.`);
     return;
   }
@@ -242,8 +256,8 @@ worker.onmessage = e => {
     if(m.type === 'error' && !key) setStatus('Non riesco a preparare la voce. Controlla la connessione e riprova.', true);
     pump();
   }
-};
-worker.onerror = () => { busy = false; setStatus('Il motore vocale si è fermato. Ricarica l\'app.', true); };
+}
+
 
 function want(list, keepKey){
   wanted = list;
@@ -263,7 +277,8 @@ function pump(){
   if(!next) return;
   const en = entries.get(next.key); en.st = 'working'; busy = true;
   const id = ++reqId; inflight.set(id, next.key);
-  worker.postMessage({ type: 'predict', id, voiceId: next.key.split('|')[0], text: en.text });
+  const vid = next.key.split('|')[0];
+  wk(vid).postMessage({ type: 'predict', id, voiceId: vid, text: en.text });
 }
 function waitFor(key){
   const en = entries.get(key);
@@ -465,7 +480,7 @@ function paragraphsToSentences(paras){
 
 /* ---------- PDF ---------- */
 async function loadPdf(buf){
-  const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+  const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buf.slice(0)) }).promise;
   const secs = [];
   for(let i = 1; i <= pdf.numPages; i++){
     setStatus(`Preparo la pagina ${i} di ${pdf.numPages}...`);
@@ -545,14 +560,16 @@ async function openFile(file, fromLibrary){
     const buf = await file.arrayBuffer();
     const isPdf = /\.pdf$/i.test(file.name) || file.type === 'application/pdf';
     const isEpub = /\.epub$/i.test(file.name) || file.type === 'application/epub+zip';
-    if(!isPdf && !isEpub){ setStatus('Formato non supportato. Scegli un file PDF o EPUB.', true); return; }
+    if(!isPdf && !isEpub){ setStatus('Formato non supportato. Scegli un file PDF o EPUB.', true); return false; }
+    if(!buf.byteLength) throw new Error('file vuoto');
+    const saved = buf.slice(0); // copia da salvare sul telefono, fatta prima di leggere il file
     const res = isPdf ? await loadPdf(buf) : await loadEpub(buf);
     const secs = res.secs.filter(s => s.sentences.length);
     if(!secs.length){
       setStatus(isPdf
         ? 'Questo PDF non contiene testo selezionabile: probabilmente è una scansione. Serve un\'app con riconoscimento del testo (OCR).'
         : 'Non ho trovato testo leggibile in questo EPUB.', true);
-      return;
+      return false;
     }
     state.sections = secs; state.isPdf = isPdf; state.sec = 0; state.idx = 0;
     state.key = hash(file.name + ':' + file.size);
@@ -560,8 +577,9 @@ async function openFile(file, fromLibrary){
     if(!fromLibrary){
       try{
         // salva una copia del file sul telefono, così non va più ricaricato
-        const blob = new Blob([buf], { type: isPdf ? 'application/pdf' : 'application/epub+zip' });
-        await lib.put({ key: state.key, name: file.name, title, blob, added: Date.now() });
+        await lib.put({ key: state.key, name: file.name, type: isPdf ? 'application/pdf' : 'application/epub+zip', title, data: saved, size: saved.byteLength, added: Date.now() });
+        const check = await lib.get(state.key);
+        if(!check || !check.data || check.data.byteLength !== saved.byteLength) throw new Error('verifica salvataggio fallita');
       }catch(e){ console.error(e); setStatus('Non sono riuscito a salvare il libro sul telefono: andrà ricaricato.', true); }
     }
     store.set('lastBook', state.key);
@@ -585,9 +603,11 @@ async function openFile(file, fromLibrary){
     renderSection();
     updateMedia();
     if(state.engine === 'piper') want(upcoming(3));
+    return true;
   }catch(e){
     console.error(e);
     setStatus('Non riesco ad aprire questo file. Potrebbe essere protetto o danneggiato.', true);
+    return false;
   }
 }
 
@@ -624,7 +644,8 @@ function buildVoiceList(){
   const g1 = document.createElement('optgroup'); g1.label = 'Voci naturali';
   PIPER_VOICES.forEach(v => {
     const o = document.createElement('option'); o.value = 'piper:' + v.id;
-    o.textContent = v.name + (readyVoices.has(v.id) ? '' : ` - da scaricare, ${v.size}`);
+    const kokoroReady = isKokoro(v.id) && [...readyVoices].some(isKokoro);
+    o.textContent = v.name + (readyVoices.has(v.id) || kokoroReady ? '' : ` - da scaricare, ${v.size}`);
     g1.appendChild(o);
   });
   sel.appendChild(g1);
@@ -653,7 +674,7 @@ function selectVoice(value){
     const v = PIPER_VOICES.find(x => x.id === state.piperVoice);
     if(!readyVoices.has(state.piperVoice)){
       setStatus(`La voce ${v.name.split(' ')[0]} va scaricata una volta (${v.size}). Il download parte ora.`);
-      worker.postMessage({ type: 'prepare', voiceId: state.piperVoice });
+      wk(state.piperVoice).postMessage({ type: 'prepare', voiceId: state.piperVoice });
     }
   } else {
     state.engine = 'sys';
@@ -735,15 +756,22 @@ document.addEventListener('visibilitychange', () => {
 if(prefs.rate){ state.rate = prefs.rate; $('rate').value = prefs.rate; $('rateVal').textContent = (+prefs.rate).toFixed(1) + 'x'; }
 buildVoiceList();
 if('speechSynthesis' in window) speechSynthesis.onvoiceschanged = buildVoiceList;
-if(state.engine === 'piper' && readyVoices.has(state.piperVoice)) worker.postMessage({ type: 'prepare', voiceId: state.piperVoice });
+if(state.engine === 'piper' && readyVoices.has(state.piperVoice)) wk(state.piperVoice).postMessage({ type: 'prepare', voiceId: state.piperVoice });
 try{ if(navigator.storage && navigator.storage.persist) navigator.storage.persist(); }catch(e){}
 
 async function openFromLibrary(key){
   try{
     const b = await lib.get(key);
-    if(!b){ setStatus('Questo libro non è più salvato sul telefono. Riaprilo con Apri file.', true); return false; }
-    await openFile(new File([b.blob], b.name, { type: b.blob.type }), true);
-    return true;
+    let data = b && (b.data || (b.blob && b.blob.size ? await b.blob.arrayBuffer() : null));
+    if(!data || !data.byteLength){
+      // copia rovinata (salvata dalla versione precedente): la elimino, il libro va riaperto una volta
+      if(b) await lib.del(key);
+      if(store.get('lastBook') === key) store.set('lastBook', null);
+      setStatus('Il salvataggio di questo libro era rovinato. Riaprilo con Apri file: da ora resta salvato e riprende da dove eri.', true);
+      return false;
+    }
+    const type = b.type || (b.blob && b.blob.type) || '';
+    return await openFile(new File([data], b.name, { type }), true);
   }catch(e){ console.error(e); return false; }
 }
 async function renderLibrary(){
@@ -785,6 +813,7 @@ $('libBtn').onclick = showLibrary;
 (async () => {
   const last = store.get('lastBook');
   if(!(last && await openFromLibrary(last))) renderLibrary();
+  else $('libBtn').classList.remove('hidden');
 })();
 </script>
 </body>

@@ -1,8 +1,8 @@
 // Service worker: rende l'app installabile e utilizzabile offline.
 // File dell'app: aggiornati in background. Librerie e voci: salvate dopo il primo download.
-const CORE = 'lettore-core-v2';
+const CORE = 'lettore-core-v4';
 const RUNTIME = 'lettore-runtime-v1';
-const CORE_FILES = ['./', './index.html', './tts-worker.js', './manifest.webmanifest',
+const CORE_FILES = ['./', './index.html', './tts-worker.js', './kokoro-worker.js', './manifest.webmanifest',
   './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
@@ -32,8 +32,8 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // librerie (cdnjs, jsdelivr) e voci (huggingface): cache-first
-  if(/cdnjs\.cloudflare\.com|cdn\.jsdelivr\.net|huggingface\.co|hf\.co/.test(url.hostname)){
+  // librerie (cdnjs, jsdelivr): cache-first. Le voci si salvano da sole, non serve duplicarle
+  if(/cdnjs\.cloudflare\.com|cdn\.jsdelivr\.net/.test(url.hostname)){
     e.respondWith(caches.open(RUNTIME).then(async cache => {
       const cached = await cache.match(req.url);
       if(cached) return cached;
