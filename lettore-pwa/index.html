@@ -114,6 +114,7 @@ svg{flex:none}
 #seek::-moz-range-thumb{width:16px;height:16px;border-radius:8px;background:var(--ink);border:0}
 .seekLabels{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);margin-top:4px}
 .seekLabels b{color:var(--ink);font-weight:600}
+#bufInfo{font-size:12px;color:var(--accent);margin-top:6px;min-height:16px}
 .pCtrls{padding:18px 20px 0;display:flex;align-items:center;justify-content:space-between}
 .ctrl{width:56px;height:56px;border:0;background:transparent;color:var(--ink);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
 .ctrl small{font-size:11px;color:var(--muted)}
@@ -223,6 +224,7 @@ body.playerOpen #toast{bottom:auto;top:calc(env(safe-area-inset-top) + 64px)}
       <label class="sr" for="seek">Posizione nel libro</label>
       <input type="range" id="seek" min="0" max="0" step="1" value="0">
       <div class="seekLabels"><span id="seekLeft"></span><b id="seekRight"></b></div>
+      <div id="bufInfo" aria-live="polite"></div>
     </div>
     <div class="pCtrls">
       <button class="ctrl side" id="prevChap" aria-label="Capitolo precedente">
@@ -291,7 +293,7 @@ const state = {
   key: null, meta: null, sections: [], offsets: [], total: 0, isPdf: false,
   sec: 0, idx: 0, playing: false, gen: 0,
   rate: 1, engine: 'piper', piperVoice: PIPER_VOICES[0].id, sysVoice: null,
-  charPos: 0, boundarySeen: false
+  charPos: 0, boundarySeen: false, prepareTo: null
 };
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 let wakeLock = null;
@@ -310,8 +312,12 @@ const lib = {
   open(){
     if(this.db) return Promise.resolve(this.db);
     return new Promise((res, rej) => {
-      const r = indexedDB.open('lettore', 1);
-      r.onupgradeneeded = () => r.result.createObjectStore('books', { keyPath: 'key' });
+      const r = indexedDB.open('lettore', 2);
+      r.onupgradeneeded = () => {
+        const db = r.result;
+        if(!db.objectStoreNames.contains('books')) db.createObjectStore('books', { keyPath: 'key' });
+        if(!db.objectStoreNames.contains('audio')) db.createObjectStore('audio', { keyPath: 'k' }).createIndex('at', 'at');
+      };
       r.onsuccess = () => { this.db = r.result; res(this.db); };
       r.onerror = () => rej(r.error);
     });
@@ -329,6 +335,49 @@ const lib = {
   get(k){ return this.tx('readonly', st => st.get(k)); },
   all(){ return this.tx('readonly', st => st.getAll()); },
   del(k){ return this.tx('readwrite', st => st.delete(k)); }
+};
+// audio già generato, salvato sul telefono: ogni frase si genera una volta sola
+const AUDIO_CAP = 300 * 1024 * 1024;
+const acache = {
+  async req(mode, fn){
+    try{
+      const db = await lib.open();
+      return await new Promise(res => {
+        const t = db.transaction('audio', mode); const r = fn(t.objectStore('audio'));
+        t.oncomplete = () => res(r && r.result !== undefined ? r.result : null);
+        t.onerror = () => res(null); t.onabort = () => res(null);
+      });
+    }catch(e){ return null; }
+  },
+  get(k){ return this.req('readonly', st => st.get(k)); },
+  async put(k, blob, book){
+    await this.req('readwrite', st => st.put({ k, blob, size: blob.size, book, at: Date.now() }));
+    const bytes = (store.get('audioBytes') || 0) + blob.size;
+    store.set('audioBytes', bytes);
+    if(bytes > AUDIO_CAP) this.prune();
+  },
+  async prune(){
+    // toglie l'audio più vecchio finché non scende sotto l'80% del limite
+    const db = await lib.open().catch(() => null); if(!db) return;
+    const t = db.transaction('audio', 'readwrite'); const st = t.objectStore('audio');
+    let total = 0;
+    await new Promise(res => { const c = st.openCursor(); c.onsuccess = () => { const cur = c.result; if(cur){ total += cur.value.size || 0; cur.continue(); } else res(); }; c.onerror = res; });
+    let excess = total - AUDIO_CAP * 0.8;
+    await new Promise(res => {
+      if(excess <= 0) return res();
+      const c = st.index('at').openCursor();
+      c.onsuccess = () => { const cur = c.result; if(cur && excess > 0){ excess -= cur.value.size || 0; total -= cur.value.size || 0; cur.delete(); cur.continue(); } else res(); };
+      c.onerror = res;
+    });
+    store.set('audioBytes', Math.max(0, total));
+  },
+  async delBook(book){
+    const db = await lib.open().catch(() => null); if(!db) return;
+    const t = db.transaction('audio', 'readwrite'); const st = t.objectStore('audio');
+    let freed = 0;
+    await new Promise(res => { const c = st.openCursor(); c.onsuccess = () => { const cur = c.result; if(cur){ if(cur.value.book === book){ freed += cur.value.size || 0; cur.delete(); } cur.continue(); } else res(); }; c.onerror = res; });
+    store.set('audioBytes', Math.max(0, (store.get('audioBytes') || 0) - freed));
+  }
 };
 function hash(str){ let h = 0; for(let i = 0; i < str.length; i++){ h = (h * 31 + str.charCodeAt(i)) | 0; } return Math.abs(h).toString(36); }
 
@@ -422,13 +471,25 @@ function wk(voiceId){
   }
   return workers[k];
 }
-const entries = new Map();
-const inflight = new Map();
+const entries = new Map();   // chiave -> { st: queued|working|ready|stored|error, text, url, res }
+const inflight = new Map();  // id richiesta -> { key, t }
 let wanted = [];
 let busy = false;
 let reqId = 0;
 let readyVoices = new Set(store.get('readyVoices') || []);
 function voiceReady(id){ return readyVoices.has(id) || (isKokoro(id) && [...readyVoices].some(isKokoro)); }
+const MEM_AHEAD = 40;        // frasi tenute pronte in memoria
+// velocità di generazione misurata su questo telefono: secondi per generare 1 secondo di audio
+function rtfOf(v){ return store.get('rtf:' + v); }
+function noteRtf(v, genMs, blob){
+  blob.slice(24, 28).arrayBuffer().then(b => {
+    const sr = new DataView(b).getUint32(0, true) || 22050;
+    const secs = Math.max(0.3, (blob.size - 44) / 2 / sr);
+    const r = genMs / 1000 / secs;
+    const old = rtfOf(v);
+    store.set('rtf:' + v, old ? old * 0.8 + r * 0.2 : r);
+  }).catch(() => {});
+}
 
 function onWorkerMessage(e){
   const m = e.data;
@@ -445,21 +506,27 @@ function onWorkerMessage(e){
   }
   if(m.type === 'result' || m.type === 'error'){
     busy = false;
-    const key = inflight.get(m.id); inflight.delete(m.id);
+    const inf = inflight.get(m.id); inflight.delete(m.id);
+    const key = inf && inf.key;
     const en = key && entries.get(key);
+    if(m.type === 'result' && key){
+      const [vid, book] = key.split('|');
+      noteRtf(vid, performance.now() - inf.t, m.blob);
+      if(!readyVoices.has(vid)){ readyVoices.add(vid); store.set('readyVoices', [...readyVoices]); if(sheetKind === 'voice') openVoiceSheet(); }
+      if(book !== 'anteprima') acache.put(key, m.blob, book);
+    }
     if(en){
       if(m.type === 'result'){
-        en.st = 'ready'; en.url = URL.createObjectURL(m.blob);
-        en.res.forEach(r => r.resolve(en.url));
-        const vid = key.split('|')[0];
-        if(!readyVoices.has(vid)){ readyVoices.add(vid); store.set('readyVoices', [...readyVoices]); if(sheetKind === 'voice') openVoiceSheet(); }
+        const far = wanted.findIndex(w => w.key === key) >= MEM_AHEAD && !en.res.length;
+        if(far){ en.st = 'stored'; } // salvato sul telefono, lo ricarico quando serve
+        else { en.st = 'ready'; en.url = URL.createObjectURL(m.blob); en.res.forEach(r => r.resolve(en.url)); en.res = []; }
       } else {
         en.st = 'error'; en.err = m.message;
-        en.res.forEach(r => r.reject(new Error(m.message)));
+        en.res.forEach(r => r.reject(new Error(m.message))); en.res = [];
       }
-      en.res = [];
     }
     if(m.type === 'error' && !key) setStatus('Non riesco a preparare la voce. Controlla la connessione e riprova.', true);
+    updateBuf();
     pump();
   }
 }
@@ -473,14 +540,34 @@ function want(list, keepKey){
     en.res.forEach(r => r.reject(new Error('skip')));
     entries.delete(k);
   }
+  // le frasi vicine salvate sul telefono tornano in memoria
+  list.slice(0, MEM_AHEAD).forEach(it => { const en = entries.get(it.key); if(en && en.st === 'stored') loadStored(it.key, en); });
+  updateBuf();
   pump();
 }
-function pump(){
+async function loadStored(key, en){
+  en.st = 'working';
+  const c = await acache.get(key);
+  if(entries.get(key) !== en) return;
+  if(c && c.blob){ en.st = 'ready'; en.url = URL.createObjectURL(c.blob); en.res.forEach(r => r.resolve(en.url)); en.res = []; }
+  else en.st = 'queued';
+  updateBuf(); pump();
+}
+async function pump(){
   if(busy) return;
   const next = wanted.find(it => { const en = entries.get(it.key); return en && en.st === 'queued'; });
   if(!next) return;
   const en = entries.get(next.key); en.st = 'working'; busy = true;
-  const id = ++reqId; inflight.set(id, next.key);
+  // già generata in passato? la prendo dal telefono
+  const c = next.key.includes('|anteprima|') ? null : await acache.get(next.key);
+  if(entries.get(next.key) !== en){ busy = false; return pump(); }
+  if(c && c.blob){
+    const idx = wanted.findIndex(w => w.key === next.key);
+    if(idx >= MEM_AHEAD && !en.res.length) en.st = 'stored';
+    else { en.st = 'ready'; en.url = URL.createObjectURL(c.blob); en.res.forEach(r => r.resolve(en.url)); en.res = []; }
+    busy = false; updateBuf(); return pump();
+  }
+  const id = ++reqId; inflight.set(id, { key: next.key, t: performance.now() });
   const vid = next.key.split('|')[0];
   wk(vid).postMessage({ type: 'predict', id, voiceId: vid, text: en.text });
 }
@@ -489,7 +576,35 @@ function waitFor(key){
   if(!en) return Promise.reject(new Error('skip'));
   if(en.st === 'ready') return Promise.resolve(en.url);
   if(en.st === 'error') return Promise.reject(new Error(en.err || 'errore'));
-  return new Promise((resolve, reject) => en.res.push({ resolve, reject }));
+  const p = new Promise((resolve, reject) => en.res.push({ resolve, reject }));
+  if(en.st === 'stored') loadStored(key, en);
+  return p;
+}
+function isReady(key){ const en = entries.get(key); return !!en && (en.st === 'ready' || en.st === 'stored'); }
+
+// quante frasi dopo quella in corso sono già pronte
+function readyAhead(){
+  let n = 0;
+  for(let i = 1; i < wanted.length; i++){ if(isReady(wanted[i].key)) n++; else break; }
+  return n;
+}
+let bufTimer = null;
+function updateBuf(){
+  if(bufTimer) return;
+  bufTimer = setTimeout(() => {
+    bufTimer = null;
+    const b = $('bufInfo'); if(!b) return;
+    if(state.engine !== 'piper' || !state.total){ b.textContent = ''; return; }
+    const n = readyAhead();
+    if(state.prepareTo != null){
+      const g = gIndex(), tot = state.prepareTo - g;
+      const done = wanted.filter(w => isReady(w.key)).length;
+      b.textContent = done >= wanted.length ? 'Preparazione completata: le prossime frasi sono pronte.' : `Preparo in anticipo: ${done} di ${Math.min(wanted.length, tot + 1)} frasi pronte`;
+      if(done >= wanted.length) state.prepareTo = null;
+    } else {
+      b.textContent = n ? `${n} ${n === 1 ? 'frase pronta' : 'frasi pronte'} in anticipo` : (busy ? 'Preparo le prossime frasi...' : '');
+    }
+  }, 250);
 }
 
 // iOS permette l'audio solo dopo un tocco: sblocca con un istante di silenzio
@@ -512,6 +627,11 @@ function unlockAudio(){
   audio.play().catch(() => {});
 }
 
+function lookahead(){
+  const g = gIndex();
+  if(state.prepareTo != null && state.prepareTo > g) return Math.min(3000, state.prepareTo - g + 1);
+  return MEM_AHEAD;
+}
 function upcoming(n){
   const list = []; let sec = state.sec, idx = state.idx;
   for(let i = 0; i < n; i++){
@@ -522,20 +642,32 @@ function upcoming(n){
   }
   return list;
 }
-async function piperSpeakCurrent(){
+async function piperSpeakCurrent(fromAdvance){
   const g = ++state.gen;
   audio.pause();
-  const list = upcoming(4);
+  const list = upcoming(lookahead());
   if(!list.length){ stop(); return; }
   const key = list[0].key;
   want(list);
   refreshPosition(true); savePos(); updateMedia();
   const en = entries.get(key);
-  if(en && en.st !== 'ready'){
-    setStatus(voiceReady(state.piperVoice) ? 'Preparo la voce...' : 'Preparo la voce. La prima volta va scaricata, può richiedere qualche minuto.', false, true);
+  const stalled = !!(en && en.st !== 'ready' && en.st !== 'stored');
+  if(stalled){
+    if(fromAdvance){
+      const r = rtfOf(state.piperVoice);
+      setStatus(r && r > 1
+        ? `${voiceName()} su questo telefono è più lenta della lettura: aspetto di avere qualche frase pronta. Per ascoltare senza pause usa Prepara in anticipo dai tre puntini, oppure una voce più leggera.`
+        : 'Preparo le prossime frasi...', false, true);
+    } else {
+      setStatus(voiceReady(state.piperVoice) ? 'Preparo la voce...' : 'Preparo la voce. La prima volta va scaricata, può richiedere qualche minuto.', false, true);
+    }
   }
   try{
     const url = await waitFor(key);
+    // dopo un'interruzione riparto solo con qualche frase già pronta, così non si ferma a ogni frase
+    if(stalled && fromAdvance && list.length > 1){
+      try{ await waitFor(list[Math.min(3, list.length - 1)].key); }catch(e){}
+    }
     if(g !== state.gen || !state.playing) return;
     setStatus('');
     audio.src = url; audio.dataset.key = key;
@@ -579,11 +711,11 @@ function sysSpeak(offset = 0){
 }
 
 /* ---------- controllo lettura ---------- */
-function speakCurrent(){ if(state.engine === 'piper') piperSpeakCurrent(); else sysSpeak(0); }
+function speakCurrent(fromAdvance){ if(state.engine === 'piper') piperSpeakCurrent(fromAdvance); else sysSpeak(0); }
 function advance(){
   const s = state.sections[state.sec];
-  if(state.idx < s.sentences.length - 1){ state.idx++; speakCurrent(); }
-  else if(state.sec < state.sections.length - 1){ state.sec++; state.idx = 0; speakCurrent(); }
+  if(state.idx < s.sentences.length - 1){ state.idx++; speakCurrent(true); }
+  else if(state.sec < state.sections.length - 1){ state.sec++; state.idx = 0; speakCurrent(true); }
   else { stop(); savePos(true); renderLibrary(); setStatus('Hai finito il libro.'); }
 }
 function stop(){
@@ -600,7 +732,7 @@ function play(){
     state.gen++;
     audio.playbackRate = state.rate;
     audio.play().catch(() => piperSpeakCurrent());
-    want(upcoming(4), key);
+    want(upcoming(lookahead()), key);
     return;
   }
   speakCurrent();
@@ -615,7 +747,7 @@ function releaseWake(){ try{ if(wakeLock){ wakeLock.release(); wakeLock = null; 
 function goTo(sec, idx){
   state.sec = sec; state.idx = idx;
   if(state.playing) speakCurrent();
-  else { refreshPosition(true); savePos(); if(state.engine === 'piper') want(upcoming(3)); }
+  else { refreshPosition(true); savePos(); if(state.engine === 'piper') want(upcoming(lookahead())); }
 }
 function move(delta){
   const p = fromG(gIndex() + delta);
@@ -888,7 +1020,7 @@ async function loadBook(key){
     }catch(e){ console.error(e); setStatus('Non riesco ad aprire questo libro.', true); return false; }
   }
   if(state.playing) stop();
-  state.key = key; state.meta = rec; state.sections = secs; state.isPdf = !!rec.isPdf;
+  state.key = key; state.meta = rec; state.sections = secs; state.isPdf = !!rec.isPdf; state.prepareTo = null;
   state.offsets = []; let acc = 0;
   for(const s of secs){ state.offsets.push(acc); acc += s.sentences.length; }
   state.total = acc;
@@ -907,7 +1039,7 @@ async function loadBook(key){
   $('pAuthor').classList.toggle('hidden', !rec.author);
   $('mini').classList.remove('hidden'); document.body.classList.remove('noMini');
   updatePlay(); refreshPosition(false); updateMedia();
-  if(state.engine === 'piper') want(upcoming(3));
+  if(state.engine === 'piper') want(upcoming(lookahead()));
   return true;
 }
 function unloadBook(){
@@ -979,7 +1111,7 @@ async function renderLibrary(){
     db.onclick = async () => {
       if(!confirm(`Rimuovere "${b.title}" dal telefono?`)) return;
       if(b.key === state.key) unloadBook();
-      await lib.del(b.key); store.del('pos:' + b.key);
+      await lib.del(b.key); store.del('pos:' + b.key); acache.delBook(b.key);
       if(coverUrls.has(b.key)){ URL.revokeObjectURL(coverUrls.get(b.key)); coverUrls.delete(b.key); }
       renderLibrary();
     };
@@ -1108,6 +1240,7 @@ async function previewVoice(kind, id){
 function selectVoice(kind, id){
   const wasPlaying = state.playing;
   if(wasPlaying) stop();
+  state.prepareTo = null;
   if(kind === 'piper'){
     state.engine = 'piper'; state.piperVoice = id;
     audio.removeAttribute('data-key');
@@ -1125,7 +1258,7 @@ function selectVoice(kind, id){
   refreshPosition(false);
   if(sheetKind === 'voice') openVoiceSheet();
   if(wasPlaying){ unlockAudio(); play(); }
-  else if(state.engine === 'piper' && state.total) want(upcoming(3));
+  else if(state.engine === 'piper' && state.total) want(upcoming(lookahead()));
 }
 function voiceRow(label, sub, selected, onPick, onTry){
   const row = el('div', 'voiceRow');
@@ -1141,7 +1274,9 @@ function openVoiceSheet(){
   body.appendChild(el('p', 'hint', 'Generate sul telefono, gratis e offline dopo il primo download. Kokoro suona meglio ma è più pesante.'));
   PIPER_VOICES.forEach(v => {
     const sel = state.engine === 'piper' && state.piperVoice === v.id;
-    const sub = v.engine + (voiceReady(v.id) ? '' : ` · da scaricare, ${v.size}`);
+    const r = rtfOf(v.id);
+    const speed = !voiceReady(v.id) ? ` · da scaricare, ${v.size}` : !r ? '' : r < 0.7 ? ' · veloce su questo telefono' : r < 1 ? ' · al limite su questo telefono' : ' · lenta su questo telefono, farà pause';
+    const sub = v.engine + speed;
     body.appendChild(voiceRow(v.name, sub, sel, () => selectVoice('piper', v.id), () => previewVoice('piper', v.id)));
   });
   const it = 'speechSynthesis' in window ? speechSynthesis.getVoices().filter(v => v.lang && v.lang.toLowerCase().startsWith('it')) : [];
@@ -1185,12 +1320,22 @@ function markTextSentence(scroll){
 
 function openMore(){
   const body = openSheet('more', state.meta ? state.meta.title : 'Opzioni');
+  if(state.engine === 'piper'){
+    const chaps = state.isPdf ? 20 : 2;
+    const lastSec = Math.min(state.sections.length - 1, state.sec + chaps);
+    const until = state.offsets[lastSec] + state.sections[lastSec].sentences.length - 1;
+    body.appendChild(option('Prepara in anticipo', state.isPdf ? 'Genera ora la voce delle prossime 20 pagine, poi le ascolti senza pause' : 'Genera ora la voce dei prossimi 2 capitoli, poi li ascolti senza pause', false, () => {
+      closeSheet(); state.prepareTo = until; requestWake();
+      want(upcoming(lookahead()));
+      setStatus('Preparazione avviata. Tieni l\'app aperta, anche in pausa: l\'avanzamento è sotto la barra del player.');
+    }));
+  }
   body.appendChild(option('Ricomincia dall\'inizio', 'Torna alla prima frase del libro', false, () => { closeSheet(); goTo(0, 0); }));
   body.appendChild(option('Segna come finito', 'Lo sposta tra i Finiti', false, () => { closeSheet(); stop(); savePos(true); renderLibrary(); setStatus('Segnato come finito.'); }));
   body.appendChild(option('Rimuovi dal telefono', 'Cancella il libro e la posizione salvata', false, async () => {
     if(!confirm(`Rimuovere "${state.meta.title}" dal telefono?`)) return;
     const k = state.key; closeSheet(); unloadBook();
-    await lib.del(k); store.del('pos:' + k); renderLibrary();
+    await lib.del(k); store.del('pos:' + k); acache.delBook(k); renderLibrary();
   }));
 }
 
