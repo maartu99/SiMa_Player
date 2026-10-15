@@ -40,6 +40,7 @@ svg{flex:none}
 .libHead{display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
 .libHead h1{margin:0;font-family:var(--serif);font-weight:600;font-size:34px;letter-spacing:-.5px}
 #libCount{font-size:14px;color:var(--muted);margin-top:4px;display:block}
+.headBtns{display:flex;gap:8px;align-items:center}
 .addBtn{height:44px;padding:0 16px;border-radius:22px;border:0;background:var(--accent);color:var(--accent-ink);font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px;white-space:nowrap}
 .chips{display:flex;gap:8px;padding:18px 0 6px;overflow-x:auto;scrollbar-width:none}
 .chips::-webkit-scrollbar{display:none}
@@ -98,11 +99,11 @@ svg{flex:none}
 .pTop{display:flex;align-items:center;justify-content:space-between;padding:0 12px}
 .roundBtn{width:44px;height:44px;border-radius:22px;border:0;background:var(--surface);color:var(--ink);display:flex;align-items:center;justify-content:center}
 .pTopLabel{font-size:13px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted)}
-.pCoverWrap{flex:1 1 0;min-height:72px;max-height:390px;display:flex;justify-content:center;align-items:center;padding:12px 0 0}
+.pCoverWrap{flex:1 1 0;min-height:72px;max-height:390px;display:flex;justify-content:center;align-items:center;padding:12px 0 0;container-type:size}
 /* la copertina si adatta allo spazio: tutto il player sta in una schermata */
-.pCoverWrap .cover.l{height:100%;width:auto;aspect-ratio:196/272;max-height:370px;container-type:size;padding:9cqh 8cqh;font-size:10cqh}
-.pCoverWrap .cover.l .cl{height:1.5cqh;width:15cqh}
-.pCoverWrap .cover.l .ca{font-size:5cqh;margin-top:3cqh}
+.pCoverWrap .cover.l{height:min(100cqh,370px);width:auto;aspect-ratio:196/272;max-width:80%;padding:min(9cqh,33px) min(7cqh,26px);font-size:min(9cqh,30px)}
+.pCoverWrap .cover.l .cl{height:min(1.4cqh,5px);width:min(14cqh,52px)}
+.pCoverWrap .cover.l .ca{font-size:min(4.6cqh,16px);margin-top:min(3cqh,11px)}
 .pMeta{padding:12px 24px 0;display:flex;flex-direction:column;gap:4px;align-items:center;text-align:center}
 #pTitle{margin:0;font-family:var(--serif);font-size:22px;font-weight:600;line-height:1.2;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #pAuthor{font-size:14px;color:var(--muted)}
@@ -197,10 +198,15 @@ body.playerOpen #toast{bottom:auto;top:calc(env(safe-area-inset-top) + 64px)}
       <h1>Libreria</h1>
       <span id="libCount">Nessun libro</span>
     </div>
+    <div class="headBtns">
+    <button class="roundBtn" id="setBtn" aria-label="Impostazioni">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+    </button>
     <button class="addBtn" id="addBtn">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
       Aggiungi libro
     </button>
+    </div>
     <input type="file" id="file" accept=".pdf,.epub,application/pdf,application/epub+zip" hidden>
   </div>
   <div class="chips" role="group" aria-label="Filtra i libri">
@@ -358,6 +364,9 @@ const store = {
   del(k){ try{ localStorage.removeItem('lettore:' + k); }catch(e){} }
 };
 let prefs = store.get('prefs') || {};
+// pulsanti accanto a play: 'frase', 15 o 30 secondi
+const SKIP_OPTS = { frase: 'Una frase alla volta', '15': '15 secondi', '30': '30 secondi' };
+const skipMode = () => SKIP_OPTS[prefs.skip] ? prefs.skip : 'frase';
 
 // i libri restano salvati sul telefono (IndexedDB)
 const lib = {
@@ -473,12 +482,12 @@ function fromG(g){
 function chapterLabel(){
   const s = state.sections[state.sec];
   if(!s) return '';
-  return state.isPdf ? `Pagina ${state.sec + 1} di ${state.sections.length}` : s.title;
+  return state.pages ? `Pagina ${state.sec + 1} di ${state.sections.length}` : s.title;
 }
 function chapterShort(){
   const s = state.sections[state.sec];
   if(!s) return '';
-  return state.isPdf ? `Pagina ${state.sec + 1}` : s.title;
+  return state.pages ? `Pagina ${state.sec + 1}` : s.title;
 }
 
 /* ---------- copertine ---------- */
@@ -953,6 +962,64 @@ function move(delta){
   const p = fromG(gIndex() + delta);
   goTo(p.sec, p.idx);
 }
+function cps(){ return store.get('cps') || 14; }
+audio.addEventListener('loadedmetadata', () => {
+  const k = audio.dataset.key || '';
+  if(!audio.duration || !isFinite(audio.duration) || !state.total || state.engine !== 'piper' || k.includes('anteprima') || k === 'gem-setup') return;
+  let chars = 0;
+  if(isGem() && state.curChunk && k === chunkKey(state.curChunk)) chars = state.curChunk.len;
+  else { const it = state.sections[state.sec] && state.sections[state.sec].sentences[state.idx]; if(it && k.endsWith(`|${state.sec}|${state.idx}`)) chars = it.t.length; }
+  if(chars < 20) return;
+  const v = chars / audio.duration;
+  if(v > 4 && v < 40) store.set('cps', cps() * 0.85 + v * 0.15);
+});
+const estDur = g => { const p = fromG(g); const it = state.sections[p.sec].sentences[p.idx]; return (it.t.length + 1) / cps(); };
+// salto di qualche secondo: dentro l'audio già pronto quando possibile, altrimenti stimando la durata delle frasi
+function skipSeconds(d){
+  if(!state.total) return;
+  const ch = isGem() ? state.curChunk : null;
+  const curKey = ch ? chunkKey(ch) : `${state.piperVoice}|${state.key}|${state.sec}|${state.idx}`;
+  const audioOn = state.engine === 'piper' && audio.dataset.key === curKey && audio.duration && isFinite(audio.duration);
+  if(audioOn){
+    const t = audio.currentTime + d;
+    if(t >= 0 && t < audio.duration - 0.3){ audio.currentTime = t; return; }
+  }
+  let left = Math.abs(d), g;
+  if(d > 0){
+    if(audioOn){ left -= audio.duration - audio.currentTime; g = ch ? state.offsets[ch.sec] + ch.end + 1 : gIndex() + 1; }
+    else { left -= estDur(gIndex()) / 2; g = gIndex() + 1; }
+    while(left > 0 && g < state.total - 1){ left -= estDur(g); if(left > 0) g++; }
+    if(g >= state.total) g = state.total - 1;
+  } else {
+    if(audioOn){ left -= audio.currentTime; g = ch ? state.offsets[ch.sec] + ch.start - 1 : gIndex() - 1; }
+    else { left -= estDur(gIndex()) / 2; g = gIndex() - 1; }
+    while(left > 0 && g > 0){ left -= estDur(g); if(left > 0) g--; }
+    if(g < 0) g = 0;
+  }
+  const p = fromG(g);
+  goTo(p.sec, p.idx);
+}
+function skipBack(){ const m = skipMode(); if(m === 'frase') move(-1); else skipSeconds(-(+m)); }
+function skipFwd(){ const m = skipMode(); if(m === 'frase') move(1); else skipSeconds(+m); }
+const SKIP_ICON = (n, fwd) => `<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${fwd ? '<path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M17.5 3.4v3.5H14"/>' : '<path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3"/><path d="M6.5 3.4v3.5H10"/>'}<text x="12" y="15.3" text-anchor="middle" font-size="7.6" font-weight="700" fill="currentColor" stroke="none" font-family="Figtree, system-ui, sans-serif">${n}</text></svg>`;
+function renderSkipButtons(){
+  const m = skipMode();
+  const back = $('prevSent'), fwd = $('nextSent'), mini = $('miniBack');
+  if(m === 'frase'){
+    back.innerHTML = '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 7l-5 5 5 5M18 7l-5 5 5 5"/></svg><small>Frase</small>';
+    fwd.innerHTML = '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 7l5 5-5 5M6 7l5 5-5 5"/></svg><small>Frase</small>';
+    back.setAttribute('aria-label', 'Frase precedente'); fwd.setAttribute('aria-label', 'Frase successiva');
+    mini.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 7l-5 5 5 5M18 7l-5 5 5 5"/></svg>';
+    mini.setAttribute('aria-label', 'Frase precedente');
+  } else {
+    back.innerHTML = SKIP_ICON(m, false) + `<small>${m} s</small>`;
+    fwd.innerHTML = SKIP_ICON(m, true) + `<small>${m} s</small>`;
+    back.setAttribute('aria-label', `Indietro di ${m} secondi`); fwd.setAttribute('aria-label', `Avanti di ${m} secondi`);
+    mini.innerHTML = SKIP_ICON(m, false).replace('width="30" height="30"', 'width="26" height="26"');
+    mini.setAttribute('aria-label', `Indietro di ${m} secondi`);
+  }
+}
+
 function moveChapter(delta){
   if(delta < 0 && state.idx > 2) return goTo(state.sec, 0); // prima torna all'inizio del capitolo
   const sec = Math.max(0, Math.min(state.sections.length - 1, state.sec + delta));
@@ -977,8 +1044,10 @@ if('mediaSession' in navigator){
   try{
     ms.setActionHandler('play', () => { unlockAudio(); play(); });
     ms.setActionHandler('pause', () => stop());
-    ms.setActionHandler('nexttrack', () => move(1));
-    ms.setActionHandler('previoustrack', () => move(-1));
+    ms.setActionHandler('nexttrack', () => skipFwd());
+    ms.setActionHandler('previoustrack', () => skipBack());
+    ms.setActionHandler('seekforward', () => skipSeconds(skipMode() === 'frase' ? 15 : +skipMode()));
+    ms.setActionHandler('seekbackward', () => skipSeconds(-(skipMode() === 'frase' ? 15 : +skipMode())));
   }catch(e){}
 }
 
@@ -1089,7 +1158,33 @@ async function loadPdf(buf){
     if(b) paras.push(b);
     secs.push({ title: `Pagina ${i}`, sentences: paragraphsToSentences(paras) });
   }
-  return { secs, title, author, cover: null };
+  // se il PDF ha i segnalibri dei capitoli, raggruppo le pagine per capitolo
+  try{
+    const outline = await pdf.getOutline();
+    let list = outline || [];
+    if(list.length === 1 && list[0].items && list[0].items.length >= 2) list = list[0].items;
+    const starts = [];
+    for(const it of list){
+      let dest = it.dest;
+      if(typeof dest === 'string') dest = await pdf.getDestination(dest);
+      if(!dest || !dest[0]) continue;
+      const pi = typeof dest[0] === 'number' ? dest[0] : await pdf.getPageIndex(dest[0]);
+      const label = (it.title || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+      if(label && !starts.some(x => x.page === pi)) starts.push({ page: pi, label });
+    }
+    starts.sort((a, b) => a.page - b.page);
+    if(starts.length >= 2){
+      const chaps = [];
+      const group = (from, to, label) => {
+        const sentences = [].concat(...secs.slice(from, to).map(x => x.sentences));
+        if(sentences.length) chaps.push({ title: label, sentences });
+      };
+      if(starts[0].page > 0) group(0, starts[0].page, 'Inizio');
+      starts.forEach((st, i) => group(st.page, i + 1 < starts.length ? starts[i + 1].page : secs.length, st.label));
+      if(chaps.length >= 2) return { secs: chaps, title, author, cover: null, chapters: true };
+    }
+  }catch(e){ console.error(e); }
+  return { secs, title, author, cover: null, chapters: false };
 }
 
 function resolvePath(base, href){
@@ -1128,28 +1223,109 @@ async function loadEpub(buf){
   }
   const pick = name => { const e = opf.getElementsByTagName('dc:' + name)[0] || opf.getElementsByTagNameNS('*', name)[0]; return e ? e.textContent.trim() : null; };
   const spine = [...opf.getElementsByTagName('itemref')];
-  const secs = []; let n = 0;
-  for(let k = 0; k < spine.length; k++){
-    setStatus(`Preparo la sezione ${k + 1} di ${spine.length}...`, false, true);
-    const href = manifest[spine[k].getAttribute('idref')];
-    if(!href) continue;
-    const f = zip.file(resolvePath(base, decodeURIComponent(href.split('#')[0])));
-    if(!f) continue;
-    const doc = new DOMParser().parseFromString(await f.async('string'), 'text/html');
-    if(!doc.body) continue;
-    doc.querySelectorAll('script,style,sup a,nav').forEach(e => e.remove());
-    doc.body.querySelectorAll('p,h1,h2,h3,h4,h5,h6,li,blockquote,div,br,tr,dt,dd')
-      .forEach(e => e.after(doc.createTextNode(' ')));
-    const paras = doc.body.textContent.split(' ').map(s => s.trim()).filter(Boolean);
-    const sentences = paragraphsToSentences(paras);
-    if(!sentences.length) continue;
-    n++;
-    const h = doc.querySelector('h1,h2,h3');
-    let t = h ? h.textContent.replace(/\s+/g, ' ').trim() : '';
-    if(t.length > 60) t = t.slice(0, 57) + '...';
-    secs.push({ title: t || `Capitolo ${n}`, sentences });
+  const toc = await readEpubToc(zip, opf, base, manifest);
+  const secs = [];
+  if(toc.length >= 2){
+    // capitoli veri, presi dall'indice del libro
+    const byFile = {};
+    toc.forEach((t, i) => { (byFile[t.file] = byFile[t.file] || []).push({ i, frag: t.frag }); });
+    let cur = { title: 'Inizio', paras: [] };
+    const flush = () => { const sentences = paragraphsToSentences(cur.paras); if(sentences.length) secs.push({ title: cur.title, sentences }); };
+    for(let k = 0; k < spine.length; k++){
+      setStatus(`Preparo la sezione ${k + 1} di ${spine.length}...`, false, true);
+      const href = manifest[spine[k].getAttribute('idref')];
+      if(!href) continue;
+      const path = resolvePath(base, decodeURIComponent(href.split('#')[0]));
+      const f = zip.file(path); if(!f) continue;
+      const doc = new DOMParser().parseFromString(await f.async('string'), 'text/html');
+      if(!doc.body) continue;
+      doc.querySelectorAll('script,style,sup a,nav').forEach(e => e.remove());
+      // segno nel testo dove inizia ogni capitolo dell'indice
+      (byFile[path] || []).forEach(({ i, frag }) => {
+        const mark = doc.createTextNode('\u2029\u2063' + i + '\u2063\u2029');
+        const target = frag ? doc.getElementById(frag) : null;
+        if(target) target.before(mark); else doc.body.prepend(mark);
+      });
+      doc.body.querySelectorAll('p,h1,h2,h3,h4,h5,h6,li,blockquote,div,br,tr,dt,dd')
+        .forEach(e => e.after(doc.createTextNode('\u2029')));
+      for(const raw of doc.body.textContent.split('\u2029')){
+        const t = raw.trim(); if(!t) continue;
+        const m = /^\u2063(\d+)\u2063$/.exec(t);
+        if(m){ flush(); cur = { title: toc[+m[1]].label, paras: [] }; continue; }
+        cur.paras.push(t);
+      }
+    }
+    flush();
+  } else {
+    // nessun indice: un capitolo per ogni file del libro
+    let n = 0;
+    for(let k = 0; k < spine.length; k++){
+      setStatus(`Preparo la sezione ${k + 1} di ${spine.length}...`, false, true);
+      const href = manifest[spine[k].getAttribute('idref')];
+      if(!href) continue;
+      const f = zip.file(resolvePath(base, decodeURIComponent(href.split('#')[0])));
+      if(!f) continue;
+      const doc = new DOMParser().parseFromString(await f.async('string'), 'text/html');
+      if(!doc.body) continue;
+      doc.querySelectorAll('script,style,sup a,nav').forEach(e => e.remove());
+      doc.body.querySelectorAll('p,h1,h2,h3,h4,h5,h6,li,blockquote,div,br,tr,dt,dd')
+        .forEach(e => e.after(doc.createTextNode('\u2029')));
+      const paras = doc.body.textContent.split('\u2029').map(x => x.trim()).filter(Boolean);
+      const sentences = paragraphsToSentences(paras);
+      if(!sentences.length) continue;
+      n++;
+      const h = doc.querySelector('h1,h2,h3');
+      let t = h ? h.textContent.replace(/\s+/g, ' ').trim() : '';
+      if(t.length > 60) t = t.slice(0, 57) + '...';
+      secs.push({ title: t || `Capitolo ${n}`, sentences });
+    }
   }
-  return { secs, title: pick('title'), author: pick('creator'), cover };
+  return { secs, title: pick('title'), author: pick('creator'), cover, chapters: true };
+}
+// legge l'indice dell'EPUB (nav di EPUB 3, oppure toc.ncx di EPUB 2)
+async function readEpubToc(zip, opf, base, manifest){
+  const items = [...opf.getElementsByTagName('item')];
+  const clean = x => (x || '').replace(/\s+/g, ' ').trim();
+  const resolveIn = (filePath, href) => {
+    const dir = filePath.includes('/') ? filePath.slice(0, filePath.lastIndexOf('/') + 1) : '';
+    const [f, frag] = href.split('#');
+    return { file: resolvePath(dir, decodeURIComponent(f)), frag: frag ? decodeURIComponent(frag) : null };
+  };
+  const pickLevel = list => (list.length === 1 && list[0].kids.length >= 2) ? list[0].kids : list;
+  try{
+    const nav = items.find(it => /\bnav\b/.test(it.getAttribute('properties') || ''));
+    if(nav){
+      const path = resolvePath(base, decodeURIComponent(nav.getAttribute('href')));
+      const doc = new DOMParser().parseFromString(await zip.file(path).async('string'), 'text/html');
+      const navs = [...doc.querySelectorAll('nav')];
+      const tocNav = navs.find(n => /toc/.test(n.getAttribute('epub:type') || n.getAttribute('type') || n.getAttribute('role') || '')) || navs[0];
+      const ol = tocNav && tocNav.querySelector('ol');
+      const walk = list => [...list.children].filter(li => li.tagName === 'LI').map(li => {
+        const a = li.querySelector(':scope > a, :scope > span > a') || li.querySelector('a');
+        const sub = li.querySelector(':scope > ol');
+        return { label: clean(a && a.textContent), href: a && a.getAttribute('href'), kids: sub ? walk(sub) : [] };
+      });
+      if(ol){
+        const out = pickLevel(walk(ol)).filter(x => x.href && x.label).map(x => ({ label: x.label.slice(0, 80), ...resolveIn(path, x.href) }));
+        if(out.length) return out;
+      }
+    }
+    const sp = opf.getElementsByTagName('spine')[0];
+    const tocId = sp && sp.getAttribute('toc');
+    const ncx = items.find(it => it.getAttribute('id') === tocId) || items.find(it => /ncx/.test(it.getAttribute('media-type') || ''));
+    if(ncx){
+      const path = resolvePath(base, decodeURIComponent(ncx.getAttribute('href')));
+      const doc = new DOMParser().parseFromString(await zip.file(path).async('string'), 'application/xml');
+      const map = doc.getElementsByTagName('navMap')[0];
+      const walk = el => [...el.children].filter(c => c.localName === 'navPoint').map(np => {
+        const lab = [...np.children].find(c => c.localName === 'navLabel');
+        const con = [...np.children].find(c => c.localName === 'content');
+        return { label: clean(lab && lab.textContent), href: con && con.getAttribute('src'), kids: walk(np) };
+      });
+      if(map) return pickLevel(walk(map)).filter(x => x.href && x.label).map(x => ({ label: x.label.slice(0, 80), ...resolveIn(path, x.href) }));
+    }
+  }catch(e){ console.error(e); }
+  return [];
 }
 
 /* ---------- aggiunta libri ---------- */
@@ -1180,8 +1356,8 @@ async function addFile(file){
     const rec = {
       key, name: file.name, type: isPdf ? 'application/pdf' : 'application/epub+zip',
       title: res.title || file.name.replace(/\.(pdf|epub)$/i, '').replace(/[_]+/g, ' '),
-      author: res.author || null, cover: res.cover || null, isPdf,
-      secs: res.secs, data: saved, size: saved.byteLength, added: Date.now(), v: 2
+      author: res.author || null, cover: res.cover || null, isPdf, chapters: !!res.chapters,
+      secs: res.secs, data: saved, size: saved.byteLength, added: Date.now(), v: 3
     };
     await lib.put(rec);
     const check = await lib.get(key);
@@ -1201,7 +1377,7 @@ async function loadBook(key){
   const rec = await lib.get(key);
   if(!rec) return false;
   let secs = rec.secs;
-  if(!secs || !secs.length){
+  if(!secs || !secs.length || (rec.v || 0) < 3){
     // libro salvato dalla versione precedente: lo analizzo e salvo il risultato
     let data = rec.data || (rec.blob && rec.blob.size ? await rec.blob.arrayBuffer() : null);
     if(!data || !data.byteLength){
@@ -1213,7 +1389,7 @@ async function loadBook(key){
     try{
       const res = await parseBook(data, rec.name, rec.type || (rec.blob && rec.blob.type));
       secs = res.secs;
-      Object.assign(rec, { secs, isPdf: res.isPdf, author: rec.author || res.author, cover: rec.cover || res.cover, data: rec.data || data, v: 2 });
+      Object.assign(rec, { secs, isPdf: res.isPdf, chapters: !!res.chapters, author: rec.author || res.author, cover: rec.cover || res.cover, data: rec.data || data, v: 3 });
       delete rec.blob;
       await lib.put(rec);
       setStatus('');
@@ -1221,13 +1397,16 @@ async function loadBook(key){
   }
   if(state.playing) stop();
   state.key = key; state.meta = rec; state.sections = secs; state.isPdf = !!rec.isPdf; state.prepareTo = null;
+  state.pages = state.isPdf && !rec.chapters; // PDF senza segnalibri: si naviga per pagine
   state.offsets = []; let acc = 0;
   for(const s of secs){ state.offsets.push(acc); acc += s.sentences.length; }
   state.total = acc;
   audio.removeAttribute('data-key');
   want([]);
   const pos = store.get('pos:' + key);
-  if(pos && secs[pos.sec] && secs[pos.sec].sentences[pos.idx]){ state.sec = pos.sec; state.idx = pos.idx; }
+  // la posizione è salvata come numero di frase nel libro: resta giusta anche se i capitoli cambiano
+  if(pos && typeof pos.g === 'number' && pos.g < state.total){ const p = fromG(pos.g); state.sec = p.sec; state.idx = p.idx; }
+  else if(pos && secs[pos.sec] && secs[pos.sec].sentences[pos.idx]){ state.sec = pos.sec; state.idx = pos.idx; }
   else { state.sec = 0; state.idx = 0; }
   store.set('lastBook', key);
   // mini player e player
@@ -1371,10 +1550,11 @@ function option(label, sub, selected, onClick){
 }
 
 function openChapters(){
-  const body = openSheet('chap', state.isPdf ? 'Pagine' : 'Capitoli', true);
+  const body = openSheet('chap', state.pages ? 'Pagine' : 'Capitoli', true);
   state.sections.forEach((s, i) => {
-    const label = state.isPdf ? `Pagina ${i + 1}` : s.title;
-    const o = option(label, `${s.sentences.length} frasi`, i === state.sec, () => { closeSheet(); goTo(i, 0); });
+    const label = state.pages ? `Pagina ${i + 1}` : s.title;
+    const mins = Math.max(1, Math.round(s.sentences.reduce((a, x) => a + x.t.length + 1, 0) / cps() / 60));
+    const o = option(label, `circa ${mins} min a velocità normale`, i === state.sec, () => { closeSheet(); goTo(i, 0); });
     body.appendChild(o);
   });
   const sel = body.querySelector('.opt.sel'); if(sel) sel.scrollIntoView({ block: 'center' });
@@ -1646,18 +1826,32 @@ function markTextSentence(scroll){
   if(sp){ sp.classList.add('on'); if(scroll) sp.scrollIntoView({ block: 'center', behavior: reduceMotion ? 'auto' : 'smooth' }); }
 }
 
+function openSettings(){
+  const body = openSheet('settings', 'Impostazioni', true);
+  body.appendChild(el('div', 'groupLabel', 'Pulsanti avanti e indietro'));
+  body.appendChild(el('p', 'hint', 'Scegli di quanto si spostano i due pulsanti accanto a play, anche dalle cuffie e dalla schermata di blocco. I pulsanti più esterni passano sempre al capitolo precedente o successivo.'));
+  ['frase', '15', '30'].map(k => [k, SKIP_OPTS[k]]).forEach(([k, label]) => {
+    body.appendChild(option(label, k === 'frase' ? 'Riparte dall\'inizio della frase precedente o successiva' : `Torna indietro o va avanti di ${k} secondi di ascolto`, skipMode() === k, () => {
+      prefs.skip = k; store.set('prefs', prefs); renderSkipButtons(); openSettings();
+    }));
+  });
+  body.appendChild(el('div', 'groupLabel', 'Capitoli'));
+  body.appendChild(el('p', 'hint', 'Gli EPUB usano l\'indice del libro, quindi i capitoli e i loro titoli sono quelli veri. Nei PDF uso i segnalibri, se ci sono; altrimenti ci si sposta di pagina in pagina. Indietro di capitolo, a metà capitolo, riporta prima al suo inizio.'));
+}
+
 function openMore(){
   const body = openSheet('more', state.meta ? state.meta.title : 'Opzioni');
   if(state.engine === 'piper'){
-    const chaps = state.isPdf ? 20 : 2;
+    const chaps = state.pages ? 20 : 2;
     const lastSec = Math.min(state.sections.length - 1, state.sec + chaps);
     const until = state.offsets[lastSec] + state.sections[lastSec].sentences.length - 1;
-    body.appendChild(option('Prepara in anticipo', state.isPdf ? 'Genera ora la voce delle prossime 20 pagine, poi le ascolti senza pause' : 'Genera ora la voce dei prossimi 2 capitoli, poi li ascolti senza pause', false, () => {
+    body.appendChild(option('Prepara in anticipo', state.pages ? 'Genera ora la voce delle prossime 20 pagine, poi le ascolti senza pause' : 'Genera ora la voce dei prossimi 2 capitoli, poi li ascolti senza pause', false, () => {
       closeSheet(); state.prepareTo = until; requestWake();
       want(upcoming(lookahead()));
       setStatus('Preparazione avviata. Tieni l\'app aperta, anche in pausa: l\'avanzamento è sotto la barra del player.');
     }));
   }
+  body.appendChild(option('Impostazioni', 'Pulsanti avanti e indietro, capitoli', false, () => openSettings()));
   body.appendChild(option('Ricomincia dall\'inizio', 'Torna alla prima frase del libro', false, () => { closeSheet(); goTo(0, 0); }));
   body.appendChild(option('Segna come finito', 'Lo sposta tra i Finiti', false, () => { closeSheet(); stop(); savePos(true); renderLibrary(); setStatus('Segnato come finito.'); }));
   body.appendChild(option('Rimuovi dal telefono', 'Cancella il libro e la posizione salvata', false, async () => {
@@ -1673,12 +1867,13 @@ $('file').onchange = e => { const f = e.target.files[0]; if(f) addFile(f); e.tar
 document.querySelectorAll('.chip').forEach(c => c.onclick = () => { filter = c.dataset.f; renderChips(); renderLibrary(); });
 $('miniOpen').onclick = openPlayer;
 $('miniPlay').onclick = togglePlay;
-$('miniBack').onclick = () => move(-1);
+$('miniBack').onclick = () => skipBack();
 $('pClose').onclick = closePlayer;
 $('pMore').onclick = openMore;
 $('bigPlay').onclick = togglePlay;
-$('prevSent').onclick = () => move(-1);
-$('nextSent').onclick = () => move(1);
+$('prevSent').onclick = () => skipBack();
+$('nextSent').onclick = () => skipFwd();
+$('setBtn').onclick = () => openSettings();
 $('prevChap').onclick = () => moveChapter(-1);
 $('nextChap').onclick = () => moveChapter(1);
 $('chapBtn').onclick = openChapters;
@@ -1725,6 +1920,7 @@ $('speedLabel').textContent = fmtRate(state.rate);
 restoreVoice();
 if('speechSynthesis' in window) speechSynthesis.onvoiceschanged = () => { if(!state.playing) restoreVoice(); if(sheetKind === 'voice') openVoiceSheet(); };
 updatePlay();
+renderSkipButtons();
 renderChips();
 try{ if(navigator.storage && navigator.storage.persist) navigator.storage.persist(); }catch(e){}
 (async () => {
