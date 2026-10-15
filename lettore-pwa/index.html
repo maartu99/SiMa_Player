@@ -41,6 +41,14 @@ svg{flex:none}
 .libHead h1{margin:0;font-family:var(--serif);font-weight:600;font-size:34px;letter-spacing:-.5px}
 #libCount{font-size:14px;color:var(--muted);margin-top:4px;display:block}
 .headBtns{display:flex;gap:8px;align-items:center}
+.secTitle{font-family:var(--serif);font-size:21px;font-weight:600;margin:22px 0 6px;scroll-margin-top:8px}
+#sheetBody>.secTitle:first-child{margin-top:4px}
+.famRow{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
+.famText{flex:1;min-width:0}
+.famTitle{font-weight:600}
+.famSub{font-size:13px;color:var(--muted);margin-top:2px;line-height:1.4}
+.moreVoices{width:100%;display:flex;align-items:center;gap:14px;margin:18px 0 6px;padding:14px;border-radius:14px;border:1px dashed var(--line2);background:transparent;color:var(--accent);text-align:left;font-weight:600}
+.moreVoices .ot span{display:block;font-size:13px;font-weight:400;color:var(--muted);margin-top:2px}
 .addBtn{height:44px;padding:0 16px;border-radius:22px;border:0;background:var(--accent);color:var(--accent-ink);font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px;white-space:nowrap}
 .chips{display:flex;gap:8px;padding:18px 0 6px;overflow-x:auto;scrollbar-width:none}
 .chips::-webkit-scrollbar{display:none}
@@ -569,7 +577,8 @@ function onWorkerMessage(e){
   }
   if(m.type === 'ready'){
     readyVoices.add(m.voiceId); store.set('readyVoices', [...readyVoices]);
-    if(sheetKind === 'voice') openVoiceSheet();
+    downloading.delete(familyKey(m.voiceId));
+    refreshVoiceUI();
     if(!state.playing) setStatus('Voce pronta.');
     return;
   }
@@ -581,7 +590,7 @@ function onWorkerMessage(e){
     if(m.type === 'result' && key){
       const [vid, book] = key.split('|');
       noteRtf(vid, performance.now() - inf.t, m.blob);
-      if(!readyVoices.has(vid)){ readyVoices.add(vid); store.set('readyVoices', [...readyVoices]); if(sheetKind === 'voice') openVoiceSheet(); }
+      if(!readyVoices.has(vid)){ readyVoices.add(vid); store.set('readyVoices', [...readyVoices]); refreshVoiceUI(); }
       if(book !== 'anteprima') acache.put(key, m.blob, book);
     }
     if(en){
@@ -594,7 +603,7 @@ function onWorkerMessage(e){
         en.res.forEach(r => r.reject(new Error(m.message))); en.res = [];
       }
     }
-    if(m.type === 'error' && !key) setStatus('Non riesco a preparare la voce. Controlla la connessione e riprova.', true);
+    if(m.type === 'error' && !key){ downloading.clear(); refreshVoiceUI(); setStatus('Non riesco a scaricare la voce. Controlla la connessione e riprova.', true); }
     updateBuf();
     pump();
   }
@@ -1602,7 +1611,7 @@ async function previewVoice(kind, id){
     speechSynthesis.speak(u);
     return;
   }
-  if(isGemId(id) && !store.get('gemKey')){ openGemSetup(id, 1); return; }
+  if(isGemId(id) && !store.get('gemKey')){ gemFrom = sheetKind === 'settings' ? 'settings' : 'voice'; openGemSetup(id, 1); return; }
   unlockAudio();
   const g = state.gen;
   const key = `${id}|anteprima|0|0`;
@@ -1622,7 +1631,7 @@ function selectVoice(kind, id){
   const wasPlaying = state.playing;
   if(wasPlaying) stop();
   state.prepareTo = null;
-  if(kind === 'piper' && isGemId(id) && !store.get('gemKey')){ if(wasPlaying){ unlockAudio(); play(); } openGemSetup(id, 1); return; }
+  if(kind === 'piper' && isGemId(id) && !store.get('gemKey')){ if(wasPlaying){ unlockAudio(); play(); } gemFrom = sheetKind === 'settings' ? 'settings' : 'voice'; openGemSetup(id, 1); return; }
   if(kind === 'piper'){
     state.engine = 'piper'; state.piperVoice = id;
     audio.removeAttribute('data-key');
@@ -1638,7 +1647,7 @@ function selectVoice(kind, id){
   savePrefs();
   $('voiceLabel').textContent = voiceName();
   refreshPosition(false);
-  if(sheetKind === 'voice') openVoiceSheet();
+  refreshVoiceUI();
   if(wasPlaying){ unlockAudio(); play(); }
   else if(state.engine === 'piper' && state.total) want(upcoming(lookahead()));
 }
@@ -1649,55 +1658,122 @@ function voiceRow(label, sub, selected, onPick, onTry){
   row.append(o, t);
   return row;
 }
+function refreshVoiceUI(){
+  if(sheetKind === 'voice') openVoiceSheet();
+  else if(sheetKind === 'settings') openSettings(null, true);
+}
+function speedNote(id){
+  const r = rtfOf(id);
+  return !r ? '' : r < 0.7 ? ' · veloce su questo telefono' : r < 1 ? ' · al limite su questo telefono' : ' · lenta su questo telefono, farà pause';
+}
+function systemVoices(){ return 'speechSynthesis' in window ? speechSynthesis.getVoices().filter(v => v.lang && v.lang.toLowerCase().startsWith('it')) : []; }
+// Player > Voce: solo le voci pronte da usare
 function openVoiceSheet(){
   const body = sheetKind === 'voice' ? $('sheetBody') : openSheet('voice', 'Voce', true);
   const scroll = body.scrollTop; body.textContent = '';
-  // Google Gemini: voci sempre visibili, la procedura guidata parte quando ne scegli una
-  const hasKey = !!store.get('gemKey');
-  body.appendChild(el('div', 'groupLabel', 'Voci Google'));
-  body.appendChild(el('p', 'hint', hasKey
-    ? 'Le più naturali: capiscono il contesto, le domande e i dialoghi. Servono internet e un limite giornaliero gratuito.'
-    : 'Le più naturali: capiscono il contesto, le domande e i dialoghi. Gratis, ma la prima volta vanno attivate con il tuo account Google: scegline una e ti guido passo passo, ci vogliono un paio di minuti.'));
-  GEM_VOICES.forEach(v => {
-    const sel = state.engine === 'piper' && state.piperVoice === v.id;
-    body.appendChild(voiceRow(v.name, 'Voce ' + v.desc + (hasKey ? '' : ' · da attivare'), sel, () => selectVoice('piper', v.id), () => previewVoice('piper', v.id)));
-  });
-  if(hasKey){
-    body.appendChild(el('div', 'groupLabel', 'Stile di lettura delle voci Google'));
-    const pre = el('div', 'presets'); pre.style.gridTemplateColumns = 'repeat(3,minmax(0,1fr))';
-    Object.entries(GEM_STYLES).forEach(([k, st]) => {
-      const b = el('button', null, st.label); b.setAttribute('aria-pressed', (prefs.gemStyle || 'narrativa') === k ? 'true' : 'false');
-      b.onclick = () => { prefs.gemStyle = k; store.set('prefs', prefs); openVoiceSheet(); setStatus('Stile salvato: vale per le parti non ancora preparate.'); };
-      pre.appendChild(b);
+  body.appendChild(el('p', 'hint', 'Tocca una voce per usarla, oppure Prova per sentirla.'));
+  if(store.get('gemKey')){
+    body.appendChild(el('div', 'groupLabel', 'Voci Google'));
+    GEM_VOICES.forEach(v => {
+      const sel = state.engine === 'piper' && state.piperVoice === v.id;
+      body.appendChild(voiceRow(v.name, 'Voce ' + v.desc + ' · serve internet', sel, () => selectVoice('piper', v.id), () => previewVoice('piper', v.id)));
     });
-    body.appendChild(pre);
-    const rm = el('button', 'smallBtn', 'Scollega account Google');
-    rm.onclick = () => { if(!confirm('Scollegare le voci Google da questo telefono? Potrai riattivarle quando vuoi.')) return; store.del('gemKey'); if(isGem()) selectVoice('piper', PIPER_VOICES[0].id); openVoiceSheet(); };
-    body.appendChild(rm);
   }
-  body.appendChild(el('div', 'groupLabel', 'Voci sul telefono'));
-  body.appendChild(el('p', 'hint', 'Generate sul telefono, gratis e offline dopo il primo download. Kokoro suona meglio di Piper ma è più pesante. Supertonic è nuova e sperimentale: file grandi, da provare in Wi-Fi.'));
-  PIPER_VOICES.forEach(v => {
-    const sel = state.engine === 'piper' && state.piperVoice === v.id;
-    const r = rtfOf(v.id);
-    const speed = !voiceReady(v.id) ? ` · da scaricare, ${v.size}` : !r ? '' : r < 0.7 ? ' · veloce su questo telefono' : r < 1 ? ' · al limite su questo telefono' : ' · lenta su questo telefono, farà pause';
-    const sub = v.engine + speed;
-    body.appendChild(voiceRow(v.name, sub, sel, () => selectVoice('piper', v.id), () => previewVoice('piper', v.id)));
-  });
-  const it = 'speechSynthesis' in window ? speechSynthesis.getVoices().filter(v => v.lang && v.lang.toLowerCase().startsWith('it')) : [];
-  body.appendChild(el('div', 'groupLabel', 'Voci dell\'iPhone'));
+  const phone = PIPER_VOICES.filter(v => voiceReady(v.id));
+  if(phone.length){
+    body.appendChild(el('div', 'groupLabel', 'Voci sul telefono'));
+    phone.forEach(v => {
+      const sel = state.engine === 'piper' && state.piperVoice === v.id;
+      body.appendChild(voiceRow(v.name, v.engine + speedNote(v.id), sel, () => selectVoice('piper', v.id), () => previewVoice('piper', v.id)));
+    });
+  }
+  const it = systemVoices();
   if(it.length){
+    body.appendChild(el('div', 'groupLabel', 'Voci dell\'iPhone'));
     it.forEach(v => {
       const sel = state.engine === 'sys' && state.sysVoice && state.sysVoice.voiceURI === v.voiceURI;
       body.appendChild(voiceRow(v.name, /enhanced|premium|avanzat|migliorat/i.test(v.name) ? 'Avanzata' : 'Di sistema', sel, () => selectVoice('sys', v.voiceURI), () => previewVoice('sys', v.voiceURI)));
     });
   }
-  body.appendChild(el('p', 'hint', 'Per voci dell\'iPhone migliori scarica le versioni Avanzate da Impostazioni > Accessibilità > Contenuto letto > Voci > Italiano.'));
+  // la voce in uso non ancora pronta (es. download in corso) resta visibile
+  if(state.engine === 'piper' && !voiceReady(state.piperVoice)){
+    const v = PIPER_VOICES.find(x => x.id === state.piperVoice) || GEM_VOICES.find(x => x.id === state.piperVoice);
+    if(v){ body.appendChild(el('div', 'groupLabel', 'In preparazione')); body.appendChild(voiceRow(v.name, 'In download, la uso appena è pronta', true, () => {}, () => previewVoice('piper', v.id))); }
+  }
+  const more = el('button', 'moreVoices');
+  more.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
+  const mt = el('span', 'ot', 'Scopri altre voci'); mt.appendChild(el('span', null, 'Voci Google, voci da scaricare sul telefono e altre, nelle Impostazioni'));
+  more.appendChild(mt);
+  more.onclick = () => openSettings('voices');
+  body.appendChild(more);
   body.scrollTop = scroll;
+}
+
+/* ---------- gestione delle voci (Impostazioni) ---------- */
+const downloading = new Set();
+const familyKey = id => familyOf(id) === 'piper' ? id : familyOf(id);
+const PHONE_GROUPS = [
+  { key: 'kokoro', title: 'Kokoro', sub: 'Sara e Nicola · le migliori sul telefono, circa 130 MB', ids: ['kokoro-if_sara', 'kokoro-im_nicola'] },
+  { key: 'it_IT-paola-medium', title: 'Piper · Paola', sub: 'Leggera e veloce, circa 60 MB', ids: ['it_IT-paola-medium'] },
+  { key: 'it_IT-riccardo-x_low', title: 'Piper · Riccardo', sub: 'La più leggera, circa 20 MB', ids: ['it_IT-riccardo-x_low'] },
+  { key: 'supertonic', title: 'Supertonic', sub: 'Sperimentale, 2 voci donna e 2 uomo, circa 400 MB: scaricala in Wi-Fi', ids: ['st-F1', 'st-F2', 'st-M1', 'st-M2'] }
+];
+function downloadGroup(g){
+  if(downloading.has(g.key)) return;
+  downloading.add(g.key);
+  setStatus(`Scarico ${g.title}. Serve solo la prima volta: tieni l'app aperta.`, false, true);
+  wk(g.ids[0]).postMessage({ type: 'prepare', voiceId: g.ids[0] });
+  refreshVoiceUI();
+}
+async function removeGroup(g){
+  if(!confirm(`Rimuovere ${g.title} dal telefono? Potrai scaricarla di nuovo quando vuoi.`)) return;
+  const fam = familyOf(g.ids[0]);
+  if(workers[fam]){ workers[fam].terminate(); delete workers[fam]; busy = false; }
+  try{
+    if(fam === 'kokoro'){
+      await caches.delete('kokoro-voices');
+      const c = await caches.open('transformers-cache');
+      for(const r of await c.keys()) if(/kokoro/i.test(r.url)) await c.delete(r);
+    } else if(fam === 'supertonic'){
+      await caches.delete('supertonic-3');
+    } else {
+      const root = await navigator.storage.getDirectory();
+      const dir = await root.getDirectoryHandle('piper');
+      for await (const name of dir.keys()) if(name.startsWith(g.ids[0])) await dir.removeEntry(name);
+    }
+  }catch(e){ console.error(e); }
+  g.ids.forEach(id => readyVoices.delete(id));
+  store.set('readyVoices', [...readyVoices]);
+  // se era la voce in uso passo a una voce già pronta
+  if(state.engine === 'piper' && g.ids.includes(state.piperVoice)){
+    const alt = PIPER_VOICES.find(v => voiceReady(v.id));
+    const sys = systemVoices()[0];
+    if(store.get('gemKey')) selectVoice('piper', GEM_VOICES[0].id);
+    else if(alt) selectVoice('piper', alt.id);
+    else selectVoice('sys', sys ? sys.voiceURI : '');
+  }
+  setStatus(`${g.title} rimossa dal telefono.`);
+  refreshVoiceUI();
+}
+function famRow(title, sub, btnLabel, onBtn, disabled){
+  const row = el('div', 'famRow');
+  const t = el('div', 'famText'); t.appendChild(el('div', 'famTitle', title)); t.appendChild(el('div', 'famSub', sub));
+  row.appendChild(t);
+  if(btnLabel){ const b = el('button', 'smallBtn', btnLabel); b.disabled = !!disabled; b.onclick = onBtn; row.appendChild(b); }
+  return row;
+}
+async function clearAudioCache(){
+  if(!confirm('Cancellare l\'audio già preparato? Le parti verranno generate di nuovo quando le ascolti.')) return;
+  try{ const db = await lib.open(); await new Promise(res => { const t = db.transaction('audio', 'readwrite'); t.objectStore('audio').clear(); t.oncomplete = res; t.onerror = res; }); }catch(e){}
+  store.set('audioBytes', 0);
+  want([]); if(state.total && state.engine === 'piper') want(upcoming(lookahead()));
+  setStatus('Audio preparato cancellato.');
+  refreshVoiceUI();
 }
 
 /* ---------- procedura guidata: attivare le voci Google ---------- */
 const gemSetup = { voice: null, step: 1, key: '' };
+let gemFrom = 'voice';
 function openGemSetup(voiceId, step){
   if(voiceId) gemSetup.voice = voiceId;
   gemSetup.step = step || gemSetup.step || 1;
@@ -1708,7 +1784,7 @@ function openGemSetup(voiceId, step){
   for(let i = 1; i <= 3; i++){ const d = el('span', i <= gemSetup.step ? 'on' : ''); prog.appendChild(d); }
   body.appendChild(prog);
   body.appendChild(el('div', 'groupLabel', `Passo ${gemSetup.step} di 3`));
-  const back = (to) => { const b = el('button', 'smallBtn', 'Indietro'); b.onclick = () => openGemSetup(null, to); return b; };
+  const back = (to) => { const b = el('button', 'smallBtn', 'Indietro'); b.onclick = () => to ? openGemSetup(null, to) : (gemFrom === 'settings' ? openSettings('voices') : openVoiceSheet()); return b; };
 
   if(gemSetup.step === 1){
     body.appendChild(el('h3', 'stepTitle', `Per usare ${v.name} serve il tuo account Google`));
@@ -1719,6 +1795,7 @@ function openGemSetup(voiceId, step){
     body.appendChild(el('p', 'stepText muted', 'Da sapere: il testo del libro viene inviato a Google per essere letto, e nel piano gratuito Google può usarlo per migliorare i suoi servizi.'));
     const go = el('button', 'wideBtn', 'Inizia'); go.onclick = () => openGemSetup(null, 2);
     body.appendChild(go);
+    body.appendChild(back(0));
   }
 
   if(gemSetup.step === 2){
@@ -1778,7 +1855,7 @@ function openGemSetup(voiceId, step){
         audio.src = URL.createObjectURL(blob); audio.dataset.key = 'gem-setup'; audio.playbackRate = state.rate;
         audio.play().catch(() => {});
         selectVoice('piper', v.id);
-        setTimeout(() => { if(sheetKind === 'gemSetup') openVoiceSheet(); }, 2500);
+        setTimeout(() => { if(sheetKind === 'gemSetup'){ if(gemFrom === 'settings') openSettings('voices'); else openVoiceSheet(); } }, 2500);
       }catch(e){
         const m = e.message || '';
         msg.className = 'stepText warn';
@@ -1826,17 +1903,88 @@ function markTextSentence(scroll){
   if(sp){ sp.classList.add('on'); if(scroll) sp.scrollIntoView({ block: 'center', behavior: reduceMotion ? 'auto' : 'smooth' }); }
 }
 
-function openSettings(){
-  const body = openSheet('settings', 'Impostazioni', true);
-  body.appendChild(el('div', 'groupLabel', 'Pulsanti avanti e indietro'));
-  body.appendChild(el('p', 'hint', 'Scegli di quanto si spostano i due pulsanti accanto a play, anche dalle cuffie e dalla schermata di blocco. I pulsanti più esterni passano sempre al capitolo precedente o successivo.'));
-  ['frase', '15', '30'].map(k => [k, SKIP_OPTS[k]]).forEach(([k, label]) => {
-    body.appendChild(option(label, k === 'frase' ? 'Riparte dall\'inizio della frase precedente o successiva' : `Torna indietro o va avanti di ${k} secondi di ascolto`, skipMode() === k, () => {
-      prefs.skip = k; store.set('prefs', prefs); renderSkipButtons(); openSettings();
+function openSettings(focus, keepScroll){
+  const body = (keepScroll && sheetKind === 'settings') ? $('sheetBody') : openSheet('settings', 'Impostazioni', true);
+  const scroll = body.scrollTop; body.textContent = '';
+  const sec = (title, id) => { const h = el('h3', 'secTitle', title); if(id) h.id = id; body.appendChild(h); return h; };
+
+  // pulsanti
+  sec('Pulsanti avanti e indietro');
+  body.appendChild(el('p', 'hint', 'Di quanto si spostano i due pulsanti accanto a play, anche dalle cuffie e dalla schermata di blocco. I pulsanti più esterni passano sempre al capitolo precedente o successivo.'));
+  ['frase', '15', '30'].forEach(k => {
+    body.appendChild(option(SKIP_OPTS[k], k === 'frase' ? 'Riparte dall\'inizio della frase precedente o successiva' : `Torna indietro o va avanti di ${k} secondi di ascolto`, skipMode() === k, () => {
+      prefs.skip = k; store.set('prefs', prefs); renderSkipButtons(); openSettings(null, true);
     }));
   });
-  body.appendChild(el('div', 'groupLabel', 'Capitoli'));
+
+  // voci
+  const vh = sec('Voci', 'setVoices');
+  body.appendChild(el('p', 'hint', 'Qui attivi e scarichi le voci. Quelle pronte compaiono nel player, in Voce.'));
+  const hasKey = !!store.get('gemKey');
+  body.appendChild(el('div', 'groupLabel', 'Voci Google'));
+  if(!hasKey){
+    body.appendChild(el('p', 'hint', 'Le più naturali: capiscono il contesto, le domande e i dialoghi. Gratis con il tuo account Google, entro un limite giornaliero, e serve internet. L\'attivazione richiede un paio di minuti e ti guido passo passo.'));
+    const go = el('button', 'wideBtn', 'Attiva le voci Google');
+    go.onclick = () => { gemFrom = 'settings'; openGemSetup(GEM_VOICES[0].id, 1); };
+    body.appendChild(go);
+  } else {
+    body.appendChild(famRow('Attive', '10 voci, serve internet. Puoi provarle e sceglierle qui o nel player.', 'Scollega', () => {
+      if(!confirm('Scollegare le voci Google da questo telefono? Potrai riattivarle quando vuoi.')) return;
+      store.del('gemKey');
+      if(isGem()){ const alt = PIPER_VOICES.find(v => voiceReady(v.id)); const sys = systemVoices()[0]; if(alt) selectVoice('piper', alt.id); else if(sys) selectVoice('sys', sys.voiceURI); }
+      refreshVoiceUI();
+    }));
+    GEM_VOICES.forEach(v => {
+      const sel = state.engine === 'piper' && state.piperVoice === v.id;
+      body.appendChild(voiceRow(v.name, 'Voce ' + v.desc, sel, () => selectVoice('piper', v.id), () => previewVoice('piper', v.id)));
+    });
+    body.appendChild(el('div', 'groupLabel', 'Stile di lettura Google'));
+    const pre = el('div', 'presets'); pre.style.gridTemplateColumns = 'repeat(3,minmax(0,1fr))';
+    Object.entries(GEM_STYLES).forEach(([k, st]) => {
+      const b = el('button', null, st.label); b.setAttribute('aria-pressed', (prefs.gemStyle || 'narrativa') === k ? 'true' : 'false');
+      b.onclick = () => { prefs.gemStyle = k; store.set('prefs', prefs); openSettings(null, true); setStatus('Stile salvato: vale per le parti non ancora preparate.'); };
+      pre.appendChild(b);
+    });
+    body.appendChild(pre);
+  }
+
+  body.appendChild(el('div', 'groupLabel', 'Voci sul telefono'));
+  body.appendChild(el('p', 'hint', 'Generate sul telefono: gratis e offline dopo il download.'));
+  PHONE_GROUPS.forEach(g => {
+    const ready = voiceReady(g.ids[0]);
+    const dl = downloading.has(g.key);
+    body.appendChild(famRow(g.title, (ready ? 'Pronta · ' : dl ? 'Download in corso · ' : '') + g.sub,
+      ready ? 'Rimuovi' : dl ? 'Scarico...' : 'Scarica', () => ready ? removeGroup(g) : downloadGroup(g), dl && !ready));
+    if(ready){
+      g.ids.forEach(id => {
+        const v = PIPER_VOICES.find(x => x.id === id);
+        const sel = state.engine === 'piper' && state.piperVoice === id;
+        body.appendChild(voiceRow(v.name, v.engine + speedNote(id), sel, () => selectVoice('piper', id), () => previewVoice('piper', id)));
+      });
+    }
+  });
+
+  body.appendChild(el('div', 'groupLabel', 'Voci dell\'iPhone'));
+  const it = systemVoices();
+  it.forEach(v => {
+    const sel = state.engine === 'sys' && state.sysVoice && state.sysVoice.voiceURI === v.voiceURI;
+    body.appendChild(voiceRow(v.name, /enhanced|premium|avanzat|migliorat/i.test(v.name) ? 'Avanzata' : 'Di sistema', sel, () => selectVoice('sys', v.voiceURI), () => previewVoice('sys', v.voiceURI)));
+  });
+  body.appendChild(el('p', 'hint', 'Sempre pronte. Per renderle più naturali scarica le versioni Avanzate dalle impostazioni dell\'iPhone: Accessibilità > Contenuto letto > Voci > Italiano.'));
+
+  // spazio
+  sec('Spazio sul telefono');
+  const audioMb = Math.round((store.get('audioBytes') || 0) / 1048576);
+  body.appendChild(famRow('Audio già preparato', `${audioMb} MB · le parti generate restano salvate per riascoltarle senza attese`, audioMb ? 'Svuota' : null, clearAudioCache));
+  const used = el('p', 'hint', ''); body.appendChild(used);
+  if(navigator.storage && navigator.storage.estimate) navigator.storage.estimate().then(e => { used.textContent = `In tutto l'app occupa circa ${Math.round((e.usage || 0) / 1048576)} MB, tra libri, voci scaricate e audio.`; }).catch(() => {});
+
+  // capitoli
+  sec('Capitoli');
   body.appendChild(el('p', 'hint', 'Gli EPUB usano l\'indice del libro, quindi i capitoli e i loro titoli sono quelli veri. Nei PDF uso i segnalibri, se ci sono; altrimenti ci si sposta di pagina in pagina. Indietro di capitolo, a metà capitolo, riporta prima al suo inizio.'));
+
+  if(keepScroll) body.scrollTop = scroll;
+  else if(focus === 'voices') vh.scrollIntoView({ block: 'start' });
 }
 
 function openMore(){
@@ -1851,7 +1999,7 @@ function openMore(){
       setStatus('Preparazione avviata. Tieni l\'app aperta, anche in pausa: l\'avanzamento è sotto la barra del player.');
     }));
   }
-  body.appendChild(option('Impostazioni', 'Pulsanti avanti e indietro, capitoli', false, () => openSettings()));
+  body.appendChild(option('Impostazioni', 'Voci, pulsanti avanti e indietro, spazio', false, () => openSettings()));
   body.appendChild(option('Ricomincia dall\'inizio', 'Torna alla prima frase del libro', false, () => { closeSheet(); goTo(0, 0); }));
   body.appendChild(option('Segna come finito', 'Lo sposta tra i Finiti', false, () => { closeSheet(); stop(); savePos(true); renderLibrary(); setStatus('Segnato come finito.'); }));
   body.appendChild(option('Rimuovi dal telefono', 'Cancella il libro e la posizione salvata', false, async () => {
@@ -1905,12 +2053,19 @@ window.addEventListener('pagehide', () => savePos());
 
 /* ---------- avvio ---------- */
 function restoreVoice(){
-  const pv = prefs.voice || 'piper:' + PIPER_VOICES[0].id;
-  if(pv.startsWith('sys:') && 'speechSynthesis' in window){
-    const v = speechSynthesis.getVoices().find(x => x.voiceURI === pv.slice(4));
-    if(v){ state.engine = 'sys'; state.sysVoice = v; }
-  } else if(pv.startsWith('piper:') && (PIPER_VOICES.some(v => v.id === pv.slice(6)) || (isGemId(pv.slice(6)) && store.get('gemKey')))){
-    state.engine = 'piper'; state.piperVoice = pv.slice(6);
+  // uso la voce scelta solo se è pronta; altrimenti una voce pronta, così l'app non parte mai con un download pesante
+  const pv = prefs.voice || '';
+  const id = pv.startsWith('piper:') ? pv.slice(6) : null;
+  const sysList = systemVoices();
+  if(pv.startsWith('sys:')){
+    state.engine = 'sys'; state.sysVoice = sysList.find(x => x.voiceURI === pv.slice(4)) || state.sysVoice || sysList[0] || null;
+  } else if(id && ((isGemId(id) && store.get('gemKey')) || (PIPER_VOICES.some(v => v.id === id) && (voiceReady(id) || downloading.has(familyKey(id)))))){
+    state.engine = 'piper'; state.piperVoice = id;
+  } else {
+    const alt = PIPER_VOICES.find(v => voiceReady(v.id));
+    if(store.get('gemKey')){ state.engine = 'piper'; state.piperVoice = GEM_VOICES[0].id; }
+    else if(alt){ state.engine = 'piper'; state.piperVoice = alt.id; }
+    else { state.engine = 'sys'; state.sysVoice = sysList[0] || null; }
   }
   $('voiceLabel').textContent = voiceName();
   if(state.total) refreshPosition(false);
@@ -1918,7 +2073,7 @@ function restoreVoice(){
 if(prefs.rate) state.rate = +prefs.rate;
 $('speedLabel').textContent = fmtRate(state.rate);
 restoreVoice();
-if('speechSynthesis' in window) speechSynthesis.onvoiceschanged = () => { if(!state.playing) restoreVoice(); if(sheetKind === 'voice') openVoiceSheet(); };
+if('speechSynthesis' in window) speechSynthesis.onvoiceschanged = () => { if(!state.playing) restoreVoice(); refreshVoiceUI(); };
 updatePlay();
 renderSkipButtons();
 renderChips();
