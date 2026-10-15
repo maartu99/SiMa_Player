@@ -343,7 +343,7 @@ body.playerOpen #toast{bottom:auto;top:calc(env(safe-area-inset-top) + 64px)}
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 19;
+const APP_VERSION = 20;
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
   let hadController = !!navigator.serviceWorker.controller, reloading = false;
@@ -1117,6 +1117,7 @@ function moveChapter(delta){
 
 /* ---------- schermata di blocco e cuffie ---------- */
 function updateMedia(){
+  syncMediaHandlers();
   if(!('mediaSession' in navigator) || !state.meta) return;
   try{
     const url = coverUrl(state.meta);
@@ -1128,11 +1129,39 @@ function updateMedia(){
     });
   }catch(e){}
 }
-if('mediaSession' in navigator){
+// play e pausa dalla schermata di blocco: con le voci che suonano come audio (Google e quelle scaricate)
+// li lascio gestire direttamente a iOS, che funziona anche quando l'app è addormentata;
+// l'app si riallinea guardando gli eventi dell'audio. Con le voci dell'iPhone servono invece i comandi dell'app.
+function syncMediaHandlers(){
+  if(!('mediaSession' in navigator)) return;
   const ms = navigator.mediaSession;
   try{
-    ms.setActionHandler('play', () => remotePlay());
-    ms.setActionHandler('pause', () => stop());
+    if(state.engine === 'piper'){ ms.setActionHandler('play', null); ms.setActionHandler('pause', null); }
+    else { ms.setActionHandler('play', () => remotePlay()); ms.setActionHandler('pause', () => stop()); }
+  }catch(e){}
+}
+audio.addEventListener('play', () => {
+  // ripartito da fuori (schermata di blocco, cuffie): l'app torna in riproduzione
+  if(state.playing || !state.total || state.engine !== 'piper') return;
+  if(audio.src === silenceUrl || (!audio.dataset.key && audio.src !== holdUrl)) return;
+  state.playing = true; updatePlay(); requestWake();
+  if(audio.src === holdUrl || audio.ended) piperSpeakCurrent();
+});
+audio.addEventListener('pause', () => {
+  // messo in pausa da fuori: controllo poco dopo, perché il cambio di frase non è una pausa
+  if(!state.playing || state.engine !== 'piper') return;
+  setTimeout(() => {
+    if(state.playing && audio.paused && !audio.ended){
+      state.playing = false; state.gen++;
+      if(audio.src === holdUrl) audio.loop = false;
+      updatePlay(); savePos(); releaseWake();
+    }
+  }, 250);
+});
+if('mediaSession' in navigator){
+  const ms = navigator.mediaSession;
+  syncMediaHandlers();
+  try{
     ms.setActionHandler('nexttrack', () => skipFwd());
     ms.setActionHandler('previoustrack', () => skipBack());
     ms.setActionHandler('seekforward', () => skipSeconds(skipMode() === 'frase' ? 15 : +skipMode()));
@@ -1786,6 +1815,7 @@ function selectVoice(kind, id){
     state.sysVoice = speechSynthesis.getVoices().find(x => x.voiceURI === id) || null;
   }
   savePrefs();
+  syncMediaHandlers();
   $('voiceLabel').textContent = voiceName();
   refreshPosition(false);
   refreshVoiceUI();
@@ -2255,6 +2285,7 @@ function restoreVoice(){
     else { state.engine = 'sys'; state.sysVoice = sysList[0] || null; }
   }
   $('voiceLabel').textContent = voiceName();
+  syncMediaHandlers();
   if(state.total) refreshPosition(false);
 }
 if(prefs.rate) state.rate = +prefs.rate;
