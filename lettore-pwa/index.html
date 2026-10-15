@@ -369,7 +369,7 @@ body.playerOpen #toast{bottom:auto;top:calc(env(safe-area-inset-top) + 64px)}
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 27;
+const APP_VERSION = 28;
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
   let hadController = !!navigator.serviceWorker.controller, reloading = false;
@@ -845,7 +845,8 @@ function unlockAudio(){
 
 /* ---------- Google Gemini ---------- */
 // più modelli con le stesse voci, ognuno con il suo limite gratuito: quando uno finisce passo al successivo
-const GEM_MODELS = ['gemini-3.8-flash-tts', 'gemini-3.1-flash-tts-preview', 'gemini-3.8-flash-lite-tts', 'gemini-2.5-flash-preview-tts', 'gemini-2.5-pro-preview-tts'];
+// solo i modelli gratuiti sul tuo account (il 2.5 Pro non lo è)
+const GEM_MODELS = ['gemini-3.8-flash-tts', 'gemini-3.1-flash-tts-preview', 'gemini-3.8-flash-lite-tts', 'gemini-2.5-flash-preview-tts'];
 const GEM_MODEL_NAMES = { 'gemini-3.8-flash-tts': 'Flash 3.8, il principale', 'gemini-3.1-flash-tts-preview': 'Flash 3.1, anteprima', 'gemini-3.8-flash-lite-tts': 'Flash Lite 3.8', 'gemini-2.5-flash-preview-tts': 'Flash 2.5', 'gemini-2.5-pro-preview-tts': 'Pro 2.5' };
 function gemBlocked(){ const b = store.get('gemBlocked') || {}; const now = Date.now(); return GEM_MODELS.filter(m => b[m] && b[m] > now); }
 function blockModel(m, until){ const b = store.get('gemBlocked') || {}; b[m] = until; store.set('gemBlocked', b); }
