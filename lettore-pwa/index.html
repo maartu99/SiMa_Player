@@ -368,7 +368,7 @@ body.playerOpen #toast{bottom:auto;top:calc(env(safe-area-inset-top) + 64px)}
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 25;
+const APP_VERSION = 26;
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
   let hadController = !!navigator.serviceWorker.controller, reloading = false;
@@ -848,6 +848,8 @@ const GEM_MODELS = ['gemini-3.8-flash-tts', 'gemini-3.1-flash-tts-preview', 'gem
 const GEM_MODEL_NAMES = { 'gemini-3.8-flash-tts': 'Flash 3.8, il principale', 'gemini-3.1-flash-tts-preview': 'Flash 3.1, anteprima', 'gemini-3.8-flash-lite-tts': 'Flash Lite 3.8', 'gemini-2.5-flash-preview-tts': 'Flash 2.5', 'gemini-2.5-pro-preview-tts': 'Pro 2.5' };
 function gemBlocked(){ const b = store.get('gemBlocked') || {}; const now = Date.now(); return GEM_MODELS.filter(m => b[m] && b[m] > now); }
 function blockModel(m, until){ const b = store.get('gemBlocked') || {}; b[m] = until; store.set('gemBlocked', b); }
+// modelli che il piano gratuito di questo account include (quelli fermi per giorni non contano)
+function gemModelsFree(){ const b = store.get('gemBlocked') || {}, now = Date.now(); return GEM_MODELS.filter(m => !(b[m] && b[m] - now > 2 * 864e5)); }
 function gemModelsLeft(){ const bl = gemBlocked(); return GEM_MODELS.filter(m => !bl.includes(m)).length; }
 function findAudio(o){
   // cerca nella risposta l'ultimo blocco audio in base64
@@ -906,6 +908,10 @@ async function geminiTTS(text, voiceId, keyOverride){
       return pcmToWav(bytes, m ? +m[1] : 24000);
     }
     const t = await r.text().catch(() => '');
+    if(r.status === 429 && /limit:\s*0\b|free.?tier.*limit.*\b0\b/i.test(t)){
+      // modello non incluso nel piano gratuito di questo account: lo riprovo tra una settimana
+      blockModel(model, Date.now() + 7 * 864e5); lastErr = lastErr || new Error('limite'); continue;
+    }
     if(r.status === 429){
       // limite del giorno: questo modello è fermo fino all'azzeramento; limite al minuto: solo per un minuto
       blockModel(model, /per ?day|daily|PerDay/i.test(t) || !/per ?minute|PerMinute/i.test(t) ? gemResetDate().getTime() : Date.now() + 65000);
@@ -2403,16 +2409,16 @@ function openSettings(focus, keepScroll){
       c2.appendChild(pre);
       // limite gratuito
       const ca = sub('Limite gratuito', left
-        ? `Oggi disponibili ${left} modelli Google su ${GEM_MODELS.length}: quando uno finisce passo da sola al successivo.`
-        : `Limite di oggi finito per tutti i ${GEM_MODELS.length} modelli: si azzera verso le ${gemResetTime()}.`);
+        ? (gemModelsFree().length > 1 ? `Il tuo account ha ${gemModelsFree().length} modelli gratuiti, oggi ne restano ${left}: quando uno finisce passo da sola al successivo.` : 'Il piano gratuito del tuo account include un modello: il limite di ogni giorno è il suo.')
+        : `Limite di oggi finito: si azzera verso le ${gemResetTime()}.`);
       // spiegazione e stato di ogni modello
       const how = el('details', 'tip');
       how.appendChild(el('summary', null, 'Come funziona il limite'));
-      how.appendChild(el('p', null, `Google offre più modelli che leggono con le stesse voci, e ognuno ha il suo limite gratuito separato. L'app li usa uno dopo l'altro: quando un modello finisce il limite passa da sola al successivo, così le ore di ascolto al giorno si moltiplicano. È tutto regolare: è il tuo account, con i limiti che Google ti dà per ciascun modello. I limiti si azzerano ogni giorno verso le ${gemResetTime()}.`));
+      how.appendChild(el('p', null, `Google ha più modelli che leggono con le stesse voci, ognuno con il suo limite. Quali sono gratuiti lo decide Google, account per account, e cambia nel tempo. L'app li prova tutti: usa quelli gratuiti uno dopo l'altro e ogni settimana riprova gli altri, così se Google ne rende gratuito uno nuovo lo usa da sola. I limiti si azzerano ogni giorno verso le ${gemResetTime()}.`));
       const bl = store.get('gemBlocked') || {}, now = Date.now();
       GEM_MODELS.forEach(m => {
         const until = bl[m] || 0, left = until - now;
-        const st = left <= 0 ? 'Disponibile' : left > 2 * 864e5 ? 'Non disponibile sul tuo account, riprovo tra qualche giorno' : left > 5 * 60000 ? `Finito per oggi, torna verso le ${gemResetTime()}` : 'In pausa per un minuto';
+        const st = left <= 0 ? 'Disponibile' : left > 2 * 864e5 ? 'Non gratuito sul tuo account, riprovo tra una settimana' : left > 5 * 60000 ? `Finito per oggi, torna verso le ${gemResetTime()}` : 'In pausa per un minuto';
         const r = el('div', 'modelRow' + (left <= 0 ? ' ok' : ''));
         r.append(el('span', 'modelName', GEM_MODEL_NAMES[m] || m), el('span', 'modelState', st));
         how.appendChild(r);
