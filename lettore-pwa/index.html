@@ -343,7 +343,7 @@ body.playerOpen #toast{bottom:auto;top:calc(env(safe-area-inset-top) + 64px)}
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 22;
+const APP_VERSION = 23;
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
   let hadController = !!navigator.serviceWorker.controller, reloading = false;
@@ -455,7 +455,14 @@ const lib = {
   del(k){ return this.tx('readwrite', st => st.delete(k)); }
 };
 // audio già generato, salvato sul telefono: ogni frase si genera una volta sola
-const AUDIO_CAP = 300 * 1024 * 1024;
+// fino a 1 GB (circa 6 ore di voce Google), meno se il telefono concede poco spazio
+let AUDIO_CAP = 1024 * 1024 * 1024;
+try{ if(navigator.storage && navigator.storage.estimate) navigator.storage.estimate().then(e => { if(e && e.quota) AUDIO_CAP = Math.max(300 * 1048576, Math.min(AUDIO_CAP, e.quota * 0.4)); }).catch(() => {}); }catch(e){}
+// la parte di un audio salvato: libro, capitolo e ultima frase che contiene
+function audioSpot(k){
+  const m = /^([^|]+)\|([^|]+)\|(\d+)\|(?:c\d+-)?(\d+)$/.exec(k || '');
+  return m ? { voice: m[1], book: m[2], sec: +m[3], end: +m[4] } : null;
+}
 const acache = {
   async req(mode, fn){
     try{
@@ -469,24 +476,34 @@ const acache = {
   },
   get(k){ return this.req('readonly', st => st.get(k)); },
   async put(k, blob, book){
-    await this.req('readwrite', st => st.put({ k, blob, size: blob.size, book, at: Date.now() }));
+    const ok = await this.req('readwrite', st => st.put({ k, blob, size: blob.size, book, at: Date.now() }));
+    if(ok === null) return false;
     const bytes = (store.get('audioBytes') || 0) + blob.size;
     store.set('audioBytes', bytes);
-    if(bytes > AUDIO_CAP) this.prune();
+    if(bytes > AUDIO_CAP) await this.prune();
+    return true;
   },
   async prune(){
-    // toglie l'audio più vecchio finché non scende sotto l'80% del limite
+    // libera spazio fino all'80% del limite: prima l'audio già ascoltato, poi quello di altre voci,
+    // poi il più vecchio; per ultimo quello ancora da ascoltare del libro aperto
     const db = await lib.open().catch(() => null); if(!db) return;
     const t = db.transaction('audio', 'readwrite'); const st = t.objectStore('audio');
-    let total = 0;
-    await new Promise(res => { const c = st.openCursor(); c.onsuccess = () => { const cur = c.result; if(cur){ total += cur.value.size || 0; cur.continue(); } else res(); }; c.onerror = res; });
+    const items = [];
+    await new Promise(res => { const c = st.openCursor(); c.onsuccess = () => { const cur = c.result; if(cur){ const v = cur.value; items.push({ k: v.k, size: v.size || 0, at: v.at || 0, book: v.book }); cur.continue(); } else res(); }; c.onerror = res; });
+    let total = items.reduce((a, x) => a + x.size, 0);
+    const curVoice = state.engine === 'piper' ? state.piperVoice : null;
+    const rank = x => {
+      const s = audioSpot(x.k); const pos = store.get('pos:' + x.book);
+      if(s && pos && (pos.done || s.sec < pos.sec || (s.sec === pos.sec && s.end < pos.idx))) return 0;
+      if(!s || s.voice !== curVoice) return 1;
+      if(x.book !== state.key) return 2;
+      return 3;
+    };
+    items.forEach(x => x.r = rank(x));
+    items.sort((a, b) => a.r - b.r || a.at - b.at);
     let excess = total - AUDIO_CAP * 0.8;
-    await new Promise(res => {
-      if(excess <= 0) return res();
-      const c = st.index('at').openCursor();
-      c.onsuccess = () => { const cur = c.result; if(cur && excess > 0){ excess -= cur.value.size || 0; total -= cur.value.size || 0; cur.delete(); cur.continue(); } else res(); };
-      c.onerror = res;
-    });
+    for(const x of items){ if(excess <= 0) break; st.delete(x.k); excess -= x.size; total -= x.size; }
+    await new Promise(res => { t.oncomplete = res; t.onerror = res; t.onabort = res; });
     store.set('audioBytes', Math.max(0, total));
   },
   async delBook(book){
@@ -513,7 +530,7 @@ function savePos(done){
 }
 function savePrefs(){
   prefs.rate = state.rate;
-  prefs.voice = state.engine === 'piper' ? 'piper:' + state.piperVoice : 'sys:' + (state.sysVoice ? state.sysVoice.voiceURI : '');
+  prefs.voice = state.fallbackFrom ? 'piper:' + state.fallbackFrom : state.engine === 'piper' ? 'piper:' + state.piperVoice : 'sys:' + (state.sysVoice ? state.sysVoice.voiceURI : '');
   store.set('prefs', prefs);
 }
 
@@ -604,6 +621,8 @@ function voiceReady(id){
   return readyVoices.has(id) || ((f === 'kokoro' || f === 'supertonic') && [...readyVoices].some(v => familyOf(v) === f));
 }
 const MEM_AHEAD = 40;        // frasi tenute pronte in memoria
+// le parti Google sono lunghe (fino a 15 minuti): in memoria solo le prime, le altre restano sul telefono
+const memAhead = () => isGem() ? 2 : MEM_AHEAD;
 // velocità di generazione misurata su questo telefono: secondi per generare 1 secondo di audio
 function rtfOf(v){ return store.get('rtf:' + v); }
 function noteRtf(v, genMs, blob){
@@ -640,12 +659,12 @@ function onWorkerMessage(e){
       const [vid, book] = key.split('|');
       noteRtf(vid, performance.now() - inf.t, m.blob);
       if(!readyVoices.has(vid)){ readyVoices.add(vid); store.set('readyVoices', [...readyVoices]); refreshVoiceUI(); }
-      if(book !== 'anteprima') acache.put(key, m.blob, book);
+      if(book !== 'anteprima') en ? (en.saving = acache.put(key, m.blob, book)) : acache.put(key, m.blob, book);
     }
     if(en){
       if(m.type === 'result'){
-        const far = wanted.findIndex(w => w.key === key) >= MEM_AHEAD && !en.res.length;
-        if(far){ en.st = 'stored'; } // salvato sul telefono, lo ricarico quando serve
+        const far = wanted.findIndex(w => w.key === key) >= memAhead() && !en.res.length;
+        if(far){ en.st = 'stored'; en.blob = m.blob; (en.saving || Promise.resolve(false)).then(ok => { if(ok) en.blob = null; }); } // salvato sul telefono, lo ricarico quando serve
         else { en.st = 'ready'; en.url = URL.createObjectURL(m.blob); en.res.forEach(r => r.resolve(en.url)); en.res = []; }
       } else {
         en.st = 'error'; en.err = m.message;
@@ -654,12 +673,17 @@ function onWorkerMessage(e){
     }
     if(m.type === 'error' && !key){ downloading.clear(); refreshVoiceUI(); setStatus('Non riesco a scaricare la voce. Controlla la connessione e riprova.', true); }
     updateBuf();
+    if(gemReplan){ gemReplan = false; if(isGem() && state.total){ want(upcoming(lookahead()), audio.dataset.key); return; } }
     pump();
   }
 }
 function want(list, keepKey){
   wanted = list;
-  for(const it of list) if(!entries.has(it.key)) entries.set(it.key, { st: 'queued', text: it.text, res: [] });
+  for(const it of list){
+    const en = entries.get(it.key);
+    if(!en) entries.set(it.key, { st: 'queued', text: it.text, res: [] });
+    else if(en.st === 'error'){ en.st = 'queued'; en.err = null; } // riprovo (ad esempio dopo l'azzeramento del limite)
+  }
   const keep = new Set(list.map(x => x.key)); if(keepKey) keep.add(keepKey);
   for(const [k, en] of entries){
     if(keep.has(k) || en.st === 'working') continue;
@@ -668,13 +692,16 @@ function want(list, keepKey){
     entries.delete(k);
   }
   // le frasi vicine salvate sul telefono tornano in memoria
-  list.slice(0, MEM_AHEAD).forEach(it => { const en = entries.get(it.key); if(en && en.st === 'stored') loadStored(it.key, en); });
+  list.slice(0, memAhead()).forEach(it => { const en = entries.get(it.key); if(en && en.st === 'stored') loadStored(it.key, en); });
   updateBuf();
   pump();
 }
 async function loadStored(key, en){
   en.st = 'working';
-  const c = await acache.get(key);
+  // appena generato e non ancora scritto sul telefono (o scrittura fallita): lo uso direttamente
+  if(en.saving) await en.saving.catch(() => {});
+  const c = en.blob ? { blob: en.blob } : await acache.get(key);
+  en.blob = null;
   if(entries.get(key) !== en) return;
   if(c && c.blob){ en.st = 'ready'; en.url = URL.createObjectURL(c.blob); en.res.forEach(r => r.resolve(en.url)); en.res = []; }
   else en.st = 'queued';
@@ -690,7 +717,7 @@ async function pump(){
   if(entries.get(next.key) !== en){ busy = false; return pump(); }
   if(c && c.blob){
     const idx = wanted.findIndex(w => w.key === next.key);
-    if(idx >= MEM_AHEAD && !en.res.length) en.st = 'stored';
+    if(idx >= memAhead() && !en.res.length) en.st = 'stored';
     else { en.st = 'ready'; en.url = URL.createObjectURL(c.blob); en.res.forEach(r => r.resolve(en.url)); en.res = []; }
     busy = false; updateBuf(); return pump();
   }
@@ -704,7 +731,7 @@ async function pump(){
           const secs = await wavSeconds(blob);
           if(secs && secs < en.text.length / 15 * 0.55){ shrinkGemChunks(en.text.length); throw new Error('tagliato'); }
         }
-        if(chunky) rememberChunk(next.key);
+        if(chunky){ rememberChunk(next.key); growGemChunks(en.text.length); }
         return blob;
       })
       .then(blob => onWorkerMessage({ data: { type: 'result', id, blob } }))
@@ -744,7 +771,10 @@ function updateBuf(){
       b.textContent = done >= wanted.length ? 'Preparazione completata: le prossime frasi sono pronte.' : `Preparo in anticipo: ${done} di ${Math.min(wanted.length, tot + 1)} frasi pronte`;
       if(done >= wanted.length) state.prepareTo = null;
     } else {
-      if(isGem()) b.textContent = n ? `${n} ${n === 1 ? 'parte pronta' : 'parti pronte'} in anticipo` : (busy ? 'Gemini sta preparando la prossima parte...' : '');
+      if(isGem()){
+        const min = readyAheadMinutes();
+        b.textContent = min >= 1 ? `Pronti circa ${fmtMin(min)} di ascolto${busy ? ', ne preparo altri' : ''}` : (busy ? 'Google sta preparando la prossima parte...' : '');
+      }
       else b.textContent = n ? `${n} ${n === 1 ? 'frase pronta' : 'frasi pronte'} in anticipo` : (busy ? 'Preparo le prossime frasi...' : '');
     }
   }, 250);
@@ -886,12 +916,27 @@ function gemErrorText(msg){
 const chunkCache = new Map();
 // lunghezza dei blocchi in caratteri: circa 7-8 minuti di ascolto; si accorcia da sola se Google taglia l'audio
 const gemTarget = () => store.get('gemChunk') || 6500;
+// tetto: la lunghezza più grande che Google regge (scende quando taglia, dopo una settimana si riprova)
+const GEM_CEIL = 15000;
+function gemCeil(){ const c = store.get('gemCeil'); return c && c.until > Date.now() ? c.v : GEM_CEIL; }
 function shrinkGemChunks(failedLen){
   // metà della lunghezza che Google non ha accettato; se più blocchi falliscono insieme, non accorcio due volte
-  const t = Math.max(1500, Math.round((failedLen || gemTarget()) / 2));
-  if(t < gemTarget()){ store.set('gemChunk', t); chunkCache.clear(); }
+  const failed = failedLen || gemTarget();
+  const ceil = Math.max(1500, Math.round(failed * 0.85));
+  if(ceil < gemCeil()) store.set('gemCeil', { v: ceil, until: Date.now() + 7 * 864e5 });
+  const t = Math.max(1500, Math.round(failed / 2));
+  if(t < gemTarget()){ store.set('gemChunk', t); chunkCache.clear(); gemReplan = true; }
   return gemTarget();
 }
+// ogni blocco lungo andato a buon fine allunga i successivi del 25%, fino al tetto: meno richieste per ora di ascolto
+function growGemChunks(okLen){
+  const T = gemTarget();
+  if(okLen < T * 0.85) return;
+  const t = Math.min(gemCeil(), Math.round(T * 1.25));
+  if(t > T){ store.set('gemChunk', t); chunkCache.clear(); gemReplan = true; }
+}
+// dopo un allungamento, le parti in coda non ancora iniziate vengono ripianificate con la nuova lunghezza
+let gemReplan = false;
 // i blocchi già generati restano validi anche se cambia la lunghezza: ne ricordo i confini
 function doneChunks(sec){ return ((store.get('gemDone:' + state.piperVoice + '|' + state.key) || {})[sec]) || []; }
 async function recallChunks(book){
@@ -912,7 +957,10 @@ function chunksFor(sec){
   const ck = state.piperVoice + '|' + state.key + '|' + sec;
   if(chunkCache.has(ck)) return chunkCache.get(ck);
   const ss = state.sections[sec].sentences, out = [], T = gemTarget();
-  const done = doneChunks(sec).filter(([a, b]) => b < ss.length);
+  // contano come già fatti anche i blocchi che Google sta generando in questo momento
+  const pre = state.piperVoice + '|' + state.key + '|' + sec + '|c';
+  const live = [...entries.entries()].filter(([k, en]) => en.st === 'working' && k.startsWith(pre)).map(([k]) => k.slice(pre.length).split('-').map(Number));
+  const done = doneChunks(sec).concat(live.filter(([a]) => !doneChunks(sec).some(([x]) => x === a))).filter(([a, b]) => b < ss.length).sort((x, y) => x[0] - y[0]);
   const make = (a, b) => { const c = { sec, start: a, end: b, cum: [], len: 0 }; for(let i = a; i <= b; i++){ c.cum.push(c.len); c.len += ss[i].t.length + 1; } return c; };
   let i = 0;
   while(i < ss.length){
@@ -928,6 +976,13 @@ function chunksFor(sec){
     }
     let endIdx = j - 1;
     if(j < stopAt && lastPara >= i) endIdx = lastPara;
+    // un pezzetto rimasto a fine capitolo costerebbe una richiesta intera: lo unisco a questo blocco
+    if(endIdx < stopAt - 1){
+      let mine = 0, rest = 0;
+      for(let x = i; x <= endIdx; x++) mine += ss[x].t.length + 1;
+      for(let x = endIdx + 1; x < stopAt; x++) rest += ss[x].t.length + 1;
+      if(rest < T * 0.35 && mine + rest <= gemCeil()) endIdx = stopAt - 1;
+    }
     out.push(make(i, endIdx)); i = endIdx + 1;
   }
   chunkCache.set(ck, out);
@@ -959,6 +1014,19 @@ audio.addEventListener('timeupdate', () => {
   if(c.start + j !== state.idx && c.sec === state.sec){ state.idx = c.start + j; refreshPosition(false); savePos(); }
 });
 
+const GEM_AHEAD_CHARS = 81000; // circa 90 minuti a velocità normale
+const gemAheadOn = () => prefs.gemAhead !== false;
+// minuti di ascolto già pronti dopo il punto attuale (per le voci Google)
+function readyAheadMinutes(){
+  if(!isGem() || !state.total) return 0;
+  let chars = 0;
+  for(let i = 1; i < wanted.length; i++){ const w = wanted[i]; if(!w.chunk || !isReady(w.key)) break; chars += w.chunk.len; }
+  // più la parte in corso, dal punto attuale
+  const c = wanted[0] && wanted[0].chunk;
+  if(c && isReady(wanted[0].key)){ const j = Math.max(0, state.idx - c.start); chars += c.len - (c.cum[j] || 0); }
+  return Math.round(chars / cps() / 60 / (state.rate || 1));
+}
+function fmtMin(m){ return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60 ? (m % 60) + ' min' : ''}`.trim(); }
 function lookahead(){
   const g = gIndex();
   if(state.prepareTo != null && state.prepareTo > g) return Math.min(3000, state.prepareTo - g + 1);
@@ -968,6 +1036,12 @@ function upcoming(n){
   if(isGem()){
     // blocchi lunghi: preparo solo quello in corso e il successivo, per non consumare richieste inutili
     let k = 2;
+    if(gemAheadOn() && gemModelsLeft()){
+      // preparazione automatica: circa un'ora e mezza di ascolto oltre il punto attuale, finché il limite di oggi lo consente
+      const u = upcomingChunks(40); let sum = 0, i = 0;
+      while(i < u.length && sum < GEM_AHEAD_CHARS){ sum += u[i].chunk.len; i++; }
+      k = Math.max(k, i);
+    }
     if(state.prepareTo != null){ const p = fromG(state.prepareTo); const u = upcomingChunks(400); const i = u.findIndex(x => x.chunk.sec === p.sec && p.idx <= x.chunk.end); k = i >= 0 ? i + 1 : u.length; }
     return upcomingChunks(k);
   }
@@ -1037,6 +1111,7 @@ async function piperSpeakCurrent(fromAdvance){
       setStatus('Il blocco era troppo lungo per Google: riprovo con blocchi più corti...', false, true);
       state.playing = true; updatePlay(); return piperSpeakCurrent(fromAdvance);
     }
+    if(isGem() && /limite/.test(err.message || '') && prefs.gemFallback && enterFallback()) return;
     if(isGem()) setStatus(gemErrorText(err.message || ''), true);
     else setStatus('Non riesco a generare la voce. Controlla la connessione per il primo download, oppure scegli una voce dell\'iPhone.', true);
   }
@@ -1047,6 +1122,40 @@ audio.onended = () => {
   if(isGem() && state.curChunk){ state.sec = state.curChunk.sec; state.idx = state.curChunk.end; }
   advance();
 };
+
+/* ---------- limite Google finito: si continua con la voce dell'iPhone, poi si torna a Google ---------- */
+function bestSysVoice(){
+  const list = systemVoices();
+  return list.find(v => /premium/i.test(v.name)) || list.find(v => /enhanced|avanzat|migliorat/i.test(v.name)) || list[0] || null;
+}
+function enterFallback(){
+  const sys = bestSysVoice(); if(!sys) return false;
+  const b = store.get('gemBlocked') || {};
+  const times = GEM_MODELS.map(m => b[m]).filter(t => t && t > Date.now());
+  state.fallbackFrom = state.piperVoice;
+  state.fallbackUntil = times.length ? Math.min(...times) : Date.now() + 60000;
+  state.engine = 'sys'; state.sysVoice = sys;
+  audio.removeAttribute('data-key');
+  syncMediaHandlers();
+  $('voiceLabel').textContent = voiceName();
+  setStatus(`Limite Google di oggi finito: continuo con ${sys.name} dell'iPhone. Torno alla voce Google da sola quando il limite si azzera.`, false);
+  state.playing = true; updatePlay();
+  sysSpeak(0);
+  return true;
+}
+function leaveFallback(){
+  if(!state.fallbackFrom) return;
+  state.engine = 'piper'; state.piperVoice = state.fallbackFrom;
+  state.fallbackFrom = null; state.fallbackUntil = 0;
+  if('speechSynthesis' in window) speechSynthesis.cancel();
+  syncMediaHandlers();
+  $('voiceLabel').textContent = voiceName();
+  refreshVoiceUI();
+}
+// a ogni nuova frase controllo se si può tornare alla voce Google
+function maybeLeaveFallback(){
+  if(state.fallbackFrom && Date.now() >= state.fallbackUntil && gemModelsLeft()){ leaveFallback(); setStatus('Il limite Google si è azzerato: torno alla voce Google.'); }
+}
 
 /* ---------- voci di sistema ---------- */
 function sysSpeak(offset = 0){
@@ -1073,7 +1182,7 @@ function sysSpeak(offset = 0){
 }
 
 /* ---------- controllo lettura ---------- */
-function speakCurrent(fromAdvance){ if(state.engine === 'piper') piperSpeakCurrent(fromAdvance); else sysSpeak(0); }
+function speakCurrent(fromAdvance){ maybeLeaveFallback(); if(state.engine === 'piper') piperSpeakCurrent(fromAdvance); else sysSpeak(0); }
 function advance(){
   const s = state.sections[state.sec];
   if(state.idx < s.sentences.length - 1){ state.idx++; speakCurrent(true); }
@@ -1880,6 +1989,7 @@ function selectVoice(kind, id){
   const wasPlaying = state.playing;
   if(wasPlaying) stop();
   state.prepareTo = null;
+  state.fallbackFrom = null; state.fallbackUntil = 0;
   if(kind === 'piper' && isGemId(id) && !store.get('gemKey')){ if(wasPlaying){ unlockAudio(); play(); } gemFrom = sheetKind === 'settings' ? 'settings' : 'voice'; openGemSetup(id, 1); return; }
   if(kind === 'piper'){
     state.engine = 'piper'; state.piperVoice = id;
@@ -2217,6 +2327,17 @@ function openSettings(focus, keepScroll){
         const sel = state.engine === 'piper' && state.piperVoice === v.id;
         c.appendChild(voiceRow(v.name, 'Voce ' + v.desc, sel, () => selectVoice('piper', v.id), b => previewVoice('piper', v.id, b), 'piper:' + v.id));
       });
+      const ca = card('Limite gratuito Google', 'Ogni giorno Google regala un certo numero di letture. Queste opzioni lo sfruttano al massimo.');
+      const toggle = (title, sub, on, flip) => ca.appendChild(famRow(title, sub, on ? 'Spegni' : 'Accendi', () => { flip(); store.set('prefs', prefs); openSettings(null, true); }));
+      const ahead = isGem() ? readyAheadMinutes() : 0;
+      toggle('Prepara in anticipo da sola', gemAheadOn()
+          ? `Acceso. Con l'app aperta, anche in pausa, preparo fino a un'ora e mezza oltre il punto in cui sei: il limite non usato oggi lo ascolti domani.${ahead ? ' Ora pronti circa ' + fmtMin(ahead) + '.' : ''}`
+          : 'Spento. Preparo solo la parte in corso e la successiva.',
+        gemAheadOn(), () => { prefs.gemAhead = !gemAheadOn(); if(gemAheadOn()) setTimeout(gemTick, 300); });
+      toggle('Se finisce il limite, continua con la voce dell\'iPhone', prefs.gemFallback
+          ? 'Acceso. La lettura non si ferma: quando il limite si azzera torno da sola alla voce Google. Con lo schermo bloccato l\'iPhone potrebbe metterla in pausa.'
+          : 'Spento. Quando il limite finisce la lettura si ferma.',
+        !!prefs.gemFallback, () => { prefs.gemFallback = !prefs.gemFallback; });
       const c2 = card('Stile di lettura Google');
       const pre = el('div', 'presets inCard'); pre.style.gridTemplateColumns = 'repeat(3,minmax(0,1fr))';
       Object.entries(GEM_STYLES).forEach(([k, st]) => {
@@ -2265,7 +2386,8 @@ function openSettings(focus, keepScroll){
     // spazio
     const cs = card('Spazio');
     const audioMb = Math.round((store.get('audioBytes') || 0) / 1048576);
-    cs.appendChild(famRow('Audio già preparato', audioMb + ' MB', audioMb ? 'Svuota' : null, clearAudioCache));
+    const aheadMin = isGem() ? readyAheadMinutes() : 0;
+    cs.appendChild(famRow('Audio già preparato', audioMb + ' MB' + (aheadMin ? ` · circa ${fmtMin(aheadMin)} pronti da ascoltare nel libro aperto` : '') + '. Quello già ascoltato si cancella per primo quando serve spazio.', audioMb ? 'Svuota' : null, clearAudioCache));
     const tot = famRow('Spazio usato dall\'app', '...', null);
     cs.appendChild(tot);
     if(navigator.storage && navigator.storage.estimate) navigator.storage.estimate().then(e => { tot.querySelector('.famSub').textContent = Math.round((e.usage || 0) / 1048576) + ' MB tra libri, voci e audio'; }).catch(() => {});
@@ -2347,6 +2469,15 @@ document.addEventListener('visibilitychange', () => {
   if(document.visibilityState === 'hidden') savePos();
 });
 window.addEventListener('pagehide', () => savePos());
+// con l'app aperta, anche in pausa, continuo a preparare le parti Google (ad esempio dopo l'azzeramento del limite)
+function gemTick(){
+  if(!state.playing) maybeLeaveFallback();
+  if(!isGem() || !state.total || !gemAheadOn() || busy || !gemModelsLeft() || state.prepareTo != null) return;
+  if(document.visibilityState !== 'visible' && !state.playing) return;
+  want(upcoming(lookahead()), audio.dataset.key);
+}
+setInterval(gemTick, 5 * 60000);
+document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') setTimeout(gemTick, 1500); });
 
 /* ---------- avvio ---------- */
 function restoreVoice(){
