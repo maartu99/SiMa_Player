@@ -343,7 +343,7 @@ body.playerOpen #toast{bottom:auto;top:calc(env(safe-area-inset-top) + 64px)}
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 21;
+const APP_VERSION = 22;
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
   let hadController = !!navigator.serviceWorker.controller, reloading = false;
@@ -788,7 +788,11 @@ function unlockAudio(){
 }
 
 /* ---------- Google Gemini ---------- */
-const GEM_MODELS = ['gemini-3.8-flash-tts', 'gemini-3.8-flash-lite-tts'];
+// più modelli con le stesse voci, ognuno con il suo limite gratuito: quando uno finisce passo al successivo
+const GEM_MODELS = ['gemini-3.8-flash-tts', 'gemini-3.1-flash-tts-preview', 'gemini-3.8-flash-lite-tts', 'gemini-2.5-flash-preview-tts', 'gemini-2.5-pro-preview-tts'];
+function gemBlocked(){ const b = store.get('gemBlocked') || {}; const now = Date.now(); return GEM_MODELS.filter(m => b[m] && b[m] > now); }
+function blockModel(m, until){ const b = store.get('gemBlocked') || {}; b[m] = until; store.set('gemBlocked', b); }
+function gemModelsLeft(){ const bl = gemBlocked(); return GEM_MODELS.filter(m => !bl.includes(m)).length; }
 function findAudio(o){
   // cerca nella risposta l'ultimo blocco audio in base64
   let found = null;
@@ -818,8 +822,11 @@ async function geminiTTS(text, voiceId, keyOverride){
   const key = keyOverride || store.get('gemKey');
   if(!key) throw new Error('chiave mancante');
   const style = (GEM_STYLES[prefs.gemStyle] || GEM_STYLES.narrativa).text;
-  let lastErr = null;
+  let lastErr = null, tried = 0;
+  const blocked = gemBlocked();
   for(const model of GEM_MODELS){
+    if(blocked.includes(model)) continue;
+    tried++;
     const body = {
       model,
       input: [{ type: 'user_input', content: [{ type: 'text', text, annotations: [{ type: 'speech_metadata', style }] }] }],
@@ -832,33 +839,43 @@ async function geminiTTS(text, voiceId, keyOverride){
         method: 'POST', headers: { 'x-goog-api-key': key, 'Content-Type': 'application/json' }, body: JSON.stringify(body)
       });
     }catch(e){ throw new Error('rete'); }
-    if(r.status === 429){ lastErr = new Error('limite'); continue; } // provo il modello lite, che ha un limite separato
-    if(r.status === 400 || r.status === 401 || r.status === 403){
-      const t = await r.text().catch(() => '');
-      throw new Error(/api key|API_KEY|permission|unauth/i.test(t) || r.status !== 400 ? 'chiave' : 'richiesta: ' + t.slice(0, 160));
+    if(r.ok){
+      const j = await r.json();
+      const a = findAudio(j);
+      if(!a){ lastErr = new Error('nessun audio nella risposta'); continue; }
+      const bin = atob(a.data); const bytes = new Uint8Array(bin.length);
+      for(let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      if(bin.slice(0, 4) === 'RIFF') return new Blob([bytes], { type: 'audio/wav' });
+      const m = /rate=(\d+)/.exec(a.mime_type || a.mimeType || '');
+      return pcmToWav(bytes, m ? +m[1] : 24000);
     }
-    if(!r.ok){ lastErr = new Error('servizio ' + r.status); continue; }
-    const j = await r.json();
-    const a = findAudio(j);
-    if(!a) throw new Error('nessun audio nella risposta');
-    const bin = atob(a.data); const bytes = new Uint8Array(bin.length);
-    for(let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-    if(bin.slice(0, 4) === 'RIFF') return new Blob([bytes], { type: 'audio/wav' });
-    const m = /rate=(\d+)/.exec(a.mime_type || a.mimeType || '');
-    return pcmToWav(bytes, m ? +m[1] : 24000);
+    const t = await r.text().catch(() => '');
+    if(r.status === 429){
+      // limite del giorno: questo modello è fermo fino all'azzeramento; limite al minuto: solo per un minuto
+      blockModel(model, /per ?day|daily|PerDay/i.test(t) || !/per ?minute|PerMinute/i.test(t) ? gemResetDate().getTime() : Date.now() + 65000);
+      lastErr = new Error('limite'); continue;
+    }
+    if(r.status === 401 || /API[_ ]?key not valid|API_KEY_INVALID|invalid api key/i.test(t)) throw new Error('chiave');
+    if(r.status === 404 || r.status === 403 || (r.status === 400 && /model|not (found|supported)|unsupported|does not support/i.test(t))){
+      // modello non disponibile per questo account: lo salto per una settimana
+      blockModel(model, Date.now() + 7 * 864e5); lastErr = lastErr || new Error('servizio ' + r.status); continue;
+    }
+    if(r.status === 400) throw new Error('richiesta: ' + t.slice(0, 160));
+    lastErr = new Error('servizio ' + r.status);
   }
+  if(!tried) throw new Error('limite');
   throw lastErr || new Error('servizio');
 }
 // il limite gratuito si azzera a mezzanotte della California: lo mostro nell'ora del telefono
-function gemResetTime(){
+function gemResetDate(){
   try{
     const now = new Date();
     const la = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
     const next = new Date(la); next.setHours(24, 0, 0, 0);
-    const reset = new Date(now.getTime() + (next - la));
-    return reset.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
-  }catch(e){ return '9:00'; }
+    return new Date(now.getTime() + (next - la) + 60000);
+  }catch(e){ return new Date(Date.now() + 12 * 36e5); }
 }
+function gemResetTime(){ return gemResetDate().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }); }
 function gemErrorText(msg){
   if(/limite/.test(msg)) return `Hai finito il limite gratuito di oggi delle voci Google: si azzera verso le ${gemResetTime()}. Intanto puoi riascoltare le parti già preparate, oppure usare una voce dell'iPhone.`;
   if(/chiave/.test(msg)) return 'La chiave Gemini non funziona. Controllala in Voce > Google Gemini.';
@@ -2194,7 +2211,8 @@ function openSettings(focus, keepScroll){
       go.onclick = () => { gemFrom = 'settings'; openGemSetup(GEM_VOICES[0].id, 1); };
       c.appendChild(go);
     } else {
-      const c = card('Voci Google', 'Attive. Servono internet.', 'Consigliate');
+      const left = gemModelsLeft();
+      const c = card('Voci Google', left ? `Attive, servono internet. Oggi disponibili ${left} modelli su ${GEM_MODELS.length}: quando uno finisce il limite passo da sola al successivo.` : `Limite gratuito di oggi finito per tutti i modelli: si azzera verso le ${gemResetTime()}.`, 'Consigliate');
       GEM_VOICES.forEach(v => {
         const sel = state.engine === 'piper' && state.piperVoice === v.id;
         c.appendChild(voiceRow(v.name, 'Voce ' + v.desc, sel, () => selectVoice('piper', v.id), b => previewVoice('piper', v.id, b), 'piper:' + v.id));
