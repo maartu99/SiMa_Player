@@ -52,7 +52,20 @@ svg{flex:none}
 .tabs{position:sticky;top:0;z-index:3;display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;margin:0 0 6px;border-radius:12px;background:var(--bg);box-shadow:0 8px 12px -6px var(--surface2)}
 .tab{height:40px;border:0;border-radius:9px;background:transparent;color:var(--muted);font-size:16px;font-weight:600}
 .tab[aria-selected="true"]{background:var(--surface);color:var(--ink)}
-.cardTitle{font-size:17px;font-weight:700;margin:20px 2px 2px}
+.cardTitle{font-size:20px;font-weight:700;margin:30px 2px 4px}
+.subTitle{font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin:18px 2px 6px}
+.subTitle+.card{margin-top:0}
+.innerLabel{font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);padding:16px 0 4px}
+.inCardNote{margin:10px 0 12px}
+.textBtn.sectionEnd{border-top:0;margin-top:10px;padding:0 2px}
+.switchRow{cursor:pointer}
+.swWrap{display:flex;align-items:center;gap:8px;flex:none}
+.swState{font-size:13px;font-weight:600;color:var(--muted);min-width:44px;text-align:right}
+.switch{position:relative;width:51px;height:31px;border-radius:16px;border:0;padding:0;background:var(--line2);flex:none;transition:background .2s}
+.switch::after{content:'';position:absolute;top:2px;left:2px;width:27px;height:27px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:transform .2s}
+.switch[aria-checked="true"]{background:var(--accent)}
+.switch[aria-checked="true"]::after{transform:translateX(20px)}
+.swWrap:has(.switch[aria-checked="true"]) .swState{color:var(--accent)}
 .cardNote{font-size:15px;color:var(--muted);margin:0 2px 8px;line-height:1.4}
 .cardTitle+.card{margin-top:8px}
 .card{background:var(--surface);border-radius:14px;padding:0 14px;margin:0 0 4px}
@@ -343,7 +356,7 @@ body.playerOpen #toast{bottom:auto;top:calc(env(safe-area-inset-top) + 64px)}
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 23;
+const APP_VERSION = 24;
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
   let hadController = !!navigator.serviceWorker.controller, reloading = false;
@@ -1128,19 +1141,34 @@ function bestSysVoice(){
   const list = systemVoices();
   return list.find(v => /premium/i.test(v.name)) || list.find(v => /enhanced|avanzat|migliorat/i.test(v.name)) || list[0] || null;
 }
+// voce di riserva: prima una voce già scaricata sul telefono (le più naturali prima, scartando quelle
+// troppo lente su questo iPhone se ce n'è una veloce), solo se non ce ne sono la voce dell'iPhone
+function fallbackVoice(){
+  // scelta dell'utente, se ancora disponibile
+  const p = prefs.fallbackVoice || '';
+  if(p.startsWith('piper:') && readyVoices.has(p.slice(6))){ const v = PIPER_VOICES.find(x => x.id === p.slice(6)); if(v) return { kind: 'piper', id: v.id, name: v.name }; }
+  if(p === 'sys'){ const s = bestSysVoice(); if(s) return { kind: 'sys', voice: s, name: s.name }; }
+  const ready = PIPER_VOICES.filter(v => readyVoices.has(v.id));
+  const fast = ready.filter(v => { const r = rtfOf(v.id); return !r || r < 1; });
+  const pick = fast[0] || ready[0];
+  if(pick) return { kind: 'piper', id: pick.id, name: pick.name };
+  const sys = bestSysVoice();
+  return sys ? { kind: 'sys', voice: sys, name: sys.name } : null;
+}
 function enterFallback(){
-  const sys = bestSysVoice(); if(!sys) return false;
+  const fb = fallbackVoice(); if(!fb) return false;
   const b = store.get('gemBlocked') || {};
   const times = GEM_MODELS.map(m => b[m]).filter(t => t && t > Date.now());
   state.fallbackFrom = state.piperVoice;
   state.fallbackUntil = times.length ? Math.min(...times) : Date.now() + 60000;
-  state.engine = 'sys'; state.sysVoice = sys;
+  if(fb.kind === 'piper'){ state.engine = 'piper'; state.piperVoice = fb.id; }
+  else { state.engine = 'sys'; state.sysVoice = fb.voice; }
   audio.removeAttribute('data-key');
   syncMediaHandlers();
   $('voiceLabel').textContent = voiceName();
-  setStatus(`Limite Google di oggi finito: continuo con ${sys.name} dell'iPhone. Torno alla voce Google da sola quando il limite si azzera.`, false);
+  setStatus(`Limite Google di oggi finito: continuo con ${fb.name}${fb.kind === 'sys' ? ' dell\'iPhone' : ''}. Torno alla voce Google da sola quando il limite si azzera.`, false);
   state.playing = true; updatePlay();
-  sysSpeak(0);
+  speakCurrent();
   return true;
 }
 function leaveFallback(){
@@ -2144,6 +2172,17 @@ async function removeGroup(g){
   setStatus(`${g.title} rimossa dal telefono.`);
   refreshVoiceUI();
 }
+// riga con interruttore Attivo / Spento
+function switchRow(title, sub, on, onChange){
+  const row = el('div', 'famRow switchRow');
+  const t = el('div', 'famText'); t.appendChild(el('div', 'famTitle', title)); if(sub) t.appendChild(el('div', 'famSub', sub));
+  const w = el('div', 'swWrap');
+  const s = el('button', 'switch'); s.setAttribute('role', 'switch'); s.setAttribute('aria-checked', on ? 'true' : 'false'); s.setAttribute('aria-label', title);
+  w.append(el('span', 'swState', on ? 'Attivo' : 'Spento'), s);
+  row.append(t, w);
+  row.onclick = () => onChange(!on);
+  return row;
+}
 function famRow(title, sub, btnLabel, onBtn, disabled){
   const row = el('div', 'famRow');
   const t = el('div', 'famText'); t.appendChild(el('div', 'famTitle', title)); t.appendChild(el('div', 'famSub', sub));
@@ -2322,23 +2361,20 @@ function openSettings(focus, keepScroll){
       c.appendChild(go);
     } else {
       const left = gemModelsLeft();
-      const c = card('Voci Google', left ? `Attive, servono internet. Oggi disponibili ${left} modelli su ${GEM_MODELS.length}: quando uno finisce il limite passo da sola al successivo.` : `Limite gratuito di oggi finito per tutti i modelli: si azzera verso le ${gemResetTime()}.`, 'Consigliate');
+      const sub = (title, note) => {
+        body.appendChild(el('div', 'subTitle', title));
+        if(note) body.appendChild(el('p', 'cardNote', note));
+        const c = el('div', 'card'); body.appendChild(c); return c;
+      };
+      card('Voci Google', 'Attive, servono internet.', 'Consigliate').remove();
+      // voci
+      const cv = sub('Voci');
       GEM_VOICES.forEach(v => {
         const sel = state.engine === 'piper' && state.piperVoice === v.id;
-        c.appendChild(voiceRow(v.name, 'Voce ' + v.desc, sel, () => selectVoice('piper', v.id), b => previewVoice('piper', v.id, b), 'piper:' + v.id));
+        cv.appendChild(voiceRow(v.name, 'Voce ' + v.desc, sel, () => selectVoice('piper', v.id), b => previewVoice('piper', v.id, b), 'piper:' + v.id));
       });
-      const ca = card('Limite gratuito Google', 'Ogni giorno Google regala un certo numero di letture. Queste opzioni lo sfruttano al massimo.');
-      const toggle = (title, sub, on, flip) => ca.appendChild(famRow(title, sub, on ? 'Spegni' : 'Accendi', () => { flip(); store.set('prefs', prefs); openSettings(null, true); }));
-      const ahead = isGem() ? readyAheadMinutes() : 0;
-      toggle('Prepara in anticipo da sola', gemAheadOn()
-          ? `Acceso. Con l'app aperta, anche in pausa, preparo fino a un'ora e mezza oltre il punto in cui sei: il limite non usato oggi lo ascolti domani.${ahead ? ' Ora pronti circa ' + fmtMin(ahead) + '.' : ''}`
-          : 'Spento. Preparo solo la parte in corso e la successiva.',
-        gemAheadOn(), () => { prefs.gemAhead = !gemAheadOn(); if(gemAheadOn()) setTimeout(gemTick, 300); });
-      toggle('Se finisce il limite, continua con la voce dell\'iPhone', prefs.gemFallback
-          ? 'Acceso. La lettura non si ferma: quando il limite si azzera torno da sola alla voce Google. Con lo schermo bloccato l\'iPhone potrebbe metterla in pausa.'
-          : 'Spento. Quando il limite finisce la lettura si ferma.',
-        !!prefs.gemFallback, () => { prefs.gemFallback = !prefs.gemFallback; });
-      const c2 = card('Stile di lettura Google');
+      // stile
+      const c2 = sub('Stile di lettura', 'Vale per le parti non ancora preparate.');
       const pre = el('div', 'presets inCard'); pre.style.gridTemplateColumns = 'repeat(3,minmax(0,1fr))';
       Object.entries(GEM_STYLES).forEach(([k, st]) => {
         const b = el('button', null, st.label); b.setAttribute('aria-pressed', (prefs.gemStyle || 'narrativa') === k ? 'true' : 'false');
@@ -2346,6 +2382,31 @@ function openSettings(focus, keepScroll){
         pre.appendChild(b);
       });
       c2.appendChild(pre);
+      // limite gratuito
+      const ca = sub('Limite gratuito', left
+        ? `Google ha più modelli con le stesse voci, ognuno con il suo limite: quando uno finisce passo da sola al successivo. Oggi ne restano ${left} su ${GEM_MODELS.length}.`
+        : `Limite di oggi finito per tutti i ${GEM_MODELS.length} modelli: si azzera verso le ${gemResetTime()}.`);
+      const save = () => { store.set('prefs', prefs); openSettings(null, true); };
+      const ahead = isGem() ? readyAheadMinutes() : 0;
+      ca.appendChild(switchRow('Prepara in anticipo da sola',
+        `Con l'app aperta, anche in pausa, preparo fino a un'ora e mezza oltre il punto in cui sei: il limite non usato oggi lo ascolti domani.${gemAheadOn() && ahead ? ' Ora pronti circa ' + fmtMin(ahead) + '.' : ''}`,
+        gemAheadOn(), on => { prefs.gemAhead = on; save(); if(on) setTimeout(gemTick, 300); }));
+      ca.appendChild(switchRow('Se finisce il limite, continua con un\'altra voce',
+        'La lettura non si ferma; quando il limite si azzera torno da sola alla voce Google.',
+        !!prefs.gemFallback, on => { prefs.gemFallback = on; save(); }));
+      if(prefs.gemFallback){
+        // quale voce usare dopo Google
+        const fb = fallbackVoice();
+        const pref = prefs.fallbackVoice || '';
+        ca.appendChild(el('div', 'innerLabel', 'Voce da usare dopo Google'));
+        const pick = v => { prefs.fallbackVoice = v; save(); };
+        ca.appendChild(option('Automatica', `La prima voce scaricata sul telefono, se no quella dell'iPhone. Ora: ${fb ? fb.name : 'nessuna'}`, !pref, () => pick('')));
+        const ready = PIPER_VOICES.filter(v => readyVoices.has(v.id));
+        ready.forEach(v => ca.appendChild(option(v.name, 'Scaricata sul telefono' + speedNote(v.id), pref === 'piper:' + v.id, () => pick('piper:' + v.id))));
+        const sv = bestSysVoice();
+        if(sv) ca.appendChild(option('Voce dell\'iPhone', sv.name + ' · a schermo bloccato potrebbe fermarsi', pref === 'sys', () => pick('sys')));
+        if(!ready.length) ca.appendChild(el('p', 'cardNote inCardNote', 'Per una voce più naturale dopo Google, scaricane una qui sotto in Voci sul telefono: comparirà in questo elenco.'));
+      }
       const out = el('button', 'textBtn', 'Scollega account Google');
       out.onclick = () => {
         if(!confirm('Scollegare le voci Google da questo telefono? Potrai riattivarle quando vuoi.')) return;
@@ -2353,7 +2414,8 @@ function openSettings(focus, keepScroll){
         if(isGem()){ const alt = PIPER_VOICES.find(v => voiceReady(v.id)); const sys = systemVoices()[0]; if(alt) selectVoice('piper', alt.id); else selectVoice('sys', sys ? sys.voiceURI : ''); }
         refreshVoiceUI();
       };
-      c2.appendChild(out);
+      out.classList.add('sectionEnd');
+      body.appendChild(out);
     }
 
     // sul telefono
