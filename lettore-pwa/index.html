@@ -53,7 +53,19 @@ svg{flex:none}
 .tab{height:40px;border:0;border-radius:9px;background:transparent;color:var(--muted);font-size:16px;font-weight:600}
 .tab[aria-selected="true"]{background:var(--surface);color:var(--ink)}
 .cardTitle{font-size:20px;font-weight:700;margin:30px 2px 4px}
-.subTitle{font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin:18px 2px 6px}
+.setSection{background:var(--bg);border:1px solid var(--line2);border-radius:20px;padding:2px 12px 12px;margin:16px 0 0}
+.setSection>.cardTitle{margin:16px 4px 4px}
+.setSection>.cardNote{margin:0 4px 10px}
+.setSection .card{margin:0}
+.subTitle{font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--accent);margin:0 4px 6px;padding:16px 0 0 10px;border-top:1px solid var(--line2);position:relative}
+.subTitle::before{content:'';position:absolute;left:0;top:17px;width:3px;height:12px;border-radius:2px;background:var(--accent)}
+.setSection>.cardNote+.subTitle{border-top:0;padding-top:4px}
+.setSection>.cardNote+.subTitle::before{top:5px}
+.subTitle+.cardNote{margin:0 4px 8px}
+.modelRow{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--line);font-size:14px}
+.modelRow .modelName{color:var(--ink);font-weight:600;flex:none}
+.modelRow .modelState{color:var(--muted);text-align:right}
+.modelRow.ok .modelState{color:var(--accent)}
 .subTitle+.card{margin-top:0}
 .innerLabel{font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);padding:16px 0 4px}
 .inCardNote{margin:10px 0 12px}
@@ -356,7 +368,7 @@ body.playerOpen #toast{bottom:auto;top:calc(env(safe-area-inset-top) + 64px)}
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 24;
+const APP_VERSION = 25;
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
   let hadController = !!navigator.serviceWorker.controller, reloading = false;
@@ -833,6 +845,7 @@ function unlockAudio(){
 /* ---------- Google Gemini ---------- */
 // più modelli con le stesse voci, ognuno con il suo limite gratuito: quando uno finisce passo al successivo
 const GEM_MODELS = ['gemini-3.8-flash-tts', 'gemini-3.1-flash-tts-preview', 'gemini-3.8-flash-lite-tts', 'gemini-2.5-flash-preview-tts', 'gemini-2.5-pro-preview-tts'];
+const GEM_MODEL_NAMES = { 'gemini-3.8-flash-tts': 'Flash 3.8, il principale', 'gemini-3.1-flash-tts-preview': 'Flash 3.1, anteprima', 'gemini-3.8-flash-lite-tts': 'Flash Lite 3.8', 'gemini-2.5-flash-preview-tts': 'Flash 2.5', 'gemini-2.5-pro-preview-tts': 'Pro 2.5' };
 function gemBlocked(){ const b = store.get('gemBlocked') || {}; const now = Date.now(); return GEM_MODELS.filter(m => b[m] && b[m] > now); }
 function blockModel(m, until){ const b = store.get('gemBlocked') || {}; b[m] = until; store.set('gemBlocked', b); }
 function gemModelsLeft(){ const bl = gemBlocked(); return GEM_MODELS.filter(m => !bl.includes(m)).length; }
@@ -2345,10 +2358,16 @@ function openSettings(focus, keepScroll){
     tabs.appendChild(t);
   });
   body.appendChild(tabs);
+  // ogni sezione è un riquadro a sé; le sottosezioni stanno dentro, con la loro etichetta
+  let section = body;
   const card = (title, note, badge) => {
-    if(title){ const h = el('h3', 'cardTitle', title + ' '); if(badge) h.appendChild(el('span', 'badge', badge)); body.appendChild(h); }
-    if(note) body.appendChild(el('p', 'cardNote', note));
-    const c = el('div', 'card'); body.appendChild(c); return c;
+    section = body;
+    if(title){
+      section = el('section', 'setSection'); body.appendChild(section);
+      const h = el('h3', 'cardTitle', title + ' '); if(badge) h.appendChild(el('span', 'badge', badge)); section.appendChild(h);
+    }
+    if(note) section.appendChild(el('p', 'cardNote', note));
+    const c = el('div', 'card'); section.appendChild(c); return c;
   };
 
   if(settingsTab === 'voci'){
@@ -2362,9 +2381,9 @@ function openSettings(focus, keepScroll){
     } else {
       const left = gemModelsLeft();
       const sub = (title, note) => {
-        body.appendChild(el('div', 'subTitle', title));
-        if(note) body.appendChild(el('p', 'cardNote', note));
-        const c = el('div', 'card'); body.appendChild(c); return c;
+        section.appendChild(el('div', 'subTitle', title));
+        if(note) section.appendChild(el('p', 'cardNote', note));
+        const c = el('div', 'card'); section.appendChild(c); return c;
       };
       card('Voci Google', 'Attive, servono internet.', 'Consigliate').remove();
       // voci
@@ -2384,8 +2403,21 @@ function openSettings(focus, keepScroll){
       c2.appendChild(pre);
       // limite gratuito
       const ca = sub('Limite gratuito', left
-        ? `Google ha più modelli con le stesse voci, ognuno con il suo limite: quando uno finisce passo da sola al successivo. Oggi ne restano ${left} su ${GEM_MODELS.length}.`
+        ? `Oggi disponibili ${left} modelli Google su ${GEM_MODELS.length}: quando uno finisce passo da sola al successivo.`
         : `Limite di oggi finito per tutti i ${GEM_MODELS.length} modelli: si azzera verso le ${gemResetTime()}.`);
+      // spiegazione e stato di ogni modello
+      const how = el('details', 'tip');
+      how.appendChild(el('summary', null, 'Come funziona il limite'));
+      how.appendChild(el('p', null, `Google offre più modelli che leggono con le stesse voci, e ognuno ha il suo limite gratuito separato. L'app li usa uno dopo l'altro: quando un modello finisce il limite passa da sola al successivo, così le ore di ascolto al giorno si moltiplicano. È tutto regolare: è il tuo account, con i limiti che Google ti dà per ciascun modello. I limiti si azzerano ogni giorno verso le ${gemResetTime()}.`));
+      const bl = store.get('gemBlocked') || {}, now = Date.now();
+      GEM_MODELS.forEach(m => {
+        const until = bl[m] || 0, left = until - now;
+        const st = left <= 0 ? 'Disponibile' : left > 2 * 864e5 ? 'Non disponibile sul tuo account, riprovo tra qualche giorno' : left > 5 * 60000 ? `Finito per oggi, torna verso le ${gemResetTime()}` : 'In pausa per un minuto';
+        const r = el('div', 'modelRow' + (left <= 0 ? ' ok' : ''));
+        r.append(el('span', 'modelName', GEM_MODEL_NAMES[m] || m), el('span', 'modelState', st));
+        how.appendChild(r);
+      });
+      ca.appendChild(how);
       const save = () => { store.set('prefs', prefs); openSettings(null, true); };
       const ahead = isGem() ? readyAheadMinutes() : 0;
       ca.appendChild(switchRow('Prepara in anticipo da sola',
@@ -2415,7 +2447,7 @@ function openSettings(focus, keepScroll){
         refreshVoiceUI();
       };
       out.classList.add('sectionEnd');
-      body.appendChild(out);
+      section.appendChild(out);
     }
 
     // sul telefono
