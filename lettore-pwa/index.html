@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <title>SiMa Player</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -26,6 +26,8 @@
   color-scheme: dark;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{touch-action:manipulation;-webkit-text-size-adjust:100%}
+button,a,input,select,label{touch-action:manipulation}
 html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:16px}
 body{min-height:100vh;overscroll-behavior-y:none}
 button{font:inherit;color:inherit;cursor:pointer}
@@ -67,6 +69,12 @@ svg{flex:none}
 .tip summary{color:var(--accent);font-weight:600;cursor:pointer}
 .tip p{margin:8px 0 0;line-height:1.45}
 .version{font-size:13px;color:var(--faint);text-align:center;margin:28px 0 8px}
+.badge{display:inline-block;vertical-align:middle;margin-left:4px;padding:3px 8px;border-radius:10px;background:var(--accent);color:var(--accent-ink);font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:.3px;text-transform:none}
+.recCard{width:100%;display:flex;flex-direction:column;gap:6px;text-align:left;margin:6px 0 10px;padding:16px;border-radius:16px;border:1.5px solid var(--accent);background:var(--surface);color:var(--ink)}
+.recTop{display:flex;align-items:center;gap:6px}
+.recTitle{font-size:17px;font-weight:700}
+.recText{font-size:15px;line-height:1.45;color:var(--ink2)}
+.recCta{font-size:15px;font-weight:700;color:var(--accent);margin-top:2px}
 .moreVoices{width:100%;display:flex;align-items:center;gap:14px;margin:18px 0 6px;padding:14px;border-radius:14px;border:1px dashed var(--line2);background:transparent;color:var(--accent);text-align:left;font-weight:600}
 .moreVoices .ot span{display:block;font-size:13px;font-weight:400;color:var(--muted);margin-top:2px}
 .addBtn{width:44px;height:44px;padding:0;border-radius:22px;border:0;background:var(--accent);color:var(--accent-ink);display:flex;align-items:center;justify-content:center;flex:none}
@@ -335,7 +343,7 @@ body.playerOpen #toast{bottom:auto;top:calc(env(safe-area-inset-top) + 64px)}
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 17;
+const APP_VERSION = 18;
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
   let hadController = !!navigator.serviceWorker.controller, reloading = false;
@@ -1779,8 +1787,16 @@ function openVoiceSheet(){
   const body = sheetKind === 'voice' ? $('sheetBody') : openSheet('voice', 'Voce', true);
   const scroll = body.scrollTop; body.textContent = '';
   body.appendChild(el('p', 'hint', 'Tocca una voce per usarla, oppure Prova per sentirla.'));
+  if(!store.get('gemKey')){
+    // in cima, il consiglio: le voci Google sono le uniche che leggono davvero bene l'italiano
+    const rec = el('button', 'recCard');
+    const top = el('span', 'recTop'); top.append(el('span', 'recTitle', 'Voci Google'), el('span', 'badge', 'Consigliate'));
+    rec.append(top, el('span', 'recText', 'Le più naturali: leggono l\'italiano con gli accenti e l\'intonazione giusti. Gratis con il tuo account Google.'), el('span', 'recCta', 'Attiva in 2 minuti'));
+    rec.onclick = () => { gemFrom = 'voice'; openGemSetup(GEM_VOICES[0].id, 1); };
+    body.appendChild(rec);
+  }
   if(store.get('gemKey')){
-    body.appendChild(el('div', 'groupLabel', 'Voci Google'));
+    const gl = el('div', 'groupLabel', 'Voci Google '); gl.appendChild(el('span', 'badge', 'Consigliate')); body.appendChild(gl);
     GEM_VOICES.forEach(v => {
       const sel = state.engine === 'piper' && state.piperVoice === v.id;
       body.appendChild(voiceRow(v.name, 'Voce ' + v.desc + ' · serve internet', sel, () => selectVoice('piper', v.id), b => previewVoice('piper', v.id, b), 'piper:' + v.id));
@@ -2043,8 +2059,8 @@ function openSettings(focus, keepScroll){
     tabs.appendChild(t);
   });
   body.appendChild(tabs);
-  const card = (title, note) => {
-    if(title) body.appendChild(el('h3', 'cardTitle', title));
+  const card = (title, note, badge) => {
+    if(title){ const h = el('h3', 'cardTitle', title + ' '); if(badge) h.appendChild(el('span', 'badge', badge)); body.appendChild(h); }
     if(note) body.appendChild(el('p', 'cardNote', note));
     const c = el('div', 'card'); body.appendChild(c); return c;
   };
@@ -2053,12 +2069,12 @@ function openSettings(focus, keepScroll){
     // Google
     const hasKey = !!store.get('gemKey');
     if(!hasKey){
-      const c = card('Voci Google', 'Le più naturali. Gratis con il tuo account Google, serve internet.');
+      const c = card('Voci Google', 'Le più naturali: leggono l\'italiano con gli accenti e l\'intonazione giusti. Gratis con il tuo account Google, serve internet.', 'Consigliate');
       const go = el('button', 'wideBtn inCard', 'Attiva le voci Google');
       go.onclick = () => { gemFrom = 'settings'; openGemSetup(GEM_VOICES[0].id, 1); };
       c.appendChild(go);
     } else {
-      const c = card('Voci Google', 'Attive. Servono internet.');
+      const c = card('Voci Google', 'Attive. Servono internet.', 'Consigliate');
       GEM_VOICES.forEach(v => {
         const sel = state.engine === 'piper' && state.piperVoice === v.id;
         c.appendChild(voiceRow(v.name, 'Voce ' + v.desc, sel, () => selectVoice('piper', v.id), b => previewVoice('piper', v.id, b), 'piper:' + v.id));
