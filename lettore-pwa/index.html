@@ -66,6 +66,7 @@ svg{flex:none}
 .modelRow .modelName{color:var(--ink);font-weight:600;flex:none}
 .modelRow .modelState{color:var(--muted);text-align:right}
 .modelRow.ok .modelState{color:var(--accent)}
+.modelErr{font-size:12px;color:var(--faint);line-height:1.4;padding:0 0 8px;word-break:break-word}
 .subTitle+.card{margin-top:0}
 .innerLabel{font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);padding:16px 0 4px}
 .inCardNote{margin:10px 0 12px}
@@ -368,7 +369,7 @@ body.playerOpen #toast{bottom:auto;top:calc(env(safe-area-inset-top) + 64px)}
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 26;
+const APP_VERSION = 27;
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
   let hadController = !!navigator.serviceWorker.controller, reloading = false;
@@ -849,7 +850,9 @@ const GEM_MODEL_NAMES = { 'gemini-3.8-flash-tts': 'Flash 3.8, il principale', 'g
 function gemBlocked(){ const b = store.get('gemBlocked') || {}; const now = Date.now(); return GEM_MODELS.filter(m => b[m] && b[m] > now); }
 function blockModel(m, until){ const b = store.get('gemBlocked') || {}; b[m] = until; store.set('gemBlocked', b); }
 // modelli che il piano gratuito di questo account include (quelli fermi per giorni non contano)
-function gemModelsFree(){ const b = store.get('gemBlocked') || {}, now = Date.now(); return GEM_MODELS.filter(m => !(b[m] && b[m] - now > 2 * 864e5)); }
+// un modello conta come gratuito se non è fermo per un errore diverso dal limite (es. non disponibile)
+function gemUnavailable(m){ const b = store.get('gemBlocked') || {}, e = (store.get('gemErr') || {})[m]; return !!(b[m] && b[m] > Date.now() && e && !/^429/.test(e.s) && !/^200/.test(e.s)) || !!(e && /limit:\s*0\b/i.test(e.t) && b[m] > Date.now()); }
+function gemModelsFree(){ return GEM_MODELS.filter(m => !gemUnavailable(m)); }
 function gemModelsLeft(){ const bl = gemBlocked(); return GEM_MODELS.filter(m => !bl.includes(m)).length; }
 function findAudio(o){
   // cerca nella risposta l'ultimo blocco audio in base64
@@ -876,58 +879,104 @@ function pcmToWav(bytes, sr){
 async function wavSeconds(blob){
   try{ const h = new DataView(await blob.slice(0, 44).arrayBuffer()); const sr = h.getUint32(24, true) || 24000; return (blob.size - 44) / 2 / sr; }catch(e){ return 0; }
 }
-async function geminiTTS(text, voiceId, keyOverride){
+// ultimo errore di ogni modello, per capire perché uno non viene usato
+function noteGemErr(model, status, text){ const e = store.get('gemErr') || {}; e[model] = { s: status, t: String(text || '').replace(/\s+/g, ' ').slice(0, 220), at: Date.now() }; store.set('gemErr', e); }
+function clearGemErr(model){ const e = store.get('gemErr') || {}; if(e[model]){ delete e[model]; store.set('gemErr', e); } }
+// due modi di chiedere l'audio a Google: l'API Interactions e la classica generateContent.
+// Se un modello non accetta il primo, provo il secondo e me lo ricordo.
+async function gemCall(model, api, text, voice, style, key){
+  const url = api === 'generate'
+    ? `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
+    : 'https://generativelanguage.googleapis.com/v1beta/interactions';
+  const body = api === 'generate'
+    ? { contents: [{ parts: [{ text }] }], generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } } } }
+    : { model, input: [{ type: 'user_input', content: [{ type: 'text', text, annotations: [{ type: 'speech_metadata', style }] }] }], response_format: { type: 'audio' }, generation_config: { speech_config: [{ voice }] } };
+  try{
+    return await fetch(url, { method: 'POST', headers: { 'x-goog-api-key': key, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  }catch(e){ throw new Error('rete'); }
+}
+function audioFrom(j){
+  const a = findAudio(j); if(!a) return null;
+  const bin = atob(a.data); const bytes = new Uint8Array(bin.length);
+  for(let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  if(bin.slice(0, 4) === 'RIFF') return new Blob([bytes], { type: 'audio/wav' });
+  const m = /rate=(\d+)/.exec(a.mime_type || a.mimeType || '');
+  return pcmToWav(bytes, m ? +m[1] : 24000);
+}
+const isUnsupported = t => /not (found|supported)|unsupported|does not support|is not available|no longer available|invalid (model|argument).*model|unknown (name|field)/i.test(t);
+const isTooLong = t => /token|too long|exceed|maximum|max_output|length/i.test(t);
+// se tutti i modelli sono fermi solo per il limite al minuto, aspetto invece di dire che il limite è finito
+async function geminiTTS(text, voiceId, keyOverride, retry = 0){
+  try{ return await geminiTTSOnce(text, voiceId, keyOverride); }
+  catch(e){
+    if(!/limite/.test(e.message || '') || retry >= 3) throw e;
+    const b = store.get('gemBlocked') || {}, now = Date.now();
+    const soon = Math.min(...GEM_MODELS.map(m => b[m] || 0).filter(t => t > now));
+    if(!isFinite(soon) || soon - now > 120000) throw e;
+    await new Promise(r => setTimeout(r, soon - now + 500));
+    return geminiTTS(text, voiceId, keyOverride, retry + 1);
+  }
+}
+async function geminiTTSOnce(text, voiceId, keyOverride){
   const key = keyOverride || store.get('gemKey');
   if(!key) throw new Error('chiave mancante');
   const style = (GEM_STYLES[prefs.gemStyle] || GEM_STYLES.narrativa).text;
+  const voice = voiceId.slice(4);
   let lastErr = null, tried = 0;
   const blocked = gemBlocked();
+  const apis = store.get('gemApi') || {};
   for(const model of GEM_MODELS){
     if(blocked.includes(model)) continue;
     tried++;
-    const body = {
-      model,
-      input: [{ type: 'user_input', content: [{ type: 'text', text, annotations: [{ type: 'speech_metadata', style }] }] }],
-      response_format: { type: 'audio' },
-      generation_config: { speech_config: [{ voice: voiceId.slice(4) }] }
-    };
-    let r;
-    try{
-      r = await fetch('https://generativelanguage.googleapis.com/v1beta/interactions', {
-        method: 'POST', headers: { 'x-goog-api-key': key, 'Content-Type': 'application/json' }, body: JSON.stringify(body)
-      });
-    }catch(e){ throw new Error('rete'); }
-    if(r.ok){
-      const j = await r.json();
-      const a = findAudio(j);
-      if(!a){ lastErr = new Error('nessun audio nella risposta'); continue; }
-      const bin = atob(a.data); const bytes = new Uint8Array(bin.length);
-      for(let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-      if(bin.slice(0, 4) === 'RIFF') return new Blob([bytes], { type: 'audio/wav' });
-      const m = /rate=(\d+)/.exec(a.mime_type || a.mimeType || '');
-      return pcmToWav(bytes, m ? +m[1] : 24000);
+    const order = apis[model] === 'generate' ? ['generate', 'interactions'] : ['interactions', 'generate'];
+    let r = null, t = '', usedApi = null;
+    for(const api of order){
+      r = await gemCall(model, api, text, voice, style, key);
+      usedApi = api;
+      if(r.ok) break;
+      t = await r.text().catch(() => '');
+      noteGemErr(model, r.status + ' ' + api, t);
+      // con l'altro metodo ha senso riprovare solo se questo non è supportato per il modello
+      if(!(r.status === 404 || (r.status === 400 && isUnsupported(t)))) break;
     }
-    const t = await r.text().catch(() => '');
-    if(r.status === 429 && /limit:\s*0\b|free.?tier.*limit.*\b0\b/i.test(t)){
-      // modello non incluso nel piano gratuito di questo account: lo riprovo tra una settimana
-      blockModel(model, Date.now() + 7 * 864e5); lastErr = lastErr || new Error('limite'); continue;
+    if(r.ok){
+      const blob = audioFrom(await r.json().catch(() => null));
+      if(!blob){ noteGemErr(model, '200 ' + usedApi, 'nessun audio nella risposta'); lastErr = new Error('nessun audio nella risposta'); continue; }
+      if(apis[model] !== usedApi){ apis[model] = usedApi; store.set('gemApi', apis); }
+      clearGemErr(model);
+      return blob;
+    }
+    if(r.status === 429 && /limit:\s*0\b/i.test(t)){
+      // modello non incluso nel piano gratuito di questo account: lo riprovo domani
+      blockModel(model, gemResetDate().getTime()); lastErr = lastErr || new Error('limite'); continue;
     }
     if(r.status === 429){
-      // limite del giorno: questo modello è fermo fino all'azzeramento; limite al minuto: solo per un minuto
-      blockModel(model, /per ?day|daily|PerDay/i.test(t) || !/per ?minute|PerMinute/i.test(t) ? gemResetDate().getTime() : Date.now() + 65000);
+      // limite al minuto: fermo un minuto; altrimenti fino all'azzeramento giornaliero
+      // Google indica quanto aspettare ("retryDelay"): se sono secondi è il limite al minuto
+      const rd = /retry(?:Delay)?"?\s*[:in]+\s*"?(\d+(?:\.\d+)?)\s*s/i.exec(t);
+      const perDay = /per ?day|PerDay|daily/i.test(t), perMin = /per ?minute|PerMinute/i.test(t);
+      const wait = rd && +rd[1] < 600 ? Math.ceil(+rd[1]) * 1000 + 3000 : 65000;
+      blockModel(model, perDay && !perMin ? gemResetDate().getTime() : (perMin || rd) ? Date.now() + wait : gemResetDate().getTime());
       lastErr = new Error('limite'); continue;
     }
     if(r.status === 401 || /API[_ ]?key not valid|API_KEY_INVALID|invalid api key/i.test(t)) throw new Error('chiave');
-    if(r.status === 404 || r.status === 403 || (r.status === 400 && /model|not (found|supported)|unsupported|does not support/i.test(t))){
-      // modello non disponibile per questo account: lo salto per una settimana
-      blockModel(model, Date.now() + 7 * 864e5); lastErr = lastErr || new Error('servizio ' + r.status); continue;
+    if(r.status === 400 && isTooLong(t) && !isUnsupported(t)) throw new Error('richiesta: ' + t.slice(0, 160));
+    if(r.status === 404 || r.status === 403 || (r.status === 400 && isUnsupported(t))){
+      // modello non disponibile per questo account con nessuno dei due metodi: lo riprovo domani
+      blockModel(model, gemResetDate().getTime()); lastErr = lastErr || new Error('servizio ' + r.status); continue;
     }
-    if(r.status === 400) throw new Error('richiesta: ' + t.slice(0, 160));
-    lastErr = new Error('servizio ' + r.status);
+    // altro errore su questo modello: provo il successivo, senza fermarlo
+    lastErr = new Error(r.status === 400 ? 'richiesta: ' + t.slice(0, 160) : 'servizio ' + r.status);
   }
   if(!tried) throw new Error('limite');
   throw lastErr || new Error('servizio');
 }
+// nessun modello resta fermo oltre il prossimo azzeramento: i blocchi di una settimana delle versioni precedenti erano sbagliati
+(() => {
+  const b = store.get('gemBlocked') || {}, lim = gemResetDate().getTime() + 36e5;
+  let ch = false; Object.keys(b).forEach(m => { if(b[m] > lim){ delete b[m]; ch = true; } });
+  if(ch) store.set('gemBlocked', b);
+})();
 // il limite gratuito si azzera a mezzanotte della California: lo mostro nell'ora del telefono
 function gemResetDate(){
   try{
@@ -2418,10 +2467,13 @@ function openSettings(focus, keepScroll){
       const bl = store.get('gemBlocked') || {}, now = Date.now();
       GEM_MODELS.forEach(m => {
         const until = bl[m] || 0, left = until - now;
-        const st = left <= 0 ? 'Disponibile' : left > 2 * 864e5 ? 'Non gratuito sul tuo account, riprovo tra una settimana' : left > 5 * 60000 ? `Finito per oggi, torna verso le ${gemResetTime()}` : 'In pausa per un minuto';
+        const st = left <= 0 ? 'Disponibile' : gemUnavailable(m) ? 'Non disponibile sul tuo account oggi, riprovo domani' : left > 5 * 60000 ? `Finito per oggi, torna verso le ${gemResetTime()}` : 'In pausa per un minuto';
         const r = el('div', 'modelRow' + (left <= 0 ? ' ok' : ''));
         r.append(el('span', 'modelName', GEM_MODEL_NAMES[m] || m), el('span', 'modelState', st));
         how.appendChild(r);
+        // l'ultimo errore ricevuto da Google per questo modello, utile per capire cosa non va
+        const er = (store.get('gemErr') || {})[m];
+        if(er && now - er.at < 3 * 864e5) how.appendChild(el('div', 'modelErr', `Ultima risposta di Google (${new Date(er.at).toLocaleString('it-IT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}): ${er.s} - ${er.t}`));
       });
       ca.appendChild(how);
       const save = () => { store.set('prefs', prefs); openSettings(null, true); };
