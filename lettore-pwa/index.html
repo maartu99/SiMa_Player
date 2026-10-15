@@ -49,7 +49,7 @@ svg{flex:none}
 .famSub{font-size:13px;color:var(--muted);margin-top:2px;line-height:1.4}
 .moreVoices{width:100%;display:flex;align-items:center;gap:14px;margin:18px 0 6px;padding:14px;border-radius:14px;border:1px dashed var(--line2);background:transparent;color:var(--accent);text-align:left;font-weight:600}
 .moreVoices .ot span{display:block;font-size:13px;font-weight:400;color:var(--muted);margin-top:2px}
-.addBtn{height:44px;padding:0 16px;border-radius:22px;border:0;background:var(--accent);color:var(--accent-ink);font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px;white-space:nowrap}
+.addBtn{width:44px;height:44px;padding:0;border-radius:22px;border:0;background:var(--accent);color:var(--accent-ink);display:flex;align-items:center;justify-content:center;flex:none}
 .chips{display:flex;gap:8px;padding:18px 0 6px;overflow-x:auto;scrollbar-width:none}
 .chips::-webkit-scrollbar{display:none}
 .chip{flex:none;height:36px;padding:0 14px;border-radius:18px;border:1px solid var(--line2);background:transparent;color:var(--ink2);font-size:14px;font-weight:500}
@@ -210,9 +210,8 @@ body.playerOpen #toast{bottom:auto;top:calc(env(safe-area-inset-top) + 64px)}
     <button class="roundBtn" id="setBtn" aria-label="Impostazioni">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
     </button>
-    <button class="addBtn" id="addBtn">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-      Aggiungi libro
+    <button class="addBtn" id="addBtn" aria-label="Aggiungi libro">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
     </button>
     </div>
     <input type="file" id="file" accept=".pdf,.epub,application/pdf,application/epub+zip" hidden>
@@ -1461,7 +1460,7 @@ async function renderLibrary(){
   if(!books.length){
     const e = el('div', 'empty');
     e.appendChild(el('h2', null, 'Aggiungi il tuo primo libro'));
-    e.appendChild(el('p', null, 'Tocca Aggiungi libro e scegli un PDF o un EPUB dall\'app File. Resta salvato sul telefono e riparte sempre dalla frase in cui eri.'));
+    e.appendChild(el('p', null, 'Tocca il pulsante + in alto e scegli un PDF o un EPUB dall\'app File. Resta salvato sul telefono e riparte sempre dalla frase in cui eri.'));
     list.appendChild(e); return;
   }
   if(!items.length){
