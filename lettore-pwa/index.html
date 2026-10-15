@@ -152,6 +152,21 @@ svg{flex:none}
 .readText .s.on{background:var(--mark);color:var(--bg)}
 .hint{font-size:14px;color:var(--muted);line-height:1.5;margin:4px 0 12px}
 .keyRow{display:flex;gap:8px;margin:0 0 12px}
+.stepDots{display:flex;gap:6px;margin:2px 0 4px}
+.stepDots span{flex:1;height:4px;border-radius:2px;background:var(--track)}
+.stepDots span.on{background:var(--accent)}
+.stepTitle{font-family:var(--serif);font-size:22px;font-weight:600;margin:4px 0 8px;line-height:1.25}
+.stepText{font-size:15px;line-height:1.55;color:var(--ink2);margin:0 0 12px}
+.stepText.muted{color:var(--muted);font-size:14px}
+.stepText.warn{color:var(--err)}
+.stepText.ok{color:var(--accent);font-weight:600}
+.stepList{margin:0 0 16px;padding-left:22px;font-size:15px;line-height:1.55;color:var(--ink2)}
+.stepList li{margin-bottom:6px}
+.wideBtn{display:flex;align-items:center;justify-content:center;width:100%;min-height:50px;border-radius:14px;border:0;background:var(--accent);color:var(--accent-ink);font-size:16px;font-weight:700;text-decoration:none;margin:0 0 10px}
+.wideBtn.alt{background:var(--ink);color:var(--bg)}
+.wideBtn:disabled{opacity:.5}
+.linkBtn{display:block;text-align:center;color:var(--accent);font-size:15px;margin:4px 0 14px}
+#gemKeyIn{width:100%;margin:0 0 10px}
 .keyIn{flex:1;min-width:0;height:44px;border-radius:12px;border:1px solid var(--line2);background:var(--bg);color:var(--ink);padding:0 12px;font:inherit;font-size:16px}
 
 /* ---------- avvisi ---------- */
@@ -691,8 +706,8 @@ function pcmToWav(bytes, sr){
   new Uint8Array(buf, 44).set(bytes);
   return new Blob([buf], { type: 'audio/wav' });
 }
-async function geminiTTS(text, voiceId){
-  const key = store.get('gemKey');
+async function geminiTTS(text, voiceId, keyOverride){
+  const key = keyOverride || store.get('gemKey');
   if(!key) throw new Error('chiave mancante');
   const style = (GEM_STYLES[prefs.gemStyle] || GEM_STYLES.narrativa).text;
   let lastErr = null;
@@ -1395,7 +1410,7 @@ async function previewVoice(kind, id){
     speechSynthesis.speak(u);
     return;
   }
-  if(isGemId(id) && !store.get('gemKey')){ setStatus('Per le voci Gemini inserisci prima la chiave gratuita, qui sopra.', true); return; }
+  if(isGemId(id) && !store.get('gemKey')){ openGemSetup(id, 1); return; }
   unlockAudio();
   const g = state.gen;
   const key = `${id}|anteprima|0|0`;
@@ -1415,7 +1430,7 @@ function selectVoice(kind, id){
   const wasPlaying = state.playing;
   if(wasPlaying) stop();
   state.prepareTo = null;
-  if(kind === 'piper' && isGemId(id) && !store.get('gemKey')){ setStatus('Per le voci Gemini inserisci prima la chiave gratuita.', true); if(wasPlaying){ unlockAudio(); play(); } return; }
+  if(kind === 'piper' && isGemId(id) && !store.get('gemKey')){ if(wasPlaying){ unlockAudio(); play(); } openGemSetup(id, 1); return; }
   if(kind === 'piper'){
     state.engine = 'piper'; state.piperVoice = id;
     audio.removeAttribute('data-key');
@@ -1445,31 +1460,18 @@ function voiceRow(label, sub, selected, onPick, onTry){
 function openVoiceSheet(){
   const body = sheetKind === 'voice' ? $('sheetBody') : openSheet('voice', 'Voce', true);
   const scroll = body.scrollTop; body.textContent = '';
-  // Google Gemini
-  body.appendChild(el('div', 'groupLabel', 'Google Gemini'));
-  body.appendChild(el('p', 'hint', 'Le più naturali: capiscono il contesto, le domande e i dialoghi. Gratis con una chiave Google personale, entro un limite giornaliero. Servono internet e l\'invio del testo a Google, che nel piano gratuito può usarlo per migliorare i suoi servizi.'));
-  if(!store.get('gemKey')){
-    const steps = el('p', 'hint');
-    steps.append('Per attivarle: apri ');
-    const a = el('a', null, 'Google AI Studio'); a.href = 'https://aistudio.google.com/apikey'; a.target = '_blank'; a.rel = 'noopener'; a.style.color = 'var(--accent)';
-    steps.append(a, ', accedi con il tuo account Google, tocca Crea chiave API, copiala e incollala qui sotto. La chiave resta solo su questo telefono.');
-    const lab = el('label', 'sr', 'Chiave API di Google Gemini'); lab.htmlFor = 'gemKeyIn';
-    const inp = el('input', 'keyIn'); inp.id = 'gemKeyIn'; inp.type = 'password'; inp.autocomplete = 'off'; inp.placeholder = 'Incolla la chiave API';
-    const save = el('button', 'smallBtn', 'Salva chiave');
-    save.onclick = () => {
-      const v = inp.value.trim();
-      if(v.length < 20){ setStatus('La chiave sembra incompleta: copiala di nuovo per intero.', true); return; }
-      store.set('gemKey', v); setStatus('Chiave salvata. Scegli una voce Gemini e tocca Prova.');
-      openVoiceSheet();
-    };
-    const row = el('div', 'keyRow'); row.append(inp, save);
-    body.append(steps, lab, row);
-  } else {
-    GEM_VOICES.forEach(v => {
-      const sel = state.engine === 'piper' && state.piperVoice === v.id;
-      body.appendChild(voiceRow(v.name, 'Voce ' + v.desc, sel, () => selectVoice('piper', v.id), () => previewVoice('piper', v.id)));
-    });
-    body.appendChild(el('div', 'groupLabel', 'Stile di lettura Gemini'));
+  // Google Gemini: voci sempre visibili, la procedura guidata parte quando ne scegli una
+  const hasKey = !!store.get('gemKey');
+  body.appendChild(el('div', 'groupLabel', 'Voci Google'));
+  body.appendChild(el('p', 'hint', hasKey
+    ? 'Le più naturali: capiscono il contesto, le domande e i dialoghi. Servono internet e un limite giornaliero gratuito.'
+    : 'Le più naturali: capiscono il contesto, le domande e i dialoghi. Gratis, ma la prima volta vanno attivate con il tuo account Google: scegline una e ti guido passo passo, ci vogliono un paio di minuti.'));
+  GEM_VOICES.forEach(v => {
+    const sel = state.engine === 'piper' && state.piperVoice === v.id;
+    body.appendChild(voiceRow(v.name, 'Voce ' + v.desc + (hasKey ? '' : ' · da attivare'), sel, () => selectVoice('piper', v.id), () => previewVoice('piper', v.id)));
+  });
+  if(hasKey){
+    body.appendChild(el('div', 'groupLabel', 'Stile di lettura delle voci Google'));
     const pre = el('div', 'presets'); pre.style.gridTemplateColumns = 'repeat(3,minmax(0,1fr))';
     Object.entries(GEM_STYLES).forEach(([k, st]) => {
       const b = el('button', null, st.label); b.setAttribute('aria-pressed', (prefs.gemStyle || 'narrativa') === k ? 'true' : 'false');
@@ -1477,8 +1479,8 @@ function openVoiceSheet(){
       pre.appendChild(b);
     });
     body.appendChild(pre);
-    const rm = el('button', 'smallBtn', 'Rimuovi chiave');
-    rm.onclick = () => { if(!confirm('Rimuovere la chiave Gemini da questo telefono?')) return; store.del('gemKey'); if(isGem()) selectVoice('piper', PIPER_VOICES[0].id); openVoiceSheet(); };
+    const rm = el('button', 'smallBtn', 'Scollega account Google');
+    rm.onclick = () => { if(!confirm('Scollegare le voci Google da questo telefono? Potrai riattivarle quando vuoi.')) return; store.del('gemKey'); if(isGem()) selectVoice('piper', PIPER_VOICES[0].id); openVoiceSheet(); };
     body.appendChild(rm);
   }
   body.appendChild(el('div', 'groupLabel', 'Voci sul telefono'));
@@ -1500,6 +1502,109 @@ function openVoiceSheet(){
   }
   body.appendChild(el('p', 'hint', 'Per voci dell\'iPhone migliori scarica le versioni Avanzate da Impostazioni > Accessibilità > Contenuto letto > Voci > Italiano.'));
   body.scrollTop = scroll;
+}
+
+/* ---------- procedura guidata: attivare le voci Google ---------- */
+const gemSetup = { voice: null, step: 1, key: '' };
+function openGemSetup(voiceId, step){
+  if(voiceId) gemSetup.voice = voiceId;
+  gemSetup.step = step || gemSetup.step || 1;
+  store.set('gemSetup', { voice: gemSetup.voice, step: gemSetup.step });
+  const v = GEM_VOICES.find(x => x.id === gemSetup.voice) || GEM_VOICES[0];
+  const body = openSheet('gemSetup', 'Attiva le voci Google', true);
+  const prog = el('div', 'stepDots');
+  for(let i = 1; i <= 3; i++){ const d = el('span', i <= gemSetup.step ? 'on' : ''); prog.appendChild(d); }
+  body.appendChild(prog);
+  body.appendChild(el('div', 'groupLabel', `Passo ${gemSetup.step} di 3`));
+  const back = (to) => { const b = el('button', 'smallBtn', 'Indietro'); b.onclick = () => openGemSetup(null, to); return b; };
+
+  if(gemSetup.step === 1){
+    body.appendChild(el('h3', 'stepTitle', `Per usare ${v.name} serve il tuo account Google`));
+    body.appendChild(el('p', 'stepText', 'Le voci Google funzionano sui server di Google, che le offre gratis con un limite al giorno. Per riconoscerti ti dà una chiave personale, una specie di password per le app: la crei una volta e la incolli qui.'));
+    const ul = el('ul', 'stepList');
+    ['Serve un account Google, lo stesso di Gmail', 'È gratis e non chiede la carta di credito', 'Ci vogliono un paio di minuti', 'La chiave resta solo su questo telefono'].forEach(t => ul.appendChild(el('li', null, t)));
+    body.appendChild(ul);
+    body.appendChild(el('p', 'stepText muted', 'Da sapere: il testo del libro viene inviato a Google per essere letto, e nel piano gratuito Google può usarlo per migliorare i suoi servizi.'));
+    const go = el('button', 'wideBtn', 'Inizia'); go.onclick = () => openGemSetup(null, 2);
+    body.appendChild(go);
+  }
+
+  if(gemSetup.step === 2){
+    body.appendChild(el('h3', 'stepTitle', 'Crea la tua chiave'));
+    const ol = el('ol', 'stepList');
+    [
+      'Tocca il pulsante qui sotto: si apre la pagina di Google.',
+      'Accedi con il tuo account Google, se te lo chiede.',
+      'Se compaiono le condizioni d\'uso, accettale.',
+      'Tocca "Create API key" (o "Crea chiave API"). Se ti chiede un progetto, scegli quello proposto.',
+      'Compare una chiave lunga che inizia con AIza: tocca l\'icona per copiarla.',
+      'Torna qui: tocca "Fine" in alto a sinistra, oppure riapri l\'app.'
+    ].forEach(t => ol.appendChild(el('li', null, t)));
+    body.appendChild(ol);
+    const open = el('a', 'wideBtn', 'Apri la pagina di Google');
+    open.href = 'https://aistudio.google.com/apikey'; open.target = '_blank'; open.rel = 'noopener';
+    open.onclick = () => store.set('gemSetup', { voice: gemSetup.voice, step: 3 });
+    body.appendChild(open);
+    const done = el('button', 'wideBtn alt', 'Ho copiato la chiave'); done.onclick = () => openGemSetup(null, 3);
+    body.appendChild(done);
+    body.appendChild(back(1));
+  }
+
+  if(gemSetup.step === 3){
+    body.appendChild(el('h3', 'stepTitle', 'Incolla la chiave'));
+    body.appendChild(el('p', 'stepText', 'Tocca "Incolla" e conferma. Poi controllo che funzioni facendoti sentire la voce.'));
+    const paste = el('button', 'wideBtn', 'Incolla');
+    const lab = el('label', 'sr', 'Chiave delle voci Google'); lab.htmlFor = 'gemKeyIn';
+    const inp = el('input', 'keyIn'); inp.id = 'gemKeyIn'; inp.type = 'text'; inp.autocomplete = 'off'; inp.spellcheck = false;
+    inp.setAttribute('autocapitalize', 'off'); inp.placeholder = 'Oppure tieni premuto qui e scegli Incolla';
+    inp.value = gemSetup.key || '';
+    const msg = el('p', 'stepText'); msg.id = 'gemMsg';
+    const verify = el('button', 'wideBtn alt', 'Verifica e attiva');
+    paste.onclick = async () => {
+      try{ const t = (await navigator.clipboard.readText()).trim(); inp.value = t; gemSetup.key = t; checkShape(); }
+      catch(e){ msg.textContent = 'Non riesco a leggere gli appunti: tieni premuto nel campo qui sotto e scegli Incolla.'; inp.focus(); }
+    };
+    const checkShape = () => {
+      const k = inp.value.trim();
+      msg.className = 'stepText';
+      if(!k) msg.textContent = '';
+      else if(!/^AIza[0-9A-Za-z_\-]{30,}$/.test(k)){ msg.className = 'stepText warn'; msg.textContent = 'Questa non sembra una chiave Google: deve iniziare con AIza ed essere lunga circa 40 caratteri. Torna alla pagina di Google e copiala di nuovo.'; }
+      else msg.textContent = 'Chiave pronta: tocca Verifica e attiva.';
+    };
+    inp.oninput = () => { gemSetup.key = inp.value.trim(); checkShape(); };
+    verify.onclick = async () => {
+      const k = inp.value.trim();
+      if(!k){ msg.className = 'stepText warn'; msg.textContent = 'Prima incolla la chiave.'; return; }
+      verify.disabled = true; paste.disabled = true;
+      msg.className = 'stepText'; msg.textContent = 'Controllo la chiave...';
+      unlockAudio();
+      try{
+        const blob = await geminiTTS(`Ciao, sono ${v.name}. Da adesso leggo io i tuoi libri.`, v.id, k);
+        store.set('gemKey', k); store.del('gemSetup'); gemSetup.key = '';
+        msg.className = 'stepText ok'; msg.textContent = 'Fatto, le voci Google sono attive.';
+        state.gen++; if(state.playing) stop();
+        audio.src = URL.createObjectURL(blob); audio.dataset.key = 'gem-setup'; audio.playbackRate = state.rate;
+        audio.play().catch(() => {});
+        selectVoice('piper', v.id);
+        setTimeout(() => { if(sheetKind === 'gemSetup') openVoiceSheet(); }, 2500);
+      }catch(e){
+        const m = e.message || '';
+        msg.className = 'stepText warn';
+        msg.textContent = /chiave/.test(m) ? 'Google non accetta questa chiave. Controlla di averla copiata tutta, oppure creane una nuova dalla pagina di Google.'
+          : /limite/.test(m) ? 'La chiave è giusta, ma il limite gratuito di oggi è finito. L\'ho salvata: riprova più tardi.'
+          : /rete/.test(m) ? 'Non riesco a raggiungere Google: controlla la connessione e riprova.'
+          : 'Qualcosa non ha funzionato (' + m + '). Riprova tra poco.';
+        if(/limite/.test(m)){ store.set('gemKey', k); store.del('gemSetup'); }
+        verify.disabled = false; paste.disabled = false;
+      }
+    };
+    body.append(paste, lab, inp, msg, verify);
+    const again = el('a', 'linkBtn', 'Riapri la pagina di Google');
+    again.href = 'https://aistudio.google.com/apikey'; again.target = '_blank'; again.rel = 'noopener';
+    body.appendChild(again);
+    body.appendChild(back(2));
+    checkShape();
+  }
 }
 
 function openText(){
@@ -1585,6 +1690,7 @@ seekEl.addEventListener('change', () => {
 });
 document.addEventListener('keydown', e => { if(e.key === 'Escape'){ if(sheetKind) closeSheet(); else closePlayer(); } });
 document.addEventListener('visibilitychange', () => {
+  if(document.visibilityState === 'visible' && sheetKind === 'gemSetup'){ const gs = store.get('gemSetup'); if(gs && gs.step !== gemSetup.step) openGemSetup(null, gs.step); }
   if(document.visibilityState === 'visible' && state.playing) requestWake();
   if(document.visibilityState === 'hidden') savePos();
 });
@@ -1610,10 +1716,13 @@ updatePlay();
 renderChips();
 try{ if(navigator.storage && navigator.storage.persist) navigator.storage.persist(); }catch(e){}
 (async () => {
+  const gs = store.get('gemSetup');
+  if(gs && !store.get('gemKey')){ gemSetup.voice = gs.voice; gemSetup.step = gs.step; }
   const last = store.get('lastBook');
   if(last) await loadBook(last);
   await renderLibrary();
-  if(state.engine === 'piper' && voiceReady(state.piperVoice)) wk(state.piperVoice).postMessage({ type: 'prepare', voiceId: state.piperVoice });
+  if(state.engine === 'piper' && !isGem() && voiceReady(state.piperVoice)) wk(state.piperVoice).postMessage({ type: 'prepare', voiceId: state.piperVoice });
+  if(gs && !store.get('gemKey') && gs.step >= 3){ openPlayer(); openGemSetup(gs.voice, gs.step); }
 })();
 </script>
 </body>
