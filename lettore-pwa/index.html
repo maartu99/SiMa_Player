@@ -343,7 +343,7 @@ body.playerOpen #toast{bottom:auto;top:calc(env(safe-area-inset-top) + 64px)}
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 20;
+const APP_VERSION = 21;
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
   let hadController = !!navigator.serviceWorker.controller, reloading = false;
@@ -698,6 +698,15 @@ async function pump(){
   const vid = next.key.split('|')[0];
   if(isGemId(vid)){
     geminiTTS(en.text, vid)
+      .then(async blob => {
+        const chunky = /\|c\d+-\d+$/.test(next.key);
+        if(chunky && en.text.length > 1500){
+          const secs = await wavSeconds(blob);
+          if(secs && secs < en.text.length / 15 * 0.55){ shrinkGemChunks(en.text.length); throw new Error('tagliato'); }
+        }
+        if(chunky) rememberChunk(next.key);
+        return blob;
+      })
       .then(blob => onWorkerMessage({ data: { type: 'result', id, blob } }))
       .catch(err => onWorkerMessage({ data: { type: 'error', id, message: String(err && err.message || err) } }));
     return;
@@ -802,6 +811,9 @@ function pcmToWav(bytes, sr){
   new Uint8Array(buf, 44).set(bytes);
   return new Blob([buf], { type: 'audio/wav' });
 }
+async function wavSeconds(blob){
+  try{ const h = new DataView(await blob.slice(0, 44).arrayBuffer()); const sr = h.getUint32(24, true) || 24000; return (blob.size - 44) / 2 / sr; }catch(e){ return 0; }
+}
 async function geminiTTS(text, voiceId, keyOverride){
   const key = keyOverride || store.get('gemKey');
   if(!key) throw new Error('chiave mancante');
@@ -837,26 +849,70 @@ async function geminiTTS(text, voiceId, keyOverride){
   }
   throw lastErr || new Error('servizio');
 }
+// il limite gratuito si azzera a mezzanotte della California: lo mostro nell'ora del telefono
+function gemResetTime(){
+  try{
+    const now = new Date();
+    const la = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
+    const next = new Date(la); next.setHours(24, 0, 0, 0);
+    const reset = new Date(now.getTime() + (next - la));
+    return reset.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+  }catch(e){ return '9:00'; }
+}
 function gemErrorText(msg){
-  if(/limite/.test(msg)) return 'Hai raggiunto il limite gratuito di Gemini per adesso. Riprova più tardi, oppure scegli un\'altra voce: le frasi già preparate restano salvate.';
+  if(/limite/.test(msg)) return `Hai finito il limite gratuito di oggi delle voci Google: si azzera verso le ${gemResetTime()}. Intanto puoi riascoltare le parti già preparate, oppure usare una voce dell'iPhone.`;
   if(/chiave/.test(msg)) return 'La chiave Gemini non funziona. Controllala in Voce > Google Gemini.';
   if(/rete/.test(msg)) return 'Gemini non risponde: serve la connessione a internet.';
   return 'Gemini non è riuscito a generare la voce (' + msg + ').';
 }
 // Gemini legge a blocchi di più frasi: meno richieste, intonazione più naturale
 const chunkCache = new Map();
+// lunghezza dei blocchi in caratteri: circa 7-8 minuti di ascolto; si accorcia da sola se Google taglia l'audio
+const gemTarget = () => store.get('gemChunk') || 6500;
+function shrinkGemChunks(failedLen){
+  // metà della lunghezza che Google non ha accettato; se più blocchi falliscono insieme, non accorcio due volte
+  const t = Math.max(1500, Math.round((failedLen || gemTarget()) / 2));
+  if(t < gemTarget()){ store.set('gemChunk', t); chunkCache.clear(); }
+  return gemTarget();
+}
+// i blocchi già generati restano validi anche se cambia la lunghezza: ne ricordo i confini
+function doneChunks(sec){ return ((store.get('gemDone:' + state.piperVoice + '|' + state.key) || {})[sec]) || []; }
+async function recallChunks(book){
+  try{
+    const db = await lib.open();
+    const keys = await new Promise(res => { const r = db.transaction('audio').objectStore('audio').getAllKeys(); r.onsuccess = () => res(r.result || []); r.onerror = () => res([]); });
+    keys.filter(k => String(k).startsWith('gem-') && String(k).includes('|' + book + '|')).forEach(k => rememberChunk(String(k)));
+  }catch(e){}
+}
+function rememberChunk(key){
+  const m = /^(gem-[^|]+)\|([^|]+)\|(\d+)\|c(\d+)-(\d+)$/.exec(key); if(!m) return;
+  const sk = 'gemDone:' + m[1] + '|' + m[2], d = store.get(sk) || {};
+  const arr = d[m[3]] = d[m[3]] || [];
+  if(!arr.some(([a, b]) => a === +m[4] && b === +m[5])){ arr.push([+m[4], +m[5]]); arr.sort((x, y) => x[0] - y[0]); store.set(sk, d); }
+  chunkCache.delete(m[1] + '|' + m[2] + '|' + m[3]);
+}
 function chunksFor(sec){
-  const ck = state.key + '|' + sec;
+  const ck = state.piperVoice + '|' + state.key + '|' + sec;
   if(chunkCache.has(ck)) return chunkCache.get(ck);
-  const ss = state.sections[sec].sentences, out = [];
-  let cur = null;
-  ss.forEach((x, i) => {
-    const len = x.t.length + 1;
-    if(cur && (cur.len >= 1100 || (cur.len >= 600 && x.p))){ out.push(cur); cur = null; }
-    if(!cur) cur = { sec, start: i, end: i, cum: [], len: 0 };
-    cur.cum.push(cur.len); cur.len += len; cur.end = i;
-  });
-  if(cur) out.push(cur);
+  const ss = state.sections[sec].sentences, out = [], T = gemTarget();
+  const done = doneChunks(sec).filter(([a, b]) => b < ss.length);
+  const make = (a, b) => { const c = { sec, start: a, end: b, cum: [], len: 0 }; for(let i = a; i <= b; i++){ c.cum.push(c.len); c.len += ss[i].t.length + 1; } return c; };
+  let i = 0;
+  while(i < ss.length){
+    const d = done.find(([a]) => a === i);
+    if(d){ out.push(make(d[0], d[1])); i = d[1] + 1; continue; }
+    // nuovo blocco: fino alla lunghezza scelta, chiuso a fine paragrafo se possibile, senza invadere un blocco già fatto
+    const stopAt = (done.find(([a]) => a > i) || [ss.length])[0];
+    let len = 0, j = i, lastPara = -1;
+    while(j < stopAt){
+      if(j > i && ss[j].p && len >= T * 0.6) lastPara = j - 1;
+      if(len >= T){ break; }
+      len += ss[j].t.length + 1; j++;
+    }
+    let endIdx = j - 1;
+    if(j < stopAt && lastPara >= i) endIdx = lastPara;
+    out.push(make(i, endIdx)); i = endIdx + 1;
+  }
   chunkCache.set(ck, out);
   return out;
 }
@@ -893,8 +949,8 @@ function lookahead(){
 }
 function upcoming(n){
   if(isGem()){
-    // blocchi: 4 in anticipo, o fino al punto da preparare
-    let k = 4;
+    // blocchi lunghi: preparo solo quello in corso e il successivo, per non consumare richieste inutili
+    let k = 2;
     if(state.prepareTo != null){ const p = fromG(state.prepareTo); const u = upcomingChunks(400); const i = u.findIndex(x => x.chunk.sec === p.sec && p.idx <= x.chunk.end); k = i >= 0 ? i + 1 : u.length; }
     return upcomingChunks(k);
   }
@@ -931,18 +987,18 @@ async function piperSpeakCurrent(fromAdvance){
   if(stalled){
     if(fromAdvance){
       const r = rtfOf(state.piperVoice);
-      setStatus(r && r > 1
+      if(isGem()) setStatus('Google sta preparando la prossima parte, qualche secondo...', false, true); else setStatus(r && r > 1
         ? `${voiceName()} su questo telefono è più lenta della lettura: aspetto di avere qualche frase pronta. Per ascoltare senza pause usa Prepara in anticipo dai tre puntini, oppure una voce più leggera.`
         : 'Preparo le prossime frasi...', false, true);
     } else {
-      setStatus(voiceReady(state.piperVoice) ? 'Preparo la voce...' : 'Preparo la voce. La prima volta va scaricata, può richiedere qualche minuto.', false, true);
+      setStatus(isGem() ? 'Google sta preparando la lettura, qualche secondo...' : voiceReady(state.piperVoice) ? 'Preparo la voce...' : 'Preparo la voce. La prima volta va scaricata, può richiedere qualche minuto.', false, true);
     }
   }
   try{
     const url = await waitFor(key);
     // dopo un'interruzione riparto solo con qualche frase già pronta, così non si ferma a ogni frase
     if(stalled && fromAdvance && list.length > 1){
-      try{ await waitFor(list[Math.min(isGem() ? 1 : 3, list.length - 1)].key); }catch(e){}
+      if(!isGem()) try{ await waitFor(list[Math.min(3, list.length - 1)].key); }catch(e){}
     }
     if(g !== state.gen || !state.playing) return;
     setStatus('');
@@ -959,6 +1015,11 @@ async function piperSpeakCurrent(fromAdvance){
     if(g !== state.gen || err.message === 'skip') return;
     if(err.name === 'NotAllowedError'){ stop(); setStatus('Tocca play per continuare.'); return; }
     stop();
+    if(isGem() && (/tagliato/.test(err.message || '') || (/richiesta/.test(err.message || '') && gemTarget() > 1500))){
+      if(/richiesta/.test(err.message || '')) shrinkGemChunks();
+      setStatus('Il blocco era troppo lungo per Google: riprovo con blocchi più corti...', false, true);
+      state.playing = true; updatePlay(); return piperSpeakCurrent(fromAdvance);
+    }
     if(isGem()) setStatus(gemErrorText(err.message || ''), true);
     else setStatus('Non riesco a generare la voce. Controlla la connessione per il primo download, oppure scegli una voce dell\'iPhone.', true);
   }
@@ -1518,6 +1579,7 @@ async function loadBook(key){
   if(state.playing) stop();
   state.key = key; state.meta = rec; state.sections = secs; state.isPdf = !!rec.isPdf; state.prepareTo = null;
   state.pages = state.isPdf && !rec.chapters; // PDF senza segnalibri: si naviga per pagine
+  await recallChunks(key);
   state.offsets = []; let acc = 0;
   for(const s of secs){ state.offsets.push(acc); acc += s.sentences.length; }
   state.total = acc;
