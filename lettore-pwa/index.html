@@ -47,6 +47,26 @@ svg{flex:none}
 .famText{flex:1;min-width:0}
 .famTitle{font-weight:600}
 .famSub{font-size:13px;color:var(--muted);margin-top:2px;line-height:1.4}
+.tabs{position:sticky;top:0;z-index:3;display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;margin:0 0 6px;border-radius:12px;background:var(--bg);box-shadow:0 8px 12px -6px var(--surface2)}
+.tab{height:40px;border:0;border-radius:9px;background:transparent;color:var(--muted);font-size:16px;font-weight:600}
+.tab[aria-selected="true"]{background:var(--surface);color:var(--ink)}
+.cardTitle{font-size:17px;font-weight:700;margin:20px 2px 2px}
+.cardNote{font-size:15px;color:var(--muted);margin:0 2px 8px;line-height:1.4}
+.cardTitle+.card{margin-top:8px}
+.card{background:var(--surface);border-radius:14px;padding:0 14px;margin:0 0 4px}
+.card>:last-child{border-bottom:0}
+.card .opt,.card .voiceRow,.card .famRow{border-bottom:1px solid var(--line)}
+.card .voiceRow .opt{border-bottom:0}
+.card .voiceRow.sub{padding-left:14px}
+.card .famTitle{font-size:16px}
+.card .famSub{font-size:14px}
+.wideBtn.inCard{margin:14px 0}
+.presets.inCard{margin:14px 0}
+.textBtn{display:block;width:100%;min-height:48px;border:0;border-top:1px solid var(--line);background:none;color:var(--err);font-size:15px;font-weight:600;text-align:left;padding:0}
+.tip{padding:12px 0;font-size:15px;color:var(--muted)}
+.tip summary{color:var(--accent);font-weight:600;cursor:pointer}
+.tip p{margin:8px 0 0;line-height:1.45}
+.version{font-size:13px;color:var(--faint);text-align:center;margin:28px 0 8px}
 .moreVoices{width:100%;display:flex;align-items:center;gap:14px;margin:18px 0 6px;padding:14px;border-radius:14px;border:1px dashed var(--line2);background:transparent;color:var(--accent);text-align:left;font-weight:600}
 .moreVoices .ot span{display:block;font-size:13px;font-weight:400;color:var(--muted);margin-top:2px}
 .addBtn{width:44px;height:44px;padding:0;border-radius:22px;border:0;background:var(--accent);color:var(--accent-ink);display:flex;align-items:center;justify-content:center;flex:none}
@@ -312,7 +332,7 @@ body.playerOpen #toast{bottom:auto;top:calc(env(safe-area-inset-top) + 64px)}
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 13;
+const APP_VERSION = 14;
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
   let hadController = !!navigator.serviceWorker.controller, reloading = false;
@@ -1732,10 +1752,10 @@ function openVoiceSheet(){
 const downloading = new Set();
 const familyKey = id => familyOf(id) === 'piper' ? id : familyOf(id);
 const PHONE_GROUPS = [
-  { key: 'kokoro', title: 'Kokoro', sub: 'Sara e Nicola · le migliori sul telefono, circa 130 MB', ids: ['kokoro-if_sara', 'kokoro-im_nicola'] },
-  { key: 'it_IT-paola-medium', title: 'Piper · Paola', sub: 'Leggera e veloce, circa 60 MB', ids: ['it_IT-paola-medium'] },
-  { key: 'it_IT-riccardo-x_low', title: 'Piper · Riccardo', sub: 'La più leggera, circa 20 MB', ids: ['it_IT-riccardo-x_low'] },
-  { key: 'supertonic', title: 'Supertonic', sub: 'Sperimentale, 2 voci donna e 2 uomo, circa 400 MB: scaricala in Wi-Fi', ids: ['st-F1', 'st-F2', 'st-M1', 'st-M2'] }
+  { key: 'kokoro', title: 'Sara e Nicola', size: '130 MB · le migliori', ids: ['kokoro-if_sara', 'kokoro-im_nicola'] },
+  { key: 'it_IT-paola-medium', title: 'Paola', size: '60 MB · leggera', ids: ['it_IT-paola-medium'] },
+  { key: 'it_IT-riccardo-x_low', title: 'Riccardo', size: '20 MB · la più leggera', ids: ['it_IT-riccardo-x_low'] },
+  { key: 'supertonic', title: 'Supertonic', size: '400 MB · sperimentale, in Wi-Fi', ids: ['st-F1', 'st-F2', 'st-M1', 'st-M2'] }
 ];
 function downloadGroup(g){
   if(downloading.has(g.key)) return;
@@ -1922,91 +1942,103 @@ function markTextSentence(scroll){
   if(sp){ sp.classList.add('on'); if(scroll) sp.scrollIntoView({ block: 'center', behavior: reduceMotion ? 'auto' : 'smooth' }); }
 }
 
+let settingsTab = 'voci';
 function openSettings(focus, keepScroll){
+  if(focus === 'voices') settingsTab = 'voci';
   const body = (keepScroll && sheetKind === 'settings') ? $('sheetBody') : openSheet('settings', 'Impostazioni', true);
   const scroll = body.scrollTop; body.textContent = '';
-  const sec = (title, id) => { const h = el('h3', 'secTitle', title); if(id) h.id = id; body.appendChild(h); return h; };
 
-  // pulsanti
-  sec('Pulsanti avanti e indietro');
-  body.appendChild(el('p', 'hint', 'Di quanto si spostano i due pulsanti accanto a play, anche dalle cuffie e dalla schermata di blocco. I pulsanti più esterni passano sempre al capitolo precedente o successivo.'));
-  ['frase', '15', '30'].forEach(k => {
-    body.appendChild(option(SKIP_OPTS[k], k === 'frase' ? 'Riparte dall\'inizio della frase precedente o successiva' : `Torna indietro o va avanti di ${k} secondi di ascolto`, skipMode() === k, () => {
-      prefs.skip = k; store.set('prefs', prefs); renderSkipButtons(); openSettings(null, true);
-    }));
+  // schede
+  const tabs = el('div', 'tabs'); tabs.setAttribute('role', 'tablist');
+  [['voci', 'Voci'], ['play', 'Riproduzione']].forEach(([k, label]) => {
+    const t = el('button', 'tab', label); t.setAttribute('role', 'tab'); t.setAttribute('aria-selected', settingsTab === k ? 'true' : 'false');
+    t.onclick = () => { settingsTab = k; openSettings(); };
+    tabs.appendChild(t);
   });
+  body.appendChild(tabs);
+  const card = (title, note) => {
+    if(title) body.appendChild(el('h3', 'cardTitle', title));
+    if(note) body.appendChild(el('p', 'cardNote', note));
+    const c = el('div', 'card'); body.appendChild(c); return c;
+  };
 
-  // voci
-  const vh = sec('Voci', 'setVoices');
-  body.appendChild(el('p', 'hint', 'Qui attivi e scarichi le voci. Quelle pronte compaiono nel player, in Voce.'));
-  const hasKey = !!store.get('gemKey');
-  body.appendChild(el('div', 'groupLabel', 'Voci Google'));
-  if(!hasKey){
-    body.appendChild(el('p', 'hint', 'Le più naturali: capiscono il contesto, le domande e i dialoghi. Gratis con il tuo account Google, entro un limite giornaliero, e serve internet. L\'attivazione richiede un paio di minuti e ti guido passo passo.'));
-    const go = el('button', 'wideBtn', 'Attiva le voci Google');
-    go.onclick = () => { gemFrom = 'settings'; openGemSetup(GEM_VOICES[0].id, 1); };
-    body.appendChild(go);
-  } else {
-    body.appendChild(famRow('Attive', '10 voci, serve internet. Puoi provarle e sceglierle qui o nel player.', 'Scollega', () => {
-      if(!confirm('Scollegare le voci Google da questo telefono? Potrai riattivarle quando vuoi.')) return;
-      store.del('gemKey');
-      if(isGem()){ const alt = PIPER_VOICES.find(v => voiceReady(v.id)); const sys = systemVoices()[0]; if(alt) selectVoice('piper', alt.id); else if(sys) selectVoice('sys', sys.voiceURI); }
-      refreshVoiceUI();
-    }));
-    GEM_VOICES.forEach(v => {
-      const sel = state.engine === 'piper' && state.piperVoice === v.id;
-      body.appendChild(voiceRow(v.name, 'Voce ' + v.desc, sel, () => selectVoice('piper', v.id), () => previewVoice('piper', v.id)));
-    });
-    body.appendChild(el('div', 'groupLabel', 'Stile di lettura Google'));
-    const pre = el('div', 'presets'); pre.style.gridTemplateColumns = 'repeat(3,minmax(0,1fr))';
-    Object.entries(GEM_STYLES).forEach(([k, st]) => {
-      const b = el('button', null, st.label); b.setAttribute('aria-pressed', (prefs.gemStyle || 'narrativa') === k ? 'true' : 'false');
-      b.onclick = () => { prefs.gemStyle = k; store.set('prefs', prefs); openSettings(null, true); setStatus('Stile salvato: vale per le parti non ancora preparate.'); };
-      pre.appendChild(b);
-    });
-    body.appendChild(pre);
-  }
+  if(settingsTab === 'voci'){
+    // Google
+    const hasKey = !!store.get('gemKey');
+    if(!hasKey){
+      const c = card('Voci Google', 'Le più naturali. Gratis con il tuo account Google, serve internet.');
+      const go = el('button', 'wideBtn inCard', 'Attiva le voci Google');
+      go.onclick = () => { gemFrom = 'settings'; openGemSetup(GEM_VOICES[0].id, 1); };
+      c.appendChild(go);
+    } else {
+      const c = card('Voci Google', 'Attive. Servono internet.');
+      GEM_VOICES.forEach(v => {
+        const sel = state.engine === 'piper' && state.piperVoice === v.id;
+        c.appendChild(voiceRow(v.name, 'Voce ' + v.desc, sel, () => selectVoice('piper', v.id), () => previewVoice('piper', v.id)));
+      });
+      const c2 = card('Stile di lettura Google');
+      const pre = el('div', 'presets inCard'); pre.style.gridTemplateColumns = 'repeat(3,minmax(0,1fr))';
+      Object.entries(GEM_STYLES).forEach(([k, st]) => {
+        const b = el('button', null, st.label); b.setAttribute('aria-pressed', (prefs.gemStyle || 'narrativa') === k ? 'true' : 'false');
+        b.onclick = () => { prefs.gemStyle = k; store.set('prefs', prefs); openSettings(null, true); setStatus('Stile salvato: vale per le parti non ancora preparate.'); };
+        pre.appendChild(b);
+      });
+      c2.appendChild(pre);
+      const out = el('button', 'textBtn', 'Scollega account Google');
+      out.onclick = () => {
+        if(!confirm('Scollegare le voci Google da questo telefono? Potrai riattivarle quando vuoi.')) return;
+        store.del('gemKey');
+        if(isGem()){ const alt = PIPER_VOICES.find(v => voiceReady(v.id)); const sys = systemVoices()[0]; if(alt) selectVoice('piper', alt.id); else selectVoice('sys', sys ? sys.voiceURI : ''); }
+        refreshVoiceUI();
+      };
+      c2.appendChild(out);
+    }
 
-  body.appendChild(el('div', 'groupLabel', 'Voci sul telefono'));
-  body.appendChild(el('p', 'hint', 'Generate sul telefono: gratis e offline dopo il download.'));
-  PHONE_GROUPS.forEach(g => {
-    const ready = voiceReady(g.ids[0]);
-    const dl = downloading.has(g.key);
-    body.appendChild(famRow(g.title, (ready ? 'Pronta · ' : dl ? 'Download in corso · ' : '') + g.sub,
-      ready ? 'Rimuovi' : dl ? 'Scarico...' : 'Scarica', () => ready ? removeGroup(g) : downloadGroup(g), dl && !ready));
-    if(ready){
-      g.ids.forEach(id => {
+    // sul telefono
+    const cp = card('Voci sul telefono', 'Funzionano anche offline, dopo il download.');
+    PHONE_GROUPS.forEach(g => {
+      const ready = voiceReady(g.ids[0]);
+      const dl = downloading.has(g.key);
+      cp.appendChild(famRow(g.title, ready ? 'Pronta' : dl ? 'Download in corso...' : g.size,
+        ready ? 'Rimuovi' : dl ? 'Attendi' : 'Scarica', () => ready ? removeGroup(g) : downloadGroup(g), dl && !ready));
+      if(ready) g.ids.forEach(id => {
         const v = PIPER_VOICES.find(x => x.id === id);
         const sel = state.engine === 'piper' && state.piperVoice === id;
-        body.appendChild(voiceRow(v.name, v.engine + speedNote(id), sel, () => selectVoice('piper', id), () => previewVoice('piper', id)));
+        const r = voiceRow(v.name, speedNote(id).replace(/^ · /, '') || v.engine, sel, () => selectVoice('piper', id), () => previewVoice('piper', id));
+        r.classList.add('sub'); cp.appendChild(r);
       });
-    }
-  });
+    });
 
-  body.appendChild(el('div', 'groupLabel', 'Voci dell\'iPhone'));
-  const it = systemVoices();
-  it.forEach(v => {
-    const sel = state.engine === 'sys' && state.sysVoice && state.sysVoice.voiceURI === v.voiceURI;
-    body.appendChild(voiceRow(v.name, /enhanced|premium|avanzat|migliorat/i.test(v.name) ? 'Avanzata' : 'Di sistema', sel, () => selectVoice('sys', v.voiceURI), () => previewVoice('sys', v.voiceURI)));
-  });
-  body.appendChild(el('p', 'hint', 'Sempre pronte. Per renderle più naturali scarica le versioni Avanzate dalle impostazioni dell\'iPhone: Accessibilità > Contenuto letto > Voci > Italiano.'));
+    // iPhone
+    const it = systemVoices();
+    const ci = card('Voci dell\'iPhone', 'Sempre pronte.');
+    it.forEach(v => {
+      const sel = state.engine === 'sys' && state.sysVoice && state.sysVoice.voiceURI === v.voiceURI;
+      ci.appendChild(voiceRow(v.name, /enhanced|premium|avanzat|migliorat/i.test(v.name) ? 'Avanzata' : 'Di sistema', sel, () => selectVoice('sys', v.voiceURI), () => previewVoice('sys', v.voiceURI)));
+    });
+    const tip = el('details', 'tip');
+    tip.appendChild(el('summary', null, 'Come averne di più naturali'));
+    tip.appendChild(el('p', null, 'Sull\'iPhone apri Impostazioni > Accessibilità > Contenuto letto > Voci > Italiano e scarica le versioni Avanzate. Poi le trovi qui.'));
+    ci.appendChild(tip);
 
-  // spazio
-  sec('Spazio sul telefono');
-  const audioMb = Math.round((store.get('audioBytes') || 0) / 1048576);
-  body.appendChild(famRow('Audio già preparato', `${audioMb} MB · le parti generate restano salvate per riascoltarle senza attese`, audioMb ? 'Svuota' : null, clearAudioCache));
-  const used = el('p', 'hint', ''); body.appendChild(used);
-  if(navigator.storage && navigator.storage.estimate) navigator.storage.estimate().then(e => { used.textContent = `In tutto l'app occupa circa ${Math.round((e.usage || 0) / 1048576)} MB, tra libri, voci scaricate e audio.`; }).catch(() => {});
-
-  // capitoli
-  sec('Capitoli');
-  body.appendChild(el('p', 'hint', 'Gli EPUB usano l\'indice del libro, quindi i capitoli e i loro titoli sono quelli veri. Nei PDF uso i segnalibri, se ci sono; altrimenti ci si sposta di pagina in pagina. Indietro di capitolo, a metà capitolo, riporta prima al suo inizio.'));
-
-  sec('Informazioni');
-  body.appendChild(el('p', 'hint', `SiMa Player, versione ${APP_VERSION}. L'app si aggiorna da sola quando la apri con la connessione attiva.`));
+    // spazio
+    const cs = card('Spazio');
+    const audioMb = Math.round((store.get('audioBytes') || 0) / 1048576);
+    cs.appendChild(famRow('Audio già preparato', audioMb + ' MB', audioMb ? 'Svuota' : null, clearAudioCache));
+    const tot = famRow('Spazio usato dall\'app', '...', null);
+    cs.appendChild(tot);
+    if(navigator.storage && navigator.storage.estimate) navigator.storage.estimate().then(e => { tot.querySelector('.famSub').textContent = Math.round((e.usage || 0) / 1048576) + ' MB tra libri, voci e audio'; }).catch(() => {});
+  } else {
+    const cb = card('Pulsanti accanto a play', 'Valgono anche per cuffie e schermata di blocco.');
+    [['frase', 'Una frase'], ['15', '15 secondi'], ['30', '30 secondi']].forEach(([k, label]) => {
+      cb.appendChild(option(label, null, skipMode() === k, () => { prefs.skip = k; store.set('prefs', prefs); renderSkipButtons(); openSettings(null, true); }));
+    });
+    const cc = card('Pulsanti esterni');
+    cc.appendChild(famRow('Capitolo precedente e successivo', 'A metà capitolo, Indietro torna prima al suo inizio.', null));
+    body.appendChild(el('p', 'version', `SiMa Player, versione ${APP_VERSION}. Si aggiorna da sola quando c'è connessione.`));
+  }
 
   if(keepScroll) body.scrollTop = scroll;
-  else if(focus === 'voices') vh.scrollIntoView({ block: 'start' });
 }
 
 function openMore(){
