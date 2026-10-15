@@ -369,7 +369,7 @@ body.playerOpen #toast{bottom:auto;top:calc(env(safe-area-inset-top) + 64px)}
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 28;
+const APP_VERSION = 29;
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
   let hadController = !!navigator.serviceWorker.controller, reloading = false;
@@ -753,10 +753,10 @@ async function pump(){
     geminiTTS(en.text, vid)
       .then(async blob => {
         const chunky = /\|c\d+-\d+$/.test(next.key);
-        if(chunky && en.text.length > 1500){
-          const secs = await wavSeconds(blob);
-          if(secs && secs < en.text.length / 15 * 0.55){ shrinkGemChunks(en.text.length); throw new Error('tagliato'); }
-        }
+        const secs = await wavSeconds(blob);
+        const cut = chunky && en.text.length > 1500 && secs && secs < en.text.length / 15 * 0.55;
+        gemStatAudio(secs, cut);
+        if(cut){ shrinkGemChunks(en.text.length); throw new Error('tagliato'); }
         if(chunky){ rememberChunk(next.key); growGemChunks(en.text.length); }
         return blob;
       })
@@ -906,6 +906,24 @@ function audioFrom(j){
 }
 const isUnsupported = t => /not (found|supported)|unsupported|does not support|is not available|no longer available|invalid (model|argument).*model|unknown (name|field)/i.test(t);
 const isTooLong = t => /token|too long|exceed|maximum|max_output|length/i.test(t);
+// consumo di oggi (il giorno di Google, che cambia a mezzanotte della California): richieste per modello e audio ricevuto
+const GEM_RPD = 10;
+function gemDay(){ try{ return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' }); }catch(e){ return new Date().toISOString().slice(0, 10); } }
+function gemStats(){ const st = store.get('gemStats'); return st && st.day === gemDay() ? st : { day: gemDay(), req: {}, n: 0, secs: 0, cut: 0 }; }
+function gemStatReq(model){ const st = gemStats(); st.req[model] = (st.req[model] || 0) + 1; store.set('gemStats', st); }
+function gemStatAudio(secs, cut){
+  const st = gemStats(); st.n++; st.secs += secs || 0; if(cut) st.cut++; store.set('gemStats', st);
+  // media di minuti per richiesta, tenuta anche tra un giorno e l'altro
+  if(secs && !cut){ const a = store.get('gemAvg'); store.set('gemAvg', a ? a * 0.8 + secs * 0.2 : secs); }
+}
+// stima: minuti per richiesta e richieste rimaste oggi
+function gemForecast(){
+  const st = gemStats(), bl = gemBlocked();
+  const avgSec = store.get('gemAvg') || Math.min(gemTarget(), gemCeil()) / 15;
+  const left = GEM_MODELS.filter(m => !gemUnavailable(m)).reduce((a, m) => a + (bl.includes(m) && !isMinuteBlock(m) ? 0 : Math.max(0, GEM_RPD - (st.req[m] || 0))), 0);
+  return { used: Object.values(st.req).reduce((a, b) => a + b, 0), genMin: Math.round(st.secs / 60), cut: st.cut, avgMin: avgSec / 60, left, leftMin: Math.round(left * avgSec / 60), measured: !!store.get('gemAvg') };
+}
+function isMinuteBlock(m){ const b = store.get('gemBlocked') || {}; return b[m] && b[m] - Date.now() < 5 * 60000; }
 // se tutti i modelli sono fermi solo per il limite al minuto, aspetto invece di dire che il limite è finito
 async function geminiTTS(text, voiceId, keyOverride, retry = 0){
   try{ return await geminiTTSOnce(text, voiceId, keyOverride); }
@@ -944,7 +962,7 @@ async function geminiTTSOnce(text, voiceId, keyOverride){
       const blob = audioFrom(await r.json().catch(() => null));
       if(!blob){ noteGemErr(model, '200 ' + usedApi, 'nessun audio nella risposta'); lastErr = new Error('nessun audio nella risposta'); continue; }
       if(apis[model] !== usedApi){ apis[model] = usedApi; store.set('gemApi', apis); }
-      clearGemErr(model);
+      clearGemErr(model); gemStatReq(model);
       return blob;
     }
     if(r.status === 429 && /limit:\s*0\b/i.test(t)){
@@ -2477,6 +2495,11 @@ function openSettings(focus, keepScroll){
         if(er && now - er.at < 3 * 864e5) how.appendChild(el('div', 'modelErr', `Ultima risposta di Google (${new Date(er.at).toLocaleString('it-IT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}): ${er.s} - ${er.t}`));
       });
       ca.appendChild(how);
+      // consumo di oggi e stima di quanto si può ancora ascoltare
+      const fc = gemForecast();
+      const fmtM = m => m >= 1 ? (Math.round(m * 10) / 10).toString().replace('.', ',') : '<1';
+      ca.appendChild(famRow('Oggi', `${fc.used} richieste usate, ${fmtMin(fc.genMin)} di audio ricevuti.${fc.cut ? ` Google ha tagliato ${fc.cut} ${fc.cut === 1 ? 'parte' : 'parti'}, ora le faccio più corte.` : ''}`, null));
+      ca.appendChild(famRow('Ancora disponibili', `Circa ${fc.left} richieste, cioè circa ${fmtMin(fc.leftMin)} di ascolto. Ogni richiesta vale ${fc.measured ? 'in media' : 'circa'} ${fmtM(fc.avgMin)} minuti${fc.measured ? '' : ' (stima, diventa precisa dopo le prime parti)'}.`, null));
       const save = () => { store.set('prefs', prefs); openSettings(null, true); };
       const ahead = isGem() ? readyAheadMinutes() : 0;
       ca.appendChild(switchRow('Prepara in anticipo da sola',
