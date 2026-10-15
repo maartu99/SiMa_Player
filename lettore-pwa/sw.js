@@ -1,12 +1,17 @@
 // Service worker: rende l'app installabile e utilizzabile offline.
-// File dell'app: aggiornati in background. Librerie e voci: salvate dopo il primo download.
-const CORE = 'lettore-core-v12';
+// File dell'app: sempre la versione più nuova se c'è connessione, la copia salvata se sei offline.
+// Librerie e voci: salvate dopo il primo download.
+const VERSION = 13;
+const CORE = 'lettore-core-v' + VERSION;
 const RUNTIME = 'lettore-runtime-v1';
 const CORE_FILES = ['./', './index.html', './tts-worker.js', './kokoro-worker.js', './supertonic-worker.js', './manifest.webmanifest',
   './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CORE).then(c => c.addAll(CORE_FILES)).then(() => self.skipWaiting()));
+  // cache: 'reload' scavalca la copia temporanea del telefono e prende i file appena pubblicati
+  e.waitUntil(caches.open(CORE)
+    .then(c => Promise.all(CORE_FILES.map(f => fetch(f, { cache: 'reload' }).then(r => r.ok ? c.put(f, r) : null).catch(() => null))))
+    .then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', e => {
@@ -23,16 +28,23 @@ self.addEventListener('fetch', e => {
   const url = new URL(req.url);
 
   if(url.origin === self.location.origin){
-    // stale-while-revalidate per i file dell'app
-    e.respondWith(caches.open(CORE).then(async cache => {
-      const cached = await cache.match(req, { ignoreSearch: true });
-      const network = fetch(req).then(res => { if(res.ok) cache.put(req, res.clone()); return res; }).catch(() => cached);
-      return cached || network;
-    }));
+    // prima la rete (controllando che sia la versione più nuova), poi la copia salvata
+    e.respondWith((async () => {
+      const cache = await caches.open(CORE);
+      try{
+        const res = await fetch(req, { cache: 'no-cache' });
+        if(res.ok) cache.put(req, res.clone());
+        return res;
+      }catch(err){
+        const cached = await cache.match(req, { ignoreSearch: true }) || (req.mode === 'navigate' ? await cache.match('./index.html') : null);
+        if(cached) return cached;
+        throw err;
+      }
+    })());
     return;
   }
 
-  // librerie (cdnjs, jsdelivr): cache-first. Le voci si salvano da sole, non serve duplicarle
+  // librerie (cdnjs, jsdelivr, font): prima la copia salvata
   if(/cdnjs\.cloudflare\.com|cdn\.jsdelivr\.net|fonts\.googleapis\.com|fonts\.gstatic\.com/.test(url.hostname)){
     e.respondWith(caches.open(RUNTIME).then(async cache => {
       const cached = await cache.match(req.url);

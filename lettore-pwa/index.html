@@ -310,9 +310,27 @@ body.playerOpen #toast{bottom:auto;top:calc(env(safe-area-inset-top) + 64px)}
 <div id="toast" class="hidden" role="status" aria-live="polite"></div>
 
 <script>
-pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+// se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
+if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+const APP_VERSION = 13;
 if('serviceWorker' in navigator){
-  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
+  let hadController = !!navigator.serviceWorker.controller, reloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if(!hadController){ hadController = true; return; }
+    if(reloading) return;
+    const apply = () => { if(reloading) return; reloading = true; try{ savePos(); }catch(e){} location.reload(); };
+    if(typeof state !== 'undefined' && state.playing){
+      setStatus('È disponibile una versione nuova dell\'app: la carico alla prossima pausa.', false);
+      const wait = setInterval(() => { if(!state.playing){ clearInterval(wait); apply(); } }, 1000);
+    } else apply();
+  });
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(reg => {
+      // controllo aggiornamenti anche quando l'app torna in primo piano
+      document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') reg.update().catch(() => {}); });
+    }).catch(() => {});
+  });
 }
 
 const $ = id => document.getElementById(id);
@@ -1339,6 +1357,7 @@ async function readEpubToc(zip, opf, base, manifest){
 /* ---------- aggiunta libri ---------- */
 async function parseBook(data, name, type){
   const isPdf = /\.pdf$/i.test(name) || type === 'application/pdf';
+  if(isPdf ? !window.pdfjsLib : !window.JSZip) throw new Error('libreria non caricata');
   const res = isPdf ? await loadPdf(data) : await loadEpub(data);
   res.secs = res.secs.filter(s => s.sentences.length);
   res.isPdf = isPdf;
@@ -1376,7 +1395,8 @@ async function addFile(file){
     await renderLibrary();
   }catch(e){
     console.error(e);
-    setStatus('Non riesco ad aprire questo file. Potrebbe essere protetto o danneggiato.', true);
+    if(/libreria/.test(e.message || '')) setStatus('Per aprire un libro nuovo la prima volta serve la connessione a internet. Riprova quando sei online.', true);
+    else setStatus('Non riesco ad aprire questo file. Potrebbe essere protetto o danneggiato.', true);
   }
 }
 
@@ -1981,6 +2001,9 @@ function openSettings(focus, keepScroll){
   // capitoli
   sec('Capitoli');
   body.appendChild(el('p', 'hint', 'Gli EPUB usano l\'indice del libro, quindi i capitoli e i loro titoli sono quelli veri. Nei PDF uso i segnalibri, se ci sono; altrimenti ci si sposta di pagina in pagina. Indietro di capitolo, a metà capitolo, riporta prima al suo inizio.'));
+
+  sec('Informazioni');
+  body.appendChild(el('p', 'hint', `SiMa Player, versione ${APP_VERSION}. L'app si aggiorna da sola quando la apri con la connessione attiva.`));
 
   if(keepScroll) body.scrollTop = scroll;
   else if(focus === 'voices') vh.scrollIntoView({ block: 'start' });
