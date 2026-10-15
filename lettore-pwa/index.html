@@ -343,7 +343,7 @@ body.playerOpen #toast{bottom:auto;top:calc(env(safe-area-inset-top) + 64px)}
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 18;
+const APP_VERSION = 19;
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
   let hadController = !!navigator.serviceWorker.controller, reloading = false;
@@ -742,7 +742,21 @@ function updateBuf(){
 }
 
 // iOS permette l'audio solo dopo un tocco: sblocca con un istante di silenzio
-let silenceUrl = null;
+let silenceUrl = null, holdUrl = null;
+// un secondo di silenzio ripetuto: per iOS l'app sta ancora suonando, quindi non perde l'audio né la schermata di blocco
+function keepAlive(){
+  if(!holdUrl){
+    const n = 24000, buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
+    const w = (o, s) => { for(let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+    w(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); w(8, 'WAVE'); w(12, 'fmt ');
+    v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+    v.setUint32(24, 24000, true); v.setUint32(28, 48000, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+    w(36, 'data'); v.setUint32(40, n * 2, true);
+    holdUrl = URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
+  }
+  if(audio.src !== holdUrl){ audio.loop = true; audio.src = holdUrl; audio.removeAttribute('data-key'); }
+  audio.play().catch(() => {});
+}
 function makeSilence(){
   if(silenceUrl) return;
   const n = 2400, buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
@@ -758,7 +772,8 @@ function unlockAudio(){
     try{ const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); }catch(e){}
   }
   makeSilence();
-  if(audio.dataset.key) return;
+  if(audio.dataset.key || audio.src === holdUrl) return;
+  audio.loop = false;
   audio.src = silenceUrl;
   audio.play().catch(() => {});
 }
@@ -894,7 +909,6 @@ function upcoming(n){
 }
 async function piperSpeakCurrent(fromAdvance){
   const g = ++state.gen;
-  audio.pause();
   const list = upcoming(lookahead());
   if(!list.length){ stop(); return; }
   const key = list[0].key;
@@ -912,6 +926,8 @@ async function piperSpeakCurrent(fromAdvance){
   refreshPosition(true); savePos(); updateMedia();
   const en = entries.get(key);
   const stalled = !!(en && en.st !== 'ready' && en.st !== 'stored');
+  // la frase non è ancora pronta: invece di fermare l'audio suono silenzio, così a schermo bloccato non si interrompe
+  if(!en || en.st !== 'ready'){ if(state.playing) keepAlive(); else audio.pause(); }
   if(stalled){
     if(fromAdvance){
       const r = rtfOf(state.piperVoice);
@@ -930,6 +946,7 @@ async function piperSpeakCurrent(fromAdvance){
     }
     if(g !== state.gen || !state.playing) return;
     setStatus('');
+    audio.loop = false;
     audio.src = url; audio.dataset.key = key;
     audio.playbackRate = state.rate;
     audio.preservesPitch = true; audio.webkitPreservesPitch = true;
@@ -947,7 +964,7 @@ async function piperSpeakCurrent(fromAdvance){
   }
 }
 audio.onended = () => {
-  if(audio.src === silenceUrl) return;
+  if(audio.src === silenceUrl || audio.src === holdUrl) return;
   if(!state.playing || state.engine !== 'piper') return;
   if(isGem() && state.curChunk){ state.sec = state.curChunk.sec; state.idx = state.curChunk.end; }
   advance();
@@ -987,6 +1004,7 @@ function advance(){
 }
 function stop(){
   state.playing = false; state.gen++;
+  if(audio.src === holdUrl){ audio.loop = false; audio.pause(); }
   if('speechSynthesis' in window) speechSynthesis.cancel();
   audio.pause();
   updatePlay(); savePos(); releaseWake();
@@ -1006,6 +1024,16 @@ function play(){
     return;
   }
   speakCurrent();
+}
+// iOS concede solo un istante per far ripartire l'audio da schermata di blocco o cuffie:
+// riparto subito con quello che c'è (la frase già caricata o il silenzio di attesa), poi preparo il resto
+function remotePlay(){
+  if(!state.total || state.playing) return;
+  if(state.engine === 'piper'){
+    if(audio.dataset.key && audio.currentTime > 0 && !audio.ended){ audio.playbackRate = state.rate; audio.play().catch(() => {}); }
+    else keepAlive();
+  } else unlockAudio();
+  play();
 }
 function togglePlay(){
   if(!state.total) return;
@@ -1103,7 +1131,7 @@ function updateMedia(){
 if('mediaSession' in navigator){
   const ms = navigator.mediaSession;
   try{
-    ms.setActionHandler('play', () => { unlockAudio(); play(); });
+    ms.setActionHandler('play', () => remotePlay());
     ms.setActionHandler('pause', () => stop());
     ms.setActionHandler('nexttrack', () => skipFwd());
     ms.setActionHandler('previoustrack', () => skipBack());
