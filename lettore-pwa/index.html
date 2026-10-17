@@ -36,6 +36,35 @@ button{font:inherit;color:inherit;cursor:pointer}
 button:disabled{opacity:.4;cursor:default}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .hidden{display:none !important}
+/* testo a tutta pagina */
+#reader{position:fixed;inset:0;z-index:35;background:var(--bg);display:flex;flex-direction:column}
+.rdTop{display:flex;align-items:center;gap:10px;padding:calc(env(safe-area-inset-top) + 8px) 12px 8px;border-bottom:1px solid var(--line)}
+.rdChapTitle{flex:1;min-width:0;text-align:center;font-size:14px;font-weight:600;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rdNotesBtn{position:relative}
+.rdNotesBtn b{position:absolute;top:-2px;right:-2px;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--accent);color:var(--accent-ink);font-size:11px;line-height:18px;text-align:center}
+.rdNotesBtn b:empty{display:none}
+#rdBody{position:relative;flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:4px 22px 140px;touch-action:pan-y}
+.rdChapH{font-family:var(--serif);font-size:22px;font-weight:600;color:var(--ink);margin:30px 0 14px;line-height:1.25}
+#rdBody p{font-family:var(--serif);font-size:19px;line-height:1.75;margin:0 0 1em;color:var(--ink2);max-width:640px}
+#rdBody .s{border-radius:3px;-webkit-box-decoration-break:clone;box-decoration-break:clone;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;transition:background .15s}
+#rdBody .s.noted{background:rgba(124,200,180,.2);box-shadow:inset 0 -2px 0 var(--accent)}
+#rdBody .s.on{background:var(--mark);color:var(--bg);box-shadow:none}
+#rdBody .s.press{background:var(--surface)}
+.rdHint{position:absolute;left:16px;right:16px;bottom:calc(env(safe-area-inset-bottom) + 84px);max-width:520px;margin:0 auto;padding:10px 14px;border-radius:12px;background:#2A3540;color:var(--ink);font-size:14px;line-height:1.4;text-align:center}
+.rdBottom{position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;gap:10px;padding:12px 16px calc(env(safe-area-inset-bottom) + 14px);background:linear-gradient(transparent,var(--bg) 35%)}
+.rdSpacer{flex:1}
+.rdFollow{height:44px;padding:0 16px;border-radius:22px;border:0;background:var(--surface);color:var(--ink);font-size:14px;font-weight:600}
+.rdPlay{width:56px;height:56px;border-radius:28px;border:0;background:var(--ink);color:var(--bg);display:flex;align-items:center;justify-content:center}
+.pTopRight{display:flex;gap:8px}
+#nowText{width:calc(100% - 48px);text-align:left;border:0;cursor:pointer}
+/* note */
+.noteQuote{font-family:var(--serif);font-size:17px;line-height:1.55;color:var(--ink);background:var(--surface);border-left:3px solid var(--accent);border-radius:8px;padding:12px 14px;margin:4px 0 6px}
+.noteWhere{font-size:13px;color:var(--muted);margin:0 0 14px}
+.noteArea{width:100%;box-sizing:border-box;min-height:110px;border-radius:12px;border:1px solid var(--line2);background:var(--bg);color:var(--ink);font:inherit;font-size:16px;line-height:1.45;padding:12px;resize:vertical;margin:0 0 12px}
+.noteItem{display:block;width:100%;text-align:left;border:0;border-bottom:1px solid var(--line);background:none;color:var(--ink);padding:14px 0}
+.noteItem small{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}
+.noteItem q{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;font-family:var(--serif);font-size:16px;line-height:1.45;quotes:none}
+.noteItem span{display:block;font-size:14px;color:var(--accent);margin-top:6px;white-space:pre-wrap}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 svg{flex:none}
 
@@ -173,7 +202,7 @@ svg{flex:none}
 #pAuthor{font-size:14px;color:var(--muted)}
 .pillBtn{margin-top:6px;height:36px;padding:0 14px;border-radius:18px;border:1px solid var(--line2);background:transparent;color:var(--ink);font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px;max-width:100%}
 .pillBtn span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#nowText{margin:12px 24px 0;padding:12px 16px;border-radius:12px;background:var(--surface2);font-family:var(--serif);font-size:16px;line-height:1.5;color:var(--ink2);height:calc(1.5em * 4 + 24px);box-sizing:border-box;overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:4}
+#nowText{margin:12px 24px 0;font:inherit;padding:12px 16px;border-radius:12px;background:var(--surface2);font-family:var(--serif);font-size:16px;line-height:1.5;color:var(--ink2);height:calc(1.5em * 4 + 24px);box-sizing:border-box;overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:4}
 #nowText mark{background:var(--mark);color:var(--bg);border-radius:3px;padding:1px 2px;-webkit-box-decoration-break:clone;box-decoration-break:clone}
 .seekWrap{padding:12px 24px 0}
 #seek{width:100%;margin:0;-webkit-appearance:none;appearance:none;height:24px;background:transparent}
@@ -299,6 +328,23 @@ body.playerOpen #toast{bottom:auto;top:calc(env(safe-area-inset-top) + 64px)}
   <div class="miniBar"><i id="miniBar"></i></div>
 </div>
 
+<!-- TESTO A TUTTA PAGINA -->
+<section id="reader" class="hidden" aria-label="Testo del libro">
+  <div class="rdTop">
+    <button class="roundBtn" id="rdClose" aria-label="Chiudi il testo"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+    <span class="rdChapTitle" id="rdChap"></span>
+    <button class="roundBtn rdNotesBtn" id="rdNotes" aria-label="Note e segnalibri"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h14v16H5z"/><path d="M9 9h6M9 13h6M9 17h3"/></svg><b id="rdNoteCount"></b></button>
+  </div>
+  <div id="rdBody"></div>
+  <div class="rdHint hidden" id="rdHint">Tocca una frase per ascoltare da lì. Tienila premuta per un segnalibro con nota.</div>
+  <div class="rdBottom">
+    <button class="rdFollow hidden" id="rdFollow">Torna alla frase in lettura</button>
+    <span class="rdSpacer"></span>
+    <button class="roundBtn" id="rdMark" aria-label="Segnalibro sulla frase in lettura"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 3.5h11v17l-5.5-4-5.5 4z"/></svg></button>
+    <button class="rdPlay" id="rdPlay" aria-label="Ascolta"></button>
+  </div>
+</section>
+
 <!-- PLAYER -->
 <section id="playerView" aria-label="Player" aria-hidden="true">
   <div class="pInner">
@@ -307,9 +353,12 @@ body.playerOpen #toast{bottom:auto;top:calc(env(safe-area-inset-top) + 64px)}
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
       </button>
       <span class="pTopLabel" id="pTopLabel">In ascolto</span>
+      <div class="pTopRight">
+      <button class="roundBtn" id="pMark" aria-label="Segnalibro sulla frase in lettura"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 3.5h11v17l-5.5-4-5.5 4z"/></svg></button>
       <button class="roundBtn" id="pMore" aria-label="Altre opzioni">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>
       </button>
+      </div>
     </div>
     <div class="pCoverWrap" id="pCover"></div>
     <div class="pMeta">
@@ -320,7 +369,7 @@ body.playerOpen #toast{bottom:auto;top:calc(env(safe-area-inset-top) + 64px)}
         <span id="chapLabel"></span>
       </button>
     </div>
-    <div id="nowText"></div>
+    <button id="nowText" aria-label="Apri il testo del libro a tutta pagina"></button>
     <div class="seekWrap">
       <label class="sr" for="seek">Posizione nel libro</label>
       <input type="range" id="seek" min="0" max="0" step="1" value="0">
@@ -371,7 +420,7 @@ body.playerOpen #toast{bottom:auto;top:calc(env(safe-area-inset-top) + 64px)}
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 30;
+const APP_VERSION = 31;
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
   let hadController = !!navigator.serviceWorker.controller, reloading = false;
@@ -1481,6 +1530,7 @@ function updatePlay(){
   $('bigPlay').innerHTML = big(p ? ICON.pause : ICON.play);
   $('bigPlay').setAttribute('aria-label', p ? 'Pausa' : 'Ascolta');
   $('pTopLabel').textContent = p ? 'In ascolto' : 'In pausa';
+  const rp = $('rdPlay'); if(rp){ rp.innerHTML = p ? ICON.pause : ICON.play; rp.setAttribute('aria-label', p ? 'Pausa' : 'Ascolta'); }
   if('mediaSession' in navigator) navigator.mediaSession.playbackState = p ? 'playing' : 'paused';
   updateRowButtons();
 }
@@ -1515,6 +1565,7 @@ function refreshPosition(scrollText){
     row.querySelector('.rowLabel').textContent = (state.playing ? 'In ascolto · ' : '') + chapterShort();
   }
   if(sheetKind === 'text') markTextSentence(scrollText);
+  if(reader.open) markReader(true);
 }
 let seeking = false;
 
@@ -1847,6 +1898,7 @@ async function loadBook(key){
   return true;
 }
 function unloadBook(){
+  if(reader.open) closeReader();
   stop();
   state.key = null; state.meta = null; state.sections = []; state.offsets = []; state.total = 0;
   store.del('lastBook');
@@ -1950,9 +2002,165 @@ function openPlayer(){
   refreshPosition(false);
 }
 function closePlayer(){
+  if(reader.open) closeReader();
   if(playerLocked){ unlockPage(); playerLocked = false; }
   $('playerView').classList.remove('open'); $('playerView').setAttribute('aria-hidden', 'true'); document.body.classList.remove('playerOpen');
 }
+
+/* ---------- segnalibri e note ---------- */
+function notes(key){ return store.get('notes:' + (key || state.key)) || []; }
+function saveNotes(list){ store.set('notes:' + state.key, list); updateNoteCount(); }
+function noteAt(sec, idx){ return notes().find(n => n.sec === sec && n.idx === idx); }
+function sentenceText(sec, idx){ const s = state.sections[sec]; return s && s.sentences[idx] ? s.sentences[idx].t : ''; }
+function secLabel(sec){ const s = state.sections[sec]; return state.pages ? `Pagina ${sec + 1}` : (s ? s.title : ''); }
+// salva subito la frase come segnalibro (evidenziata); il commento si aggiunge dopo, se si vuole
+function addNote(sec, idx){
+  const old = noteAt(sec, idx); if(old) return { note: old, isNew: false };
+  const note = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 5), sec, idx, text: sentenceText(sec, idx), comment: '', at: Date.now() };
+  const list = notes(); list.push(note); list.sort((a, b) => a.sec - b.sec || a.idx - b.idx); saveNotes(list);
+  markNoted(sec, idx, true);
+  return { note, isNew: true };
+}
+function markNoted(sec, idx, on){ const sp = document.querySelector(`#rdBody .s[data-s="${sec}"][data-i="${idx}"]`); if(sp) sp.classList.toggle('noted', on); }
+function updateNoteCount(){ const n = state.key ? notes().length : 0; const b = $('rdNoteCount'); if(b) b.textContent = n ? String(n) : ''; }
+function bookmarkCurrent(){ if(!state.total) return; const r = addNote(state.sec, state.idx); openNoteEditor(r.note, r.isNew); }
+function openNoteEditor(note, isNew){
+  const body = openSheet('note', isNew ? 'Segnalibro salvato' : 'Segnalibro');
+  body.appendChild(el('div', 'noteQuote', note.text));
+  body.appendChild(el('p', 'noteWhere', `${secLabel(note.sec)} · ${new Date(note.at).toLocaleDateString('it-IT', { day: 'numeric', month: 'long' })}`));
+  const ta = el('textarea', 'noteArea'); ta.placeholder = 'Aggiungi un commento (facoltativo)'; ta.value = note.comment || ''; ta.setAttribute('aria-label', 'Commento');
+  // il commento si salva mentre scrivi: chiudere il pannello non lo perde
+  const persist = () => { const list = notes(); const n = list.find(x => x.id === note.id); if(n){ n.comment = ta.value.trim(); note.comment = n.comment; saveNotes(list); } };
+  ta.addEventListener('input', persist);
+  body.appendChild(ta);
+  const done = el('button', 'wideBtn', 'Fatto'); done.onclick = () => { persist(); closeSheet(); };
+  body.appendChild(done);
+  body.appendChild(option('Ascolta da questa frase', secLabel(note.sec), false, () => { persist(); closeSheet(); jumpTo(note.sec, note.idx, true); }));
+  const del = el('button', 'textBtn', 'Elimina segnalibro');
+  del.onclick = () => { saveNotes(notes().filter(x => x.id !== note.id)); markNoted(note.sec, note.idx, false); closeSheet(); setStatus('Segnalibro eliminato.'); };
+  body.appendChild(del);
+}
+function openNotesList(){
+  const list = notes();
+  const body = openSheet('notes', 'Note e segnalibri', true);
+  if(!list.length){
+    body.appendChild(el('p', 'hint', 'Ancora nessun segnalibro in questo libro. Tocca il segnalibro in alto nel player mentre ascolti, oppure nel testo a tutta pagina tieni premuta una frase.'));
+    return;
+  }
+  body.appendChild(el('p', 'hint', `${list.length} ${list.length === 1 ? 'segnalibro' : 'segnalibri'}, in ordine di lettura. Tocca per vedere, commentare o ascoltare da lì.`));
+  list.forEach(n => {
+    const b = el('button', 'noteItem');
+    b.append(el('small', null, secLabel(n.sec)), el('q', null, n.text));
+    if(n.comment) b.appendChild(el('span', null, n.comment));
+    b.onclick = () => openNoteEditor(n, false);
+    body.appendChild(b);
+  });
+}
+// va a una frase e la fa ascoltare; se il testo è aperto, lo mostra lì
+function jumpTo(sec, idx, listen){
+  goTo(sec, idx);
+  if(reader.open){ reader.follow = true; $('rdFollow').classList.add('hidden'); markReader(true); }
+  if(listen && !state.playing){ unlockAudio(); play(); }
+}
+
+/* ---------- testo a tutta pagina ---------- */
+const reader = { open: false, first: -1, last: -1, follow: true, onEl: null };
+function chapterEl(sec){
+  const s = state.sections[sec];
+  const wrap = el('div', 'rdChap'); wrap.dataset.sec = sec;
+  wrap.appendChild(el('h2', 'rdChapH', secLabel(sec)));
+  const marked = new Set(notes().filter(n => n.sec === sec).map(n => n.idx));
+  let p = null;
+  s.sentences.forEach((x, i) => {
+    if(x.p || !p){ p = el('p'); wrap.appendChild(p); }
+    const sp = el('span', 's' + (marked.has(i) ? ' noted' : ''), x.t); sp.dataset.s = sec; sp.dataset.i = i;
+    p.append(sp, document.createTextNode(' '));
+  });
+  return wrap;
+}
+function buildReaderAround(sec){
+  const b = $('rdBody'); b.textContent = ''; reader.onEl = null;
+  reader.first = reader.last = sec; b.appendChild(chapterEl(sec));
+  appendChapter(); prependChapter(); fillReader();
+}
+// capitoli corti: aggiungo testo finché c'è abbastanza da scorrere in entrambe le direzioni
+function fillReader(){
+  const b = $('rdBody');
+  let guard = 0;
+  while(guard++ < 30 && reader.last < state.sections.length - 1 && b.scrollHeight - b.scrollTop - b.clientHeight < 1000) appendChapter();
+  guard = 0;
+  while(guard++ < 30 && reader.first > 0 && b.scrollTop < 700) prependChapter();
+}
+function prependChapter(){
+  if(reader.first <= 0) return;
+  const b = $('rdBody'), h = b.scrollHeight, top = b.scrollTop;
+  b.insertBefore(chapterEl(reader.first - 1), b.firstChild); reader.first--;
+  b.scrollTop = top + (b.scrollHeight - h);
+}
+function appendChapter(){
+  if(reader.last >= state.sections.length - 1) return;
+  $('rdBody').appendChild(chapterEl(reader.last + 1)); reader.last++;
+}
+function readerTitle(){
+  const b = $('rdBody'), y = b.scrollTop + 80;
+  let cur = null; b.querySelectorAll('.rdChap').forEach(c => { if(c.offsetTop <= y) cur = c; });
+  $('rdChap').textContent = cur ? secLabel(+cur.dataset.sec) : '';
+}
+function markReader(scroll){
+  if(!reader.open) return;
+  if(state.sec < reader.first || state.sec > reader.last){
+    if(!reader.follow) return;
+    buildReaderAround(state.sec);
+  }
+  const sp = document.querySelector(`#rdBody .s[data-s="${state.sec}"][data-i="${state.idx}"]`);
+  if(reader.onEl && reader.onEl !== sp) reader.onEl.classList.remove('on');
+  if(sp){ sp.classList.add('on'); reader.onEl = sp; if(scroll && reader.follow) sp.scrollIntoView({ block: 'center', behavior: reduceMotion ? 'auto' : 'smooth' }); }
+  readerTitle();
+}
+function openReader(){
+  if(!state.total) return;
+  reader.open = true; reader.follow = true;
+  $('reader').classList.remove('hidden'); $('rdFollow').classList.add('hidden');
+  buildReaderAround(state.sec); updateNoteCount(); updatePlay();
+  requestAnimationFrame(() => { const sp = document.querySelector(`#rdBody .s[data-s="${state.sec}"][data-i="${state.idx}"]`); if(sp){ sp.classList.add('on'); reader.onEl = sp; sp.scrollIntoView({ block: 'center' }); } readerTitle(); });
+  const seen = store.get('rdHint') || 0;
+  if(seen < 3){ store.set('rdHint', seen + 1); $('rdHint').classList.remove('hidden'); setTimeout(() => $('rdHint').classList.add('hidden'), 6000); }
+}
+function closeReader(){ reader.open = false; $('reader').classList.add('hidden'); $('rdBody').textContent = ''; reader.onEl = null; }
+(function readerEvents(){
+  const b = $('rdBody');
+  b.addEventListener('scroll', () => {
+    fillReader();
+    readerTitle();
+  }, { passive: true });
+  // se scorri tu, smetto di seguire la lettura e compare il pulsante per tornarci
+  const stopFollow = () => { if(reader.follow){ reader.follow = false; $('rdFollow').classList.remove('hidden'); } };
+  b.addEventListener('touchmove', stopFollow, { passive: true });
+  b.addEventListener('wheel', stopFollow, { passive: true });
+  // tocco = ascolta da qui; pressione lunga = segnalibro
+  let press = null;
+  const cancel = () => { if(press){ clearTimeout(press.t); press.sp.classList.remove('press'); press = null; } };
+  b.addEventListener('pointerdown', e => {
+    const sp = e.target.closest('.s'); if(!sp) return;
+    cancel();
+    press = { sp, x: e.clientX, y: e.clientY, long: false };
+    sp.classList.add('press');
+    press.t = setTimeout(() => {
+      if(!press) return; press.long = true; sp.classList.remove('press');
+      try{ navigator.vibrate && navigator.vibrate(15); }catch(err){}
+      const r = addNote(+sp.dataset.s, +sp.dataset.i); openNoteEditor(r.note, r.isNew);
+    }, 550);
+  });
+  b.addEventListener('pointermove', e => { if(press && (Math.abs(e.clientX - press.x) > 10 || Math.abs(e.clientY - press.y) > 10)) cancel(); });
+  b.addEventListener('pointercancel', cancel);
+  b.addEventListener('pointerup', () => {
+    if(!press) return;
+    const { sp, long } = press; cancel();
+    if(long) return;
+    jumpTo(+sp.dataset.s, +sp.dataset.i, true);
+  });
+  b.addEventListener('contextmenu', e => e.preventDefault());
+})();
 
 /* ---------- pannelli ---------- */
 let sheetKind = null;
@@ -2594,13 +2802,15 @@ function openMore(){
       setStatus('Preparazione avviata. Tieni l\'app aperta, anche in pausa: l\'avanzamento è sotto la barra del player.');
     }));
   }
+  const nn = notes().length;
+  body.appendChild(option('Note e segnalibri', nn ? `${nn} in questo libro` : 'Le frasi che hai segnato, con i tuoi commenti', false, () => openNotesList()));
   body.appendChild(option('Impostazioni', 'Voci, pulsanti avanti e indietro, spazio', false, () => openSettings()));
   body.appendChild(option('Ricomincia dall\'inizio', 'Torna alla prima frase del libro', false, () => { closeSheet(); goTo(0, 0); }));
   body.appendChild(option('Segna come finito', 'Lo sposta tra i Finiti', false, () => { closeSheet(); stop(); savePos(true); renderLibrary(); setStatus('Segnato come finito.'); }));
   body.appendChild(option('Rimuovi dal telefono', 'Cancella il libro e la posizione salvata', false, async () => {
     if(!confirm(`Rimuovere "${state.meta.title}" dal telefono?`)) return;
     const k = state.key; closeSheet(); unloadBook();
-    await lib.del(k); store.del('pos:' + k); acache.delBook(k); renderLibrary();
+    await lib.del(k); store.del('pos:' + k); store.del('notes:' + k); acache.delBook(k); renderLibrary();
   }));
 }
 
@@ -2622,7 +2832,14 @@ $('nextChap').onclick = () => moveChapter(1);
 $('chapBtn').onclick = openChapters;
 $('speedBtn').onclick = openSpeed;
 $('voiceBtn').onclick = openVoiceSheet;
-$('textBtn').onclick = openText;
+$('textBtn').onclick = openReader;
+$('nowText').onclick = openReader;
+$('pMark').onclick = bookmarkCurrent;
+$('rdMark').onclick = bookmarkCurrent;
+$('rdClose').onclick = closeReader;
+$('rdNotes').onclick = openNotesList;
+$('rdPlay').onclick = togglePlay;
+$('rdFollow').onclick = () => { reader.follow = true; $('rdFollow').classList.add('hidden'); markReader(true); };
 $('sheetClose').onclick = closeSheet;
 // trascinare sullo sfondo o sull'intestazione del pannello non fa scorrere nulla
 ['sheetBack', 'sheet'].forEach(id => $(id).addEventListener('touchmove', e => { if(!e.target.closest('#sheetBody')) e.preventDefault(); }, { passive: false }));
@@ -2640,7 +2857,7 @@ seekEl.addEventListener('change', () => {
   const p = fromG(+seekEl.value);
   goTo(p.sec, p.idx);
 });
-document.addEventListener('keydown', e => { if(e.key === 'Escape'){ if(sheetKind) closeSheet(); else closePlayer(); } });
+document.addEventListener('keydown', e => { if(e.key === 'Escape'){ if(sheetKind) closeSheet(); else if(reader.open) closeReader(); else closePlayer(); } });
 document.addEventListener('visibilitychange', () => {
   if(document.visibilityState === 'visible' && sheetKind === 'gemSetup'){ const gs = store.get('gemSetup'); if(gs && gs.step !== gemSetup.step) openGemSetup(null, gs.step); }
   if(document.visibilityState === 'visible' && state.playing) requestWake();
