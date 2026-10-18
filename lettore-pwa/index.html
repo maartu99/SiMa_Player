@@ -424,14 +424,16 @@ body.noMini #toast{bottom:calc(env(safe-area-inset-bottom) + 76px)}
 #pTopLabel{font-size:12px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--ink)}
 .pTopRight{gap:2px}
 .pCoverWrap{max-height:230px;padding:10px 0 0}
-.pCoverWrap .cover.l{aspect-ratio:1;height:min(100cqh,180px);width:auto;max-width:none;border-radius:18px;border:1px solid var(--line);box-shadow:var(--cover-shadow);padding:min(9cqh,18px);font-size:min(10cqh,20px)}
+.pCoverWrap .cover.l .ct{-webkit-line-clamp:3}
+.pCoverWrap .cover img{object-position:center top}
+.pCoverWrap .cover.l{aspect-ratio:1;justify-content:space-between;height:min(100cqh,180px);width:auto;max-width:none;border-radius:18px;border:1px solid var(--line);box-shadow:var(--cover-shadow);padding:min(9cqh,18px);font-size:min(10cqh,20px)}
 .pMeta{padding:10px 0 0;gap:2px}
 #pTitle{font-size:24px;letter-spacing:-.3px}
 #pAuthor{font-size:14px;font-weight:500}
 .chapPill{margin-top:8px;height:44px;padding:0 16px;border-radius:22px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-size:13px;font-weight:500;display:inline-flex;align-items:center;gap:6px;max-width:100%}
 .chapPill #chapLabel{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #nowText{margin:12px 0 0;width:100%;height:auto;display:flex;flex-direction:column;gap:6px;padding:14px;border-radius:16px;background:var(--surface);border:1px solid var(--line);border-left:1px solid var(--line);text-align:left;-webkit-line-clamp:unset;overflow:hidden;box-shadow:var(--soft-shadow)}
-.nowQuote{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;background:var(--accent-soft);border:1px solid var(--accent-line);border-radius:12px;padding:10px;font-family:var(--serif);font-size:16px;line-height:22px;font-weight:600;color:var(--accent-text)}
+.nowQuote{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;max-height:66px;flex:none;background:var(--accent-soft);border:1px solid var(--accent-line);border-radius:12px;padding:10px;font-family:var(--serif);font-size:16px;line-height:22px;font-weight:600;color:var(--accent-text)}
 .nowNext{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 4px;font-family:var(--serif);font-size:14px;line-height:20px;color:var(--muted)}
 .nowFoot{display:flex;align-items:center;gap:4px;padding:0 4px;font-family:var(--sans);font-size:12px;color:var(--muted)}
 .seekWrap{padding:10px 4px 0}
@@ -756,7 +758,7 @@ body.noMini #toast{bottom:calc(env(safe-area-inset-bottom) + 76px)}
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 34;
+const APP_VERSION = 35;
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
   let hadController = !!navigator.serviceWorker.controller, reloading = false;
@@ -863,8 +865,8 @@ const lib = {
     });
   },
   put(b){ return this.tx('readwrite', st => st.put(b)); },
-  get(k){ return this.tx('readonly', st => st.get(k)); },
-  all(){ return this.tx('readonly', st => st.getAll()); },
+  async get(k){ const r = await this.tx('readonly', st => st.get(k)); return cleanRec(r); },
+  async all(){ const l = await this.tx('readonly', st => st.getAll()); return (l || []).map(cleanRec); },
   del(k){ return this.tx('readwrite', st => st.delete(k)); }
 };
 // audio già generato, salvato sul telefono: ogni frase si genera una volta sola
@@ -927,6 +929,10 @@ const acache = {
     store.set('audioBytes', Math.max(0, (store.get('audioBytes') || 0) - freed));
   }
 };
+// l'autore nei metadati a volte è il programma che ha creato il file (python-docx, Word...): non è un autore
+const FAKE_AUTHOR = /^\s*$|python|docx|reportlab|wkhtml|pdfium|ghostscript|latex|pdftex|acrobat|distiller|quartz|microsoft|^word$|libre ?office|open ?office|writer|^pages$|google docs|calibre|adobe|^pdf|unknown|anonym|sconosciut|^admin|^user$|^utente$|^autore$|^author$|^owner$|^proprietario$/i;
+function cleanAuthor(a){ a = (a || '').trim(); return a && !FAKE_AUTHOR.test(a) ? a : null; }
+function cleanRec(r){ if(r && r.author && !cleanAuthor(r.author)) r.author = null; return r; }
 function hash(str){ let h = 0; for(let i = 0; i < str.length; i++){ h = (h * 31 + str.charCodeAt(i)) | 0; } return Math.abs(h).toString(36); }
 
 function savePos(done){
@@ -1941,7 +1947,7 @@ async function loadPdf(buf){
     const md = await pdf.getMetadata();
     const info = (md && md.info) || {};
     if(info.Title && info.Title.trim().length > 2 && !/microsoft|untitled|\.docx?|\.pdf/i.test(info.Title)) title = info.Title.trim();
-    if(info.Author && info.Author.trim() && !/^(anonymous|unknown|sconosciuto|admin|user|utente)$/i.test(info.Author.trim())) author = info.Author.trim();
+    if(cleanAuthor(info.Author)) author = info.Author.trim();
   }catch(e){}
   const secs = [];
   for(let i = 1; i <= pdf.numPages; i++){
@@ -2087,7 +2093,7 @@ async function loadEpub(buf){
       secs.push({ title: t || `Capitolo ${n}`, sentences });
     }
   }
-  return { secs, title: pick('title'), author: pick('creator'), cover, chapters: true };
+  return { secs, title: pick('title'), author: cleanAuthor(pick('creator')), cover, chapters: true };
 }
 // legge l'indice dell'EPUB (nav di EPUB 3, oppure toc.ncx di EPUB 2)
 async function readEpubToc(zip, opf, base, manifest){
