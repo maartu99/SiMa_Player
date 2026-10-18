@@ -20,7 +20,7 @@
   var t = 'auto'; try{ t = (JSON.parse(localStorage.getItem('lettore:prefs')) || {}).theme || 'auto'; }catch(e){}
   var dark = t === 'dark' || (t !== 'light' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
   document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
-  var m = document.getElementById('themeColor'); if(m) m.content = dark ? '#0F0F10' : '#F6F4F5';
+  var m = document.getElementById('themeColor'); if(m) m.content = dark ? '#0B0B0D' : '#FCF8FB';
 })();
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -33,27 +33,31 @@
   --serif:'Newsreader', ui-serif, Georgia, serif;
   --sans:'Plus Jakarta Sans', -apple-system, system-ui, sans-serif;
 }
-/* tema scuro */
+/* tema scuro (Stitch "Nocturne Editorial") */
 :root, :root[data-theme="dark"]{
-  --bg:#0F0F10; --surface:#1F1F21; --surface2:#18181A; --sheet:#1A1A1C; --card:#242427;
-  --line:#2A2A2D; --line2:#3A3A3F; --track:#343438;
-  --ink:#ECECEC; --ink2:#C9C9CC; --muted:#9C9CA2; --faint:#7A7A80;
-  --accent:#FF3B5C; --accent-ink:#FFFFFF; --accent-soft:rgba(255,59,92,.14);
-  --mark-bg:rgba(255,59,92,.24); --mark-ink:#FFE1E6; --err:#FF8A80;
-  --toast:#2C2C30; --toast-ink:#ECECEC; --toast-err:#4A1F27; --toast-err-ink:#FFC9C2;
-  --shadow:0 10px 30px rgba(0,0,0,.45); --soft-shadow:none; --cover-shadow:0 18px 40px rgba(0,0,0,.55);
+  --bg:#0B0B0D; --surface:#1C1C1E; --surface2:#252528; --sheet:#1B1B1D; --card:#262628; --card2:#2C2C2E;
+  --line:#2C2C2E; --line2:#38383A; --track:#2C2C2E;
+  --ink:#F5F5F7; --ink2:#D1D1D6; --muted:#8E8E93; --faint:#636366;
+  --accent:#FF2D55; --accent-ink:#FFFFFF; --accent-soft:rgba(255,45,85,.15); --accent-line:rgba(255,45,85,.3); --accent-text:#FF617D;
+  --mark-bg:rgba(255,45,85,.2); --mark-ink:#FFFFFF; --bookmark:#FBBF24; --err:#FF6B6B;
+  --chip-on:#FFFFFF; --chip-on-ink:#000000;
+  --toast:#2C2C2E; --toast-ink:#F5F5F7; --toast-err:#4A1F27; --toast-err-ink:#FFC9C2;
+  --bar:rgba(0,0,0,.88); --glass:rgba(28,28,30,.9);
+  --shadow:0 10px 30px rgba(0,0,0,.8); --soft-shadow:none; --cover-shadow:0 16px 36px rgba(0,0,0,.65); --play-shadow:0 8px 28px rgba(255,45,85,.45);
   --scrim:rgba(0,0,0,.6);
   color-scheme: dark;
 }
-/* tema chiaro */
+/* tema chiaro (Stitch "Editorial Audio & Reader") */
 :root[data-theme="light"]{
-  --bg:#F6F4F5; --surface:#FFFFFF; --surface2:#F2F2F7; --sheet:#FFFFFF; --card:#F4F3F6;
-  --line:#ECEAEE; --line2:#DAD7DD; --track:#E5E5EA;
-  --ink:#1C1C1E; --ink2:#3A3A3C; --muted:#6E6E73; --faint:#8E8E93;
-  --accent:#E0183F; --accent-ink:#FFFFFF; --accent-soft:rgba(224,24,63,.08);
-  --mark-bg:rgba(224,24,63,.13); --mark-ink:#9E0A28; --err:#C62828;
-  --toast:#1C1C1E; --toast-ink:#FFFFFF; --toast-err:#B3261E; --toast-err-ink:#FFFFFF;
-  --shadow:0 8px 28px rgba(0,0,0,.10); --soft-shadow:0 2px 10px rgba(0,0,0,.05); --cover-shadow:0 16px 36px rgba(60,20,30,.22);
+  --bg:#FCF8FB; --surface:#FFFFFF; --surface2:#F6F3F5; --sheet:#FCF8FB; --card:#FFFFFF; --card2:#F0EDEF;
+  --line:#F0EDEF; --line2:#E4E2E4; --track:#EAE7EA;
+  --ink:#1B1B1D; --ink2:#3A3436; --muted:#76696A; --faint:#916E6F;
+  --accent:#E51245; --accent-ink:#FFFFFF; --accent-soft:rgba(229,18,69,.08); --accent-line:rgba(229,18,69,.25); --accent-text:#BA0034;
+  --mark-bg:rgba(229,18,69,.12); --mark-ink:#7A0020; --bookmark:#D97706; --err:#BA1A1A;
+  --chip-on:#1B1B1D; --chip-on-ink:#FFFFFF;
+  --toast:#1B1B1D; --toast-ink:#FFFFFF; --toast-err:#BA1A1A; --toast-err-ink:#FFFFFF;
+  --bar:rgba(252,248,251,.88); --glass:rgba(255,255,255,.9);
+  --shadow:0 8px 28px rgba(60,20,30,.12); --soft-shadow:0 1px 6px rgba(60,20,30,.06); --cover-shadow:0 16px 36px rgba(60,20,30,.22); --play-shadow:0 8px 24px rgba(229,18,69,.35);
   --scrim:rgba(20,10,15,.32);
   color-scheme: light;
 }
@@ -319,26 +323,288 @@ svg{flex:none}
 #toast.err{background:var(--toast-err);color:var(--toast-err-ink)}
 body.noMini #toast{bottom:calc(env(safe-area-inset-bottom) + 20px)}
 body.playerOpen #toast{bottom:auto;top:calc(env(safe-area-inset-top) + 64px)}
+
+/* =========================================================
+   Grafica Stitch: "Editorial Audio & Reader" / "Nocturne Editorial"
+   ========================================================= */
+body{background:var(--bg)}
+.acc{color:var(--accent);display:inline-flex}
+.dim{color:var(--faint);display:inline-flex}
+.ghostBtn{width:44px;height:44px;border-radius:22px;border:0;background:transparent;color:var(--ink);display:flex;align-items:center;justify-content:center;flex:none}
+.ghostBtn:active{background:var(--surface)}
+.roundBtn{background:var(--surface);border:1px solid var(--line);box-shadow:var(--soft-shadow)}
+
+/* barra in alto della libreria */
+.appBar{position:sticky;top:0;z-index:15;display:flex;align-items:center;justify-content:space-between;padding:calc(env(safe-area-inset-top) + 10px) 16px 12px;background:var(--bar);-webkit-backdrop-filter:blur(20px) saturate(180%);backdrop-filter:blur(20px) saturate(180%);border-bottom:1px solid var(--line);max-width:560px;margin:0 auto}
+.brand{display:flex;align-items:center;gap:10px;font-family:var(--serif);font-size:21px;font-weight:600;letter-spacing:-.3px}
+.brandMark{width:32px;height:32px;border-radius:8px;background:var(--accent-soft);border:1px solid var(--accent-line);color:var(--accent);display:flex;align-items:center;justify-content:center}
+#libView{padding:16px 16px calc(env(safe-area-inset-bottom) + 190px)}
+.actRow{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:20px}
+.addBtn{height:44px;padding:0 20px;gap:8px;border-radius:22px;font-size:15px;font-weight:600;letter-spacing:-.2px;box-shadow:0 6px 16px var(--accent-soft)}
+.libHead{display:block;margin-bottom:20px}
+.libHead h1{font-size:34px;line-height:1.15;letter-spacing:-.5px}
+#libCount{font-size:14px;margin-top:4px}
+.chips{gap:8px;padding:0 16px 8px;margin:0 -16px 16px}
+.chip{height:44px;padding:0 20px;border-radius:22px;border:1px solid var(--line);background:var(--surface);color:var(--muted);font-size:14px;font-weight:500;box-shadow:none}
+.chip[aria-pressed="true"]{background:var(--chip-on);color:var(--chip-on-ink);border-color:var(--chip-on);font-weight:600}
+
+/* schede dei libri */
+#list{display:flex;flex-direction:column;gap:14px}
+.row{display:block;padding:0;margin:0;border-radius:18px;background:var(--surface);border:1px solid var(--line);box-shadow:var(--soft-shadow);overflow:hidden;position:relative}
+.row.current{background-image:linear-gradient(135deg,var(--accent-soft),transparent 55%)}
+.rowMain{display:flex;align-items:stretch;gap:16px;width:100%;padding:16px 16px 14px}
+.coverBox{position:relative;flex:none}
+.cover.s{width:78px;height:106px;border-radius:12px;box-shadow:0 6px 16px rgba(0,0,0,.25);font-size:12px;padding:9px 8px}
+.liveBadge{position:absolute;left:6px;bottom:6px;display:flex;align-items:flex-end;gap:3px;height:20px;padding:4px 7px;border-radius:10px;background:rgba(0,0,0,.8);border:1px solid rgba(255,255,255,.1)}
+.rowText{flex:1;min-width:0;display:flex;flex-direction:column;gap:0;justify-content:space-between;padding:2px 0}
+.rowTop{display:flex;flex-direction:column;min-width:0}
+.rowEyebrow,.rowTitle,.rowAuthor{display:block}
+.rowTitle,.rowAuthor{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rowProg{display:block}
+.rowProgTop{display:flex}
+.bar{display:block;width:100%}
+.bar>i{display:block}
+.rowEyebrow{font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--accent);margin-bottom:4px}
+.row.current .rowTitle::before{content:none}
+.rowTitle{font-family:var(--serif);font-size:19px;font-weight:600;letter-spacing:-.2px;line-height:1.3;color:var(--ink)}
+.rowAuthor{font-size:13px;color:var(--muted);margin-top:2px}
+.rowAuthor em{font-style:normal;color:var(--faint)}
+.rowProg{margin-top:10px}
+.rowProgTop{display:flex;justify-content:space-between;gap:8px;font-size:12px;margin-bottom:6px}
+.rowLabel{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row.current .rowLabel{color:var(--ink);font-weight:500}
+.pct{font-size:12px;font-weight:600;color:var(--ink);min-width:0}
+.pct.new{font-weight:500;color:var(--muted)}
+.row.current .pct{color:var(--accent)}
+.bar{height:6px;border-radius:3px;background:var(--card2)}
+.bar>i{border-radius:3px;background:var(--ink2);opacity:.8}
+.row.current .bar>i{background:var(--accent);opacity:1}
+.rowFoot{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 16px;border-top:1px solid var(--line);background:var(--surface2)}
+.rowFootL{display:flex;align-items:center;gap:12px;min-width:0}
+.rowVoice{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rowBtns{display:contents}
+.playCirc{width:44px;height:44px;border-radius:22px;border:0;background:var(--chip-on);color:var(--chip-on-ink)}
+:root[data-theme="dark"] .playCirc,:root:not([data-theme]) .playCirc{background:#2C2C2E;color:#fff}
+.playCirc.on,.row.current .playCirc{background:var(--accent);color:#fff;box-shadow:0 4px 12px var(--accent-soft)}
+.delBtn{width:44px;height:44px;border-radius:22px;color:var(--faint)}
+.empty{padding:24px 4px 0}
+
+/* barre animate "in ascolto" */
+.waveBars{display:inline-flex;align-items:flex-end;gap:2.5px;height:14px}
+.waveBars i,.liveBadge i{display:block;width:2.5px;border-radius:2px;background:var(--accent);height:40%}
+.waveBars i:nth-child(2),.liveBadge i:nth-child(2){height:100%}
+.waveBars i:nth-child(3),.liveBadge i:nth-child(3){height:60%}
+body.isPlaying .waveBars i,.liveBadge i{animation:wave 1s ease-in-out infinite}
+.waveBars i:nth-child(2),.liveBadge i:nth-child(2){animation-delay:.15s}
+.waveBars i:nth-child(3),.liveBadge i:nth-child(3){animation-delay:.3s}
+@keyframes wave{0%,100%{transform:scaleY(.45)}50%{transform:scaleY(1)}}
+.waveBars i,.liveBadge i{transform-origin:bottom}
+@media (prefers-reduced-motion: reduce){.waveBars i,.liveBadge i{animation:none !important}}
+
+/* mini player e barra in basso */
+#mini{left:12px;right:12px;bottom:calc(env(safe-area-inset-bottom) + 66px);border-radius:16px;background:var(--glass);-webkit-backdrop-filter:blur(24px);backdrop-filter:blur(24px);border:1px solid var(--line);box-shadow:var(--shadow);height:68px}
+.miniRow{height:100%;padding:0 12px;gap:10px}
+.miniBar{display:none}
+#miniCover .cover.xs{width:44px;height:44px;border-radius:8px}
+#miniTitle{font-family:var(--serif);font-size:15px;font-weight:600}
+#miniSub{font-size:12px}
+.miniPlay{width:44px;height:44px;border-radius:22px;box-shadow:var(--play-shadow)}
+#miniBack{color:var(--ink)}
+#tabBar{position:fixed;left:0;right:0;bottom:0;z-index:22;display:flex;justify-content:space-around;align-items:flex-start;padding:6px 8px calc(env(safe-area-inset-bottom) + 6px);background:var(--bar);-webkit-backdrop-filter:blur(24px) saturate(180%);backdrop-filter:blur(24px) saturate(180%);border-top:1px solid var(--line)}
+.tabBtn{min-width:64px;min-height:48px;border:0;background:none;color:var(--faint);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:10px;font-weight:500;letter-spacing:-.1px}
+.tabBtn[aria-current="page"]{color:var(--accent);font-weight:600}
+body.noMini #toast{bottom:calc(env(safe-area-inset-bottom) + 76px)}
+#toast{bottom:calc(env(safe-area-inset-bottom) + 146px)}
+
+/* player */
+#playerView{background:var(--bg)}
+.pInner{padding:calc(env(safe-area-inset-top) + 6px) 16px calc(env(safe-area-inset-bottom) + 12px)}
+.pTop{padding:0;height:44px}
+.statusPill{display:inline-flex;align-items:center;gap:8px;height:30px;padding:0 14px;border-radius:15px;background:var(--surface);border:1px solid var(--line)}
+#pTopLabel{font-size:12px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--ink)}
+.pTopRight{gap:2px}
+.pCoverWrap{max-height:230px;padding:10px 0 0}
+.pCoverWrap .cover.l{aspect-ratio:1;height:min(100cqh,180px);width:auto;max-width:none;border-radius:18px;border:1px solid var(--line);box-shadow:var(--cover-shadow);padding:min(9cqh,18px);font-size:min(10cqh,20px)}
+.pMeta{padding:10px 0 0;gap:2px}
+#pTitle{font-size:24px;letter-spacing:-.3px}
+#pAuthor{font-size:14px;font-weight:500}
+.chapPill{margin-top:8px;height:44px;padding:0 16px;border-radius:22px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-size:13px;font-weight:500;display:inline-flex;align-items:center;gap:6px;max-width:100%}
+.chapPill #chapLabel{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#nowText{margin:12px 0 0;width:100%;height:auto;display:flex;flex-direction:column;gap:6px;padding:14px;border-radius:16px;background:var(--surface);border:1px solid var(--line);border-left:1px solid var(--line);text-align:left;-webkit-line-clamp:unset;overflow:hidden;box-shadow:var(--soft-shadow)}
+.nowQuote{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;background:var(--accent-soft);border:1px solid var(--accent-line);border-radius:12px;padding:10px;font-family:var(--serif);font-size:16px;line-height:22px;font-weight:600;color:var(--accent-text)}
+.nowNext{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 4px;font-family:var(--serif);font-size:14px;line-height:20px;color:var(--muted)}
+.nowFoot{display:flex;align-items:center;gap:4px;padding:0 4px;font-family:var(--sans);font-size:12px;color:var(--muted)}
+.seekWrap{padding:10px 4px 0}
+.seekLabels{margin:0 0 2px;font-size:13px;font-weight:500;color:var(--ink2)}
+.seekLabels b{font-weight:600;color:var(--ink)}
+#seek{height:28px}
+#seek::-webkit-slider-runnable-track{height:6px;border-radius:3px;background:linear-gradient(to right,var(--accent) var(--p,0%),var(--track) var(--p,0%))}
+#seek::-webkit-slider-thumb{width:16px;height:16px;border-radius:8px;background:#fff;margin-top:-5px;border:0;box-shadow:0 2px 10px rgba(255,45,85,.7)}
+#bufInfo{text-align:center;color:var(--muted);font-size:12px;margin-top:0}
+.pCtrls{padding:6px 8px 0}
+.ctrl.side{width:48px;height:48px;color:var(--ink2)}
+.ctrl.round{width:48px;height:48px;border-radius:24px;background:var(--surface);border:1px solid var(--line);gap:0}
+.ctrl.round small{font-size:10px;line-height:11px;font-weight:600;color:var(--muted);margin-top:-1px}
+.bigPlay{width:64px;height:64px;border-radius:32px;box-shadow:var(--play-shadow)}
+.pBottom{padding:12px 0 0;gap:8px}
+.tile{height:58px;border-radius:16px;background:var(--surface);border:1px solid var(--line);gap:2px}
+.tileTop{display:flex;align-items:center;justify-content:center;gap:6px;max-width:100%}
+.tile b{font-size:15px;font-weight:600}
+.tile small{font-size:11px}
+@media (max-height:700px){
+  .pCoverWrap{max-height:150px}
+  .nowQuote{-webkit-line-clamp:1}
+  .nowNext{display:none}
+  .bigPlay{width:58px;height:58px}
+  .tile{height:52px}
+}
+
+/* testo a tutta pagina */
+#reader{background:var(--bg)}
+.rdTop{background:var(--bar);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);padding:calc(env(safe-area-inset-top) + 6px) 12px 6px}
+.rdCenter{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center}
+.rdCenter small{font-size:10px;font-weight:500;letter-spacing:2px;text-transform:uppercase;color:var(--muted)}
+.rdChapTitle{font-family:var(--serif);font-size:17px;line-height:20px}
+.rdChapTitle::before{content:none}
+.rdNotesBtn b{top:6px;right:4px;background:var(--accent);color:#fff;font-size:10px;height:16px;line-height:16px;min-width:16px;padding:0 4px}
+#rdBody{padding:4px 20px 150px}
+.rdChapHead{padding:24px 0 8px;margin:16px 0 18px}
+.rdEyebrow{font-size:11px;font-weight:500;letter-spacing:3px;opacity:.85}
+.rdEyebrow::before,.rdEyebrow::after{width:16px;opacity:1}
+.rdChapH{font-size:32px;line-height:38px;font-weight:500}
+.rdChapTime{font-size:12px;color:var(--faint);margin-top:8px;letter-spacing:.3px}
+#rdBody p{font-size:19px;line-height:32px;letter-spacing:.01em;text-indent:1.5em;margin:0 auto 24px;color:var(--ink)}
+#rdBody .s{padding:2px 2px;border-radius:6px}
+#rdBody .s.on{background:var(--mark-bg);color:var(--mark-ink);box-shadow:0 0 0 1px var(--accent-line);padding:3px 6px}
+#rdBody .s.on::before{content:"";display:inline-block;width:15px;height:15px;margin-right:6px;vertical-align:-2px;background:var(--accent);-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M11 5L6 9H2v6h4l5 4V5z'/%3E%3Cpath d='M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M11 5L6 9H2v6h4l5 4V5z'/%3E%3Cpath d='M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14'/%3E%3C/svg%3E") center/contain no-repeat}
+#rdBody .s.noted{background:var(--surface);box-shadow:inset 3px 0 0 var(--bookmark);padding:2px 4px 2px 8px}
+#rdBody .s.on.noted{box-shadow:inset 3px 0 0 var(--bookmark),0 0 0 1px var(--accent-line)}
+.rdHint{position:absolute;top:calc(env(safe-area-inset-top) + 70px);bottom:auto;left:16px;right:16px;display:flex;align-items:flex-start;gap:12px;text-align:left;padding:14px 6px 14px 14px;border-radius:14px;background:var(--surface);color:var(--ink);border:1px solid var(--line);box-shadow:var(--shadow);z-index:2}
+.rdHintIco{width:36px;height:36px;border-radius:18px;background:var(--accent-soft);border:1px solid var(--accent-line);color:var(--accent);display:flex;align-items:center;justify-content:center;flex:none}
+.rdHintText{flex:1;font-size:13px;line-height:1.5;color:var(--muted)}
+.rdHintText b{display:block;font-size:14px;color:var(--ink);margin-bottom:2px}
+.rdHint .ghostBtn{margin:-8px 0 0}
+.rdFollow{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom) + 84px);display:flex;align-items:center;gap:8px;height:40px;padding:0 16px;border-radius:20px;background:var(--toast);color:var(--toast-ink);font-size:13px;font-weight:500;white-space:nowrap;z-index:3}
+.rdFollow svg{color:var(--accent)}
+.rdBottom{background:var(--bar);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);border-top:1px solid var(--line);padding:10px 16px calc(env(safe-area-inset-bottom) + 10px);gap:12px}
+.rdProg{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;font-size:12px;font-weight:500;color:var(--ink2)}
+.rdProgBar{width:110px;height:3px;border-radius:2px;background:var(--track);overflow:hidden}
+.rdProgBar i{display:block;height:100%;background:var(--accent);width:0}
+.rdPlay{width:48px;height:48px;border-radius:24px;box-shadow:var(--play-shadow)}
+
+/* pannelli */
+#sheet{background:var(--sheet);border-top:1px solid var(--line)}
+.grab{width:36px;background:var(--line2)}
+.sheetHead{padding:8px 20px 14px}
+.sheetHead h2{font-size:24px;font-weight:600;letter-spacing:-.3px}
+#sheetClose{height:40px;padding:0 18px;border-radius:20px;border:0;background:var(--accent-soft);color:var(--accent-text);font-weight:600}
+.bookCard{display:flex;align-items:center;gap:14px;padding:12px 14px;margin:0 0 16px;border-radius:16px;background:var(--card);border:1px solid var(--line)}
+.bookCard .cover.xs{width:44px;height:60px;border-radius:6px}
+.bookCard .bcText{flex:1;min-width:0}
+.bcEyebrow{font-size:10px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;color:var(--accent);display:flex;align-items:center;gap:5px}
+.bcEyebrow::before{content:"";width:6px;height:6px;border-radius:3px;background:var(--accent)}
+.bcTitle{font-family:var(--serif);font-size:19px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.bcSub{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.bcSide{font-size:13px;font-weight:600;color:var(--ink2)}
+.statRow{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 0 18px}
+.statBox{padding:12px 14px;border-radius:14px;background:var(--card);border:1px solid var(--line)}
+.statBox small{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+.statBox b{display:block;font-size:17px;font-weight:600;margin-top:4px}
+.listHead{display:flex;justify-content:space-between;align-items:baseline;margin:0 2px 6px;font-size:12px;color:var(--muted)}
+.listHead b{font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--ink)}
+.chapRow{width:100%;display:flex;align-items:center;gap:14px;padding:12px 10px;border:0;border-radius:14px;background:none;text-align:left;color:var(--ink)}
+.chapNum{width:24px;font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums}
+.chapTx{flex:1;min-width:0}
+.chapTx b{display:block;font-family:var(--serif);font-size:17px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chapTx small{display:block;font-size:12px;color:var(--muted);margin-top:2px}
+.chapGo{color:var(--muted);display:flex}
+.chapRow.cur{background:var(--accent-soft);box-shadow:inset 3px 0 0 var(--accent)}
+.chapRow.cur .chapTx b{color:var(--accent-text);font-weight:600}
+.chapRow.cur .chapGo{width:40px;height:40px;border-radius:20px;background:var(--accent);color:#fff;align-items:center;justify-content:center}
+.tag{display:inline-block;font-family:var(--sans);font-size:10px;font-weight:600;padding:2px 7px;border-radius:9px;background:var(--accent-soft);color:var(--accent-text);margin-left:6px;vertical-align:2px}
+.speedCard{padding:20px 18px;border-radius:18px;background:var(--card);border:1px solid var(--line);text-align:center;margin:0 0 18px}
+.speedBig{font-size:44px;margin:0}
+.speedBig small{font-size:24px;color:var(--accent)}
+.speedSub{font-size:14px;color:var(--muted);margin:2px 0 16px}
+#speedRange{accent-color:var(--accent)}
+.rangeLabels{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);letter-spacing:.5px;margin-top:4px}
+.presets{gap:10px}
+.presets button{height:48px;border:1px solid var(--line);background:var(--card);border-radius:14px;color:var(--ink)}
+.presets button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:var(--play-shadow)}
+.noteBox{display:flex;gap:12px;padding:14px;border-radius:14px;background:var(--card);border:1px solid var(--line);font-size:13px;line-height:1.5;color:var(--muted);margin-top:14px}
+.group{border-radius:16px;background:var(--card);border:1px solid var(--line);overflow:hidden;margin:0 0 14px}
+.gRow{width:100%;display:flex;align-items:center;gap:14px;padding:14px;border:0;border-bottom:1px solid var(--line);background:none;text-align:left;color:var(--ink)}
+.gRow:last-child{border-bottom:0}
+.gIco{width:36px;height:36px;border-radius:18px;background:var(--card2);display:flex;align-items:center;justify-content:center;flex:none;color:var(--ink2)}
+.gTx{flex:1;min-width:0}
+.gTx b{display:block;font-size:16px;font-weight:600}
+.gTx small{display:block;font-size:12px;color:var(--muted);margin-top:2px}
+.gRow .chevR{color:var(--faint);display:flex}
+.gRow.danger,.gRow.danger .gTx b{color:var(--err)}
+.gRow.danger .gIco{background:var(--accent-soft);color:var(--err)}
+.pillTag{font-size:11px;font-weight:600;padding:3px 8px;border-radius:10px;background:var(--accent-soft);color:var(--accent-text)}
+.quoteCard{padding:18px;border-radius:18px;background:var(--card);border:1px solid var(--line);margin:0 0 18px}
+.quoteCard .qLabel{font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--accent);margin-bottom:10px}
+.quoteCard blockquote{margin:0;font-family:var(--serif);font-style:italic;font-size:20px;line-height:1.5;color:var(--ink)}
+.listenRow{width:100%;display:flex;align-items:center;gap:12px;margin-top:14px;padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:var(--surface2);color:var(--ink);text-align:left}
+.listenRow .lp{width:32px;height:32px;border-radius:16px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center}
+.listenRow .lt{flex:1;font-size:14px;font-weight:600}
+.listenRow .lt small{display:block;font-size:11px;font-weight:500;color:var(--muted)}
+.fieldLabel{display:flex;justify-content:space-between;font-size:13px;font-weight:600;color:var(--ink);margin:0 2px 8px}
+.fieldLabel span{color:var(--faint);font-weight:500}
+.noteArea{background:var(--card);border:1px solid var(--line);border-radius:14px;min-height:120px}
+.wideBtn{min-height:52px;border-radius:26px;font-weight:600;box-shadow:var(--play-shadow);gap:8px}
+.wideBtn.alt{box-shadow:none}
+.wideBtn.soft{background:var(--card);color:var(--ink);border:1px solid var(--line);box-shadow:none;justify-content:space-between;padding:0 18px;border-radius:14px}
+.linkDanger{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;min-height:44px;border:0;background:none;color:var(--err);font-weight:600;font-size:15px}
+.nCard{padding:16px;border-radius:18px;background:var(--card);border:1px solid var(--line);margin:0 0 14px}
+.nHead{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px;color:var(--muted)}
+.nHead b{color:var(--ink);font-weight:600;font-size:15px}
+.nCard blockquote{margin:12px 0;padding-left:12px;border-left:2px solid var(--accent-line);font-family:var(--serif);font-style:italic;font-size:17px;line-height:1.5;color:var(--ink);display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:4;overflow:hidden}
+.nNote{display:flex;gap:8px;padding:10px 12px;border-radius:12px;background:var(--surface2);font-size:14px;line-height:1.45;color:var(--ink2);margin-bottom:12px;white-space:pre-wrap}
+.nFoot{display:flex;align-items:center;justify-content:space-between}
+.softPill{display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 16px;border-radius:20px;border:0;background:var(--accent-soft);color:var(--accent-text);font-weight:600;font-size:14px}
+.card{background:var(--card);border:1px solid var(--line)}
+.setSection{background:transparent;border:0;padding:0;margin:20px 0 0}
+.setSection>.cardTitle{font-family:var(--serif);font-size:22px;font-weight:600;margin:0 2px 4px}
+.opt.sel{color:var(--accent-text)}
+.badge{background:var(--accent);color:#fff;text-transform:uppercase;letter-spacing:.6px;font-size:10px}
+.groupLabel{font-size:12px;font-weight:600;letter-spacing:1.2px;color:var(--muted);margin:18px 2px 8px}
+.voiceRow{gap:12px}
+.voiceRow .tick{display:none}
+.vIco{width:32px;height:32px;border-radius:16px;background:var(--card2);color:var(--muted);display:flex;align-items:center;justify-content:center;flex:none}
+.voiceRow.selRow .vIco{background:var(--accent);color:#fff}
+.smallBtn{height:40px;border-radius:20px;border:0;background:var(--card2);color:var(--ink);display:inline-flex;align-items:center;gap:6px;padding:0 14px}
+.smallBtn.busy{background:var(--accent);color:#fff}
+.recCard{background:var(--card);border:1px solid var(--accent-line);border-radius:18px;padding:18px;box-shadow:var(--soft-shadow)}
+.recTitle{font-family:var(--serif);font-size:22px;font-weight:600}
+.recCta{display:flex;align-items:center;justify-content:center;gap:8px;min-height:50px;margin-top:10px;border-radius:25px;background:var(--accent);color:#fff;box-shadow:var(--play-shadow)}
+.stepDots span{height:4px}
+.stepTitle{font-size:30px;line-height:1.15;letter-spacing:-.4px}
+.searchBox{display:flex;align-items:center;gap:10px;height:48px;padding:0 14px;border-radius:14px;background:var(--card);border:1px solid var(--line);margin:0 0 14px;color:var(--muted)}
+.searchBox input{flex:1;min-width:0;border:0;background:none;color:var(--ink);font:inherit;font-size:16px;outline:none}
+.sRes{width:100%;display:block;text-align:left;padding:12px 4px;border:0;border-bottom:1px solid var(--line);background:none;color:var(--ink)}
+.sRes small{display:block;font-size:12px;color:var(--muted);margin-bottom:3px}
+.sRes span{font-family:var(--serif);font-size:16px;line-height:1.45}
+.sRes mark{background:var(--mark-bg);color:var(--mark-ink);border-radius:3px;padding:0 2px}
 </style>
 </head>
 <body class="noMini">
 
 <!-- LIBRERIA -->
+<header class="appBar">
+  <div class="brand"><span class="brandMark"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9v6M15 9v6M9 12h6"/></svg></span><span>SiMa</span></div>
+  <button class="roundBtn" id="profBtn" aria-label="Account Google e voci"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></button>
+</header>
 <main id="libView">
-  <div class="libHead">
-    <div>
-      <h1>Libreria</h1>
-      <span id="libCount">Nessun libro</span>
-    </div>
-    <div class="headBtns">
-    <button class="roundBtn" id="setBtn" aria-label="Impostazioni">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
-    </button>
-    <button class="addBtn" id="addBtn" aria-label="Aggiungi libro">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Aggiungi libro</span>
-    </button>
-    </div>
+  <div class="actRow">
+    <button class="roundBtn" id="setBtn" aria-label="Impostazioni"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+    <button class="addBtn" id="addBtn" aria-label="Aggiungi libro PDF o EPUB"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Aggiungi libro</span></button>
     <input type="file" id="file" accept=".pdf,.epub,application/pdf,application/epub+zip" hidden>
+  </div>
+  <div class="libHead">
+    <h1>Libreria</h1>
+    <span id="libCount">Nessun libro</span>
   </div>
   <div class="chips" role="group" aria-label="Filtra i libri">
     <button class="chip" data-f="all">Tutti</button>
@@ -364,19 +630,27 @@ body.playerOpen #toast{bottom:auto;top:calc(env(safe-area-inset-top) + 64px)}
   <div class="miniBar"><i id="miniBar"></i></div>
 </div>
 
+<!-- BARRA IN BASSO -->
+<nav id="tabBar" aria-label="Navigazione">
+  <button class="tabBtn" data-tab="now"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polygon fill="currentColor" points="10 8 16 12 10 16 10 8"/></svg><span>Ascolta ora</span></button>
+  <button class="tabBtn" data-tab="lib" aria-current="page"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><span>Libreria</span></button>
+  <button class="tabBtn" data-tab="browse"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect height="7" width="7" x="3" y="3"/><rect height="7" width="7" x="14" y="3"/><rect height="7" width="7" x="14" y="14"/><rect height="7" width="7" x="3" y="14"/></svg><span>Sfoglia</span></button>
+  <button class="tabBtn" data-tab="search"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" x2="16.65" y1="21" y2="16.65"/></svg><span>Cerca</span></button>
+</nav>
+
 <!-- TESTO A TUTTA PAGINA -->
 <section id="reader" class="hidden" aria-label="Testo del libro">
   <div class="rdTop">
-    <button class="roundBtn" id="rdClose" aria-label="Chiudi il testo"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
-    <span class="rdChapTitle" id="rdChap"></span>
-    <button class="roundBtn rdNotesBtn" id="rdNotes" aria-label="Note e segnalibri"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h14v16H5z"/><path d="M9 9h6M9 13h6M9 17h3"/></svg><b id="rdNoteCount"></b></button>
+    <button class="ghostBtn" id="rdClose" aria-label="Chiudi il testo"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <span class="rdCenter"><small>In riproduzione</small><span class="rdChapTitle" id="rdChap"></span></span>
+    <button class="ghostBtn rdNotesBtn" id="rdNotes" aria-label="Note e segnalibri"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h14v16H5z"/><path d="M9 9h6M9 13h6M9 17h3"/></svg><b id="rdNoteCount"></b></button>
   </div>
   <div id="rdBody"></div>
-  <div class="rdHint hidden" id="rdHint">Tocca una frase per ascoltare da lì. Tienila premuta per un segnalibro con nota.</div>
+  <div class="rdHint hidden" id="rdHint"><span class="rdHintIco"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11V5.5a1.5 1.5 0 0 1 3 0V10"/><path d="M12 10V8.5a1.5 1.5 0 0 1 3 0V11"/><path d="M15 10.5a1.5 1.5 0 0 1 3 0V15a6 6 0 0 1-6 6h-1a6 6 0 0 1-5-2.7L3.5 15a1.5 1.5 0 0 1 2.4-1.8L9 15"/></svg></span><span class="rdHintText"><b>Gesti di lettura</b>Tocca una frase per ascoltare da lì. Tienila premuta per un segnalibro con nota.</span><button class="ghostBtn" id="rdHintClose" aria-label="Chiudi avviso"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+  <button class="rdFollow hidden" id="rdFollow"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 11v2"/></svg><span>Torna alla frase in lettura</span></button>
   <div class="rdBottom">
-    <button class="rdFollow hidden" id="rdFollow">Torna alla frase in lettura</button>
-    <span class="rdSpacer"></span>
-    <button class="roundBtn" id="rdMark" aria-label="Segnalibro sulla frase in lettura"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 3.5h11v17l-5.5-4-5.5 4z"/></svg></button>
+    <button class="ghostBtn" id="rdMark" aria-label="Segnalibro sulla frase in lettura"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 3.5h11v17l-5.5-4-5.5 4z"/></svg></button>
+    <span class="rdProg"><span id="rdProgText"></span><span class="rdProgBar"><i id="rdProgFill"></i></span></span>
     <button class="rdPlay" id="rdPlay" aria-label="Ascolta"></button>
   </div>
 </section>
@@ -385,57 +659,41 @@ body.playerOpen #toast{bottom:auto;top:calc(env(safe-area-inset-top) + 64px)}
 <section id="playerView" aria-label="Player" aria-hidden="true">
   <div class="pInner">
     <div class="pTop">
-      <button class="roundBtn" id="pClose" aria-label="Torna alla libreria">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
-      </button>
-      <span class="pTopLabel" id="pTopLabel">In ascolto</span>
+      <button class="ghostBtn" id="pClose" aria-label="Chiudi e torna alla libreria"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+      <span class="statusPill"><span class="waveBars" aria-hidden="true"><i></i><i></i><i></i></span><span id="pTopLabel">In ascolto</span></span>
       <div class="pTopRight">
-      <button class="roundBtn" id="pMark" aria-label="Segnalibro sulla frase in lettura"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 3.5h11v17l-5.5-4-5.5 4z"/></svg></button>
-      <button class="roundBtn" id="pMore" aria-label="Altre opzioni">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>
-      </button>
+        <button class="ghostBtn" id="pMark" aria-label="Segnalibro sulla frase in lettura"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 3.5h11v17l-5.5-4-5.5 4z"/></svg></button>
+        <button class="ghostBtn" id="pMore" aria-label="Altre opzioni"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.9"/><circle cx="12" cy="12" r="1.9"/><circle cx="19" cy="12" r="1.9"/></svg></button>
       </div>
     </div>
     <div class="pCoverWrap" id="pCover"></div>
     <div class="pMeta">
       <h1 id="pTitle"></h1>
       <span id="pAuthor"></span>
-      <button class="pillBtn" id="chapBtn">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
-        <span id="chapLabel"></span>
-      </button>
+      <button class="chapPill" id="chapBtn"><span class="acc"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/></svg></span><span id="chapLabel"></span><span class="dim"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></span></button>
     </div>
-    <button id="nowText" aria-label="Apri il testo del libro a tutta pagina"></button>
+    <button id="nowText" aria-label="Apri il testo del libro a tutta pagina">
+      <span class="nowQuote" id="nowQuote"></span>
+      <span class="nowNext" id="nowNext"></span>
+      <span class="nowFoot">Tocca per aprire il testo completo <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+    </button>
     <div class="seekWrap">
+      <div class="seekLabels"><span id="seekLeft"></span><b id="seekRight"></b></div>
       <label class="sr" for="seek">Posizione nel libro</label>
       <input type="range" id="seek" min="0" max="0" step="1" value="0">
-      <div class="seekLabels"><span id="seekLeft"></span><b id="seekRight"></b></div>
       <div id="bufInfo" aria-live="polite"></div>
     </div>
     <div class="pCtrls">
-      <button class="ctrl side" id="prevChap" aria-label="Capitolo precedente">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="5" y="5" width="2.4" height="14" rx="1"/><path d="M19 5.9v12.2a.9.9 0 0 1-1.4.75L9.3 12.75a.9.9 0 0 1 0-1.5l8.3-5.85A.9.9 0 0 1 19 5.9z"/></svg>
-      </button>
-      <button class="ctrl" id="prevSent" aria-label="Frase precedente">
-        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 7l-5 5 5 5M18 7l-5 5 5 5"/></svg>
-        <small>Frase</small>
-      </button>
+      <button class="ctrl side" id="prevChap" aria-label="Capitolo precedente"><svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="5" y="5" width="2.2" height="14" rx="1"/><path d="M19 6.2v11.6a.9.9 0 0 1-1.4.74L9.4 12.74a.9.9 0 0 1 0-1.48l8.2-5.8A.9.9 0 0 1 19 6.2z"/></svg></button>
+      <button class="ctrl round" id="prevSent" aria-label="Frase precedente"></button>
       <button class="bigPlay" id="bigPlay" aria-label="Ascolta"></button>
-      <button class="ctrl" id="nextSent" aria-label="Frase successiva">
-        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 7l5 5-5 5M6 7l5 5-5 5"/></svg>
-        <small>Frase</small>
-      </button>
-      <button class="ctrl side" id="nextChap" aria-label="Capitolo successivo">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="16.6" y="5" width="2.4" height="14" rx="1"/><path d="M5 5.9v12.2a.9.9 0 0 0 1.4.75l8.3-5.85a.9.9 0 0 0 0-1.5L6.4 5.65A.9.9 0 0 0 5 5.9z"/></svg>
-      </button>
+      <button class="ctrl round" id="nextSent" aria-label="Frase successiva"></button>
+      <button class="ctrl side" id="nextChap" aria-label="Capitolo successivo"><svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="16.8" y="5" width="2.2" height="14" rx="1"/><path d="M5 6.2v11.6a.9.9 0 0 0 1.4.74l8.2-5.8a.9.9 0 0 0 0-1.48l-8.2-5.8A.9.9 0 0 0 5 6.2z"/></svg></button>
     </div>
     <div class="pBottom">
-      <button class="tile" id="speedBtn"><b id="speedLabel">1,0x</b><small>Velocità</small></button>
-      <button class="tile" id="voiceBtn"><b id="voiceLabel">Sara</b><small>Voce</small></button>
-      <button class="tile" id="textBtn">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11"/></svg>
-        <small>Testo</small>
-      </button>
+      <button class="tile" id="speedBtn"><span class="tileTop"><span class="acc"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 14l4-4"/><path d="M3.5 17a9 9 0 1 1 17 0"/></svg></span><b id="speedLabel">1,0x</b></span><small>Velocità</small></button>
+      <button class="tile" id="voiceBtn"><span class="tileTop"><span class="acc"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 11v2"/></svg></span><b id="voiceLabel">Sara</b></span><small>Voce</small></button>
+      <button class="tile" id="textBtn"><span class="tileTop"><span class="acc"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 5.5A2 2 0 0 1 4.5 4H10a2 2 0 0 1 2 2v14a1.5 1.5 0 0 0-1.5-1.5h-8z"/><path d="M21.5 5.5A2 2 0 0 0 19.5 4H14a2 2 0 0 0-2 2v14a1.5 1.5 0 0 1 1.5-1.5h8z"/></svg></span><b>Leggi</b></span><small>Testo</small></button>
     </div>
   </div>
 </section>
@@ -456,7 +714,7 @@ body.playerOpen #toast{bottom:auto;top:calc(env(safe-area-inset-top) + 64px)}
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 32;
+const APP_VERSION = 33;
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
   let hadController = !!navigator.serviceWorker.controller, reloading = false;
@@ -1480,22 +1738,17 @@ function skipSeconds(d){
 function skipBack(){ const m = skipMode(); if(m === 'frase') move(-1); else skipSeconds(-(+m)); }
 function skipFwd(){ const m = skipMode(); if(m === 'frase') move(1); else skipSeconds(+m); }
 const SKIP_ICON = (n, fwd) => `<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${fwd ? '<path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M17.5 3.4v3.5H14"/>' : '<path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3"/><path d="M6.5 3.4v3.5H10"/>'}<text x="12" y="15.3" text-anchor="middle" font-size="7.6" font-weight="700" fill="currentColor" stroke="none" font-family="Figtree, system-ui, sans-serif">${n}</text></svg>`;
+const SI = {"replay": "<svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M3 12a9 9 0 1 0 3-6.7L3 8\"/><path d=\"M3 3v5h5\"/></svg>", "forward": "<svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M21 12a9 9 0 1 1-3-6.7L21 8\"/><path d=\"M21 3v5h-5\"/></svg>", "check": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M5 12.5l4.5 4.5L19 7.5\"/></svg>", "wave": "<svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M4 10v4M8 7v10M12 4v16M16 8v8M20 11v2\"/></svg>", "chev": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M9 6l6 6-6 6\"/></svg>", "clock": "<svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M12 7v5l3 2\"/></svg>", "mark": "<svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M6.5 3.5h11v17l-5.5-4-5.5 4z\"/></svg>", "cloud": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.9\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M7 18a4.5 4.5 0 0 1-.5-9A6 6 0 0 1 18 8.5a4 4 0 0 1-.5 9.5z\"/><path d=\"M12 11v6M9.5 14.5L12 17l2.5-2.5\"/></svg>", "notes": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.9\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M6.5 3.5h11v17l-5.5-4-5.5 4z\"/></svg>", "gear": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.9\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"3\"/><path d=\"M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z\"/></svg>", "restart": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.9\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M3 12a9 9 0 1 0 3-6.7L3 8\"/><path d=\"M3 3v5h5\"/></svg>", "done": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.9\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M8 12.5l2.5 2.5L16 9.5\"/></svg>", "trash": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.9\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6\"/></svg>", "arrowR": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M5 12h14M13 6l6 6-6 6\"/></svg>", "play": "<svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"currentColor\" aria-hidden=\"true\"><path d=\"M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z\"/></svg>", "playC": "<svg width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.9\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M10 8.5l5 3.5-5 3.5z\" fill=\"currentColor\"/></svg>", "note": "<svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.9\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M4 6h16M4 12h10M4 18h7\"/><path d=\"M17 15l4 4M15 21l6-6\"/></svg>", "speed": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.9\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M12 7v5l3 2\"/></svg>", "info": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.9\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M12 8h.01M11 12h1v5h1\"/></svg>", "sort": "<svg width=\"15\" height=\"15\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.9\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M7 4v16M3 8l4-4 4 4M17 20V4M13 16l4 4 4-4\"/></svg>", "search": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"11\" cy=\"11\" r=\"7\"/><path d=\"M20 20l-3.5-3.5\"/></svg>"};
 function renderSkipButtons(){
   const m = skipMode();
   const back = $('prevSent'), fwd = $('nextSent'), mini = $('miniBack');
-  if(m === 'frase'){
-    back.innerHTML = '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 7l-5 5 5 5M18 7l-5 5 5 5"/></svg><small>Frase</small>';
-    fwd.innerHTML = '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 7l5 5-5 5M6 7l5 5-5 5"/></svg><small>Frase</small>';
-    back.setAttribute('aria-label', 'Frase precedente'); fwd.setAttribute('aria-label', 'Frase successiva');
-    mini.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 7l-5 5 5 5M18 7l-5 5 5 5"/></svg>';
-    mini.setAttribute('aria-label', 'Frase precedente');
-  } else {
-    back.innerHTML = SKIP_ICON(m, false) + `<small>${m} s</small>`;
-    fwd.innerHTML = SKIP_ICON(m, true) + `<small>${m} s</small>`;
-    back.setAttribute('aria-label', `Indietro di ${m} secondi`); fwd.setAttribute('aria-label', `Avanti di ${m} secondi`);
-    mini.innerHTML = SKIP_ICON(m, false).replace('width="30" height="30"', 'width="26" height="26"');
-    mini.setAttribute('aria-label', `Indietro di ${m} secondi`);
-  }
+  const lab = m === 'frase' ? 'Frase' : `${m} s`;
+  back.innerHTML = SI.replay + `<small>${lab}</small>`;
+  fwd.innerHTML = SI.forward + `<small>${lab}</small>`;
+  mini.innerHTML = SI.replay.replace('width="20" height="20"', 'width="24" height="24"');
+  back.setAttribute('aria-label', m === 'frase' ? 'Frase precedente' : `Indietro di ${m} secondi`);
+  fwd.setAttribute('aria-label', m === 'frase' ? 'Frase successiva' : `Avanti di ${m} secondi`);
+  mini.setAttribute('aria-label', m === 'frase' ? 'Frase precedente' : `Indietro di ${m} secondi`);
 }
 
 function moveChapter(delta){
@@ -1566,6 +1819,7 @@ function updatePlay(){
   $('bigPlay').innerHTML = big(p ? ICON.pause : ICON.play);
   $('bigPlay').setAttribute('aria-label', p ? 'Pausa' : 'Ascolta');
   $('pTopLabel').textContent = p ? 'In ascolto' : 'In pausa';
+  document.body.classList.toggle('isPlaying', p);
   const rp = $('rdPlay'); if(rp){ rp.innerHTML = p ? ICON.pause : ICON.play; rp.setAttribute('aria-label', p ? 'Pausa' : 'Ascolta'); }
   if('mediaSession' in navigator) navigator.mediaSession.playbackState = p ? 'playing' : 'paused';
   updateRowButtons();
@@ -1588,11 +1842,13 @@ function refreshPosition(scrollText){
   $('seekRight').textContent = `${pct}% del libro`;
   // frase in lettura con la successiva
   const s = state.sections[state.sec];
-  const now = $('nowText'); now.textContent = '';
-  const m = el('mark', null, s.sentences[state.idx] ? s.sentences[state.idx].t : '');
-  now.appendChild(m);
+  $('nowQuote').textContent = s.sentences[state.idx] ? `“${s.sentences[state.idx].t}”` : '';
   const nx = fromG(g + 1);
-  if(g + 1 < state.total){ now.appendChild(document.createTextNode(' ' + state.sections[nx.sec].sentences[nx.idx].t)); }
+  $('nowNext').textContent = g + 1 < state.total ? state.sections[nx.sec].sentences[nx.idx].t : '';
+  // testo a tutta pagina: posizione nel capitolo
+  const n = s.sentences.length;
+  $('rdProgText').textContent = `Frase ${state.idx + 1} di ${n}`;
+  $('rdProgFill').style.width = Math.round((state.idx + 1) * 100 / n) + '%';
   // riga della libreria
   const row = document.querySelector(`.row[data-key="${state.key}"]`);
   if(row){
@@ -1975,19 +2231,25 @@ async function renderLibrary(){
   }
   for(const { b, st } of items){
     const pct = st.kind === 'done' ? 100 : (st.pos && st.pos.pct) || 0;
-    const row = el('div', 'row' + (b.key === state.key ? ' current' : '')); row.dataset.key = b.key;
+    const row = el('article', 'row' + (b.key === state.key ? ' current' : '')); row.dataset.key = b.key;
     const main = el('button', 'rowMain'); main.setAttribute('aria-label', `Apri ${b.title} nel player`);
-    main.appendChild(makeCover(b, 's'));
+    const cb = el('span', 'coverBox'); cb.appendChild(makeCover(b, 's'));
+    const live = el('span', 'liveBadge'); live.innerHTML = '<i></i><i></i><i></i>'; cb.appendChild(live);
+    main.appendChild(cb);
     const tx = el('span', 'rowText');
-    tx.appendChild(el('span', 'rowTitle', b.title));
-    tx.appendChild(el('span', 'rowAuthor', b.author || (b.isPdf ? 'PDF' : 'EPUB')));
-    const prog = el('span', 'prog');
+    const top = el('span', 'rowTop');
+    top.appendChild(el('span', 'rowEyebrow', 'In ascolto'));
+    top.appendChild(el('span', 'rowTitle', b.title));
+    const au = el('span', 'rowAuthor', b.author ? b.author + ' · ' : ''); au.appendChild(el('em', null, b.isPdf ? 'PDF' : 'EPUB'));
+    top.appendChild(au);
+    tx.appendChild(top);
+    const prog = el('span', 'rowProg');
+    const pt = el('span', 'rowProgTop');
+    const chap = st.kind === 'done' ? 'Finito' : (st.pos && st.pos.chap) || (st.kind === 'new' ? 'Inizio del libro' : '');
+    pt.append(el('span', 'rowLabel', b.key === state.key && state.total ? chapterShort() : chap), el('span', 'pct' + (st.kind === 'new' ? ' new' : ''), st.kind === 'new' ? 'Da iniziare' : pct + '%'));
     const bar = el('span', 'bar'); const fill = el('i'); fill.style.width = pct + '%'; bar.appendChild(fill);
-    prog.append(bar, el('span', 'pct', pct + '%'));
+    prog.append(pt, bar);
     tx.appendChild(prog);
-    let label = st.kind === 'done' ? 'Finito' : st.kind === 'new' ? 'Da iniziare' : (st.pos.chap || '');
-    if(b.key === state.key && state.playing) label = 'In ascolto · ' + chapterShort();
-    tx.appendChild(el('span', 'rowLabel', label));
     main.appendChild(tx);
     main.onclick = async () => { if(b.key !== state.key && !(await loadBook(b.key))) return renderLibrary(); renderLibrary(); openPlayer(); };
     const btns = el('div', 'rowBtns');
@@ -2007,8 +2269,10 @@ async function renderLibrary(){
       if(coverUrls.has(b.key)){ URL.revokeObjectURL(coverUrls.get(b.key)); coverUrls.delete(b.key); }
       renderLibrary();
     };
-    btns.append(pb, db);
-    row.append(main, btns);
+    const foot = el('div', 'rowFoot'); const fl = el('div', 'rowFootL');
+    fl.append(pb, el('span', 'rowVoice', ''));
+    foot.append(fl, db);
+    row.append(main, foot);
     list.appendChild(row);
   }
   updateRowButtons();
@@ -2023,9 +2287,11 @@ function updateRowButtons(){
     b.setAttribute('aria-label', (on ? 'Metti in pausa ' : 'Ascolta ') + title);
     if(row){
       row.classList.toggle('current', b.dataset.key === state.key);
-      if(b.dataset.key === state.key && state.total){
-        row.querySelector('.rowLabel').textContent = (state.playing ? 'In ascolto · ' : '') + chapterShort();
-      }
+      const cur = b.dataset.key === state.key;
+      if(cur && state.total) row.querySelector('.rowLabel').textContent = chapterShort();
+      const v = row.querySelector('.rowVoice'); if(v) v.textContent = cur && state.total ? `Voce: ${voiceName()} (${fmtRate(state.rate).replace('x', '×')})` : '';
+      const lb = row.querySelector('.liveBadge'); if(lb) lb.style.display = on ? '' : 'none';
+      const eb = row.querySelector('.rowEyebrow'); if(eb) eb.style.display = cur ? '' : 'none';
     }
   });
 }
@@ -2034,10 +2300,11 @@ function updateRowButtons(){
 function openPlayer(){
   if(!state.key) return;
   if(!playerLocked){ lockPage(); playerLocked = true; }
-  $('playerView').classList.add('open'); $('playerView').setAttribute('aria-hidden', 'false'); document.body.classList.add('playerOpen');
+  $('playerView').classList.add('open'); $('playerView').setAttribute('aria-hidden', 'false'); document.body.classList.add('playerOpen'); setTab('now');
   refreshPosition(false);
 }
 function closePlayer(){
+  setTab('lib');
   if(reader.open) closeReader();
   if(playerLocked){ unlockPage(); playerLocked = false; }
   $('playerView').classList.remove('open'); $('playerView').setAttribute('aria-hidden', 'true'); document.body.classList.remove('playerOpen');
@@ -2049,10 +2316,78 @@ function applyTheme(){
   const t = prefs.theme || 'auto';
   const dark = t === 'dark' || (t === 'auto' && darkQuery && darkQuery.matches);
   document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
-  const m = $('themeColor'); if(m) m.content = dark ? '#0F0F10' : '#F6F4F5';
+  const m = $('themeColor'); if(m) m.content = dark ? '#0B0B0D' : '#FCF8FB';
 }
 // in Automatico il tema cambia insieme a quello dell'iPhone
 if(darkQuery){ const f = () => { if((prefs.theme || 'auto') === 'auto') applyTheme(); }; darkQuery.addEventListener ? darkQuery.addEventListener('change', f) : darkQuery.addListener(f); }
+
+/* ---------- scheda del libro in cima ai pannelli (come Stitch) ---------- */
+async function bookCardEl(side){
+  const c = el('div', 'bookCard');
+  const rec = state.key ? await lib.get(state.key).catch(() => null) : null;
+  if(rec) c.appendChild(makeCover(rec, 'xs'));
+  const t = el('div', 'bcText');
+  t.append(el('div', 'bcEyebrow', state.playing ? 'In ascolto' : 'In pausa'), el('div', 'bcTitle', state.meta ? state.meta.title : ''), el('div', 'bcSub', [state.meta && state.meta.author, chapterShort()].filter(Boolean).join(' · ')));
+  c.appendChild(t);
+  if(side) c.appendChild(el('div', 'bcSide', side));
+  return c;
+}
+function gRow(icon, title, sub, onClick, opts = {}){
+  const r = el('button', 'gRow' + (opts.danger ? ' danger' : ''));
+  const ic = el('span', 'gIco'); ic.innerHTML = icon;
+  const tx = el('span', 'gTx'); const tb = el('b', null, title); if(opts.tag) tb.appendChild(el('span', 'tag', opts.tag)); tx.appendChild(tb); if(sub) tx.appendChild(el('small', null, sub));
+  r.append(ic, tx);
+  if(opts.pill) r.appendChild(el('span', 'pillTag', opts.pill));
+  const ch = el('span', 'chevR'); ch.innerHTML = opts.end || SI.chev; r.appendChild(ch);
+  r.onclick = onClick;
+  return r;
+}
+
+/* ---------- cerca ---------- */
+function openSearch(){
+  const body = openSheet('search', 'Cerca', true);
+  const box = el('label', 'searchBox'); box.innerHTML = SI.search;
+  const inp = el('input'); inp.type = 'search'; inp.placeholder = state.total ? 'Cerca nel libro e nella libreria' : 'Cerca nella libreria'; inp.setAttribute('aria-label', 'Cerca');
+  box.appendChild(inp); body.appendChild(box);
+  const out = el('div'); body.appendChild(out);
+  const esc = t => t.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]);
+  let timer = null;
+  const run = async () => {
+    const q = inp.value.trim().toLowerCase(); out.textContent = '';
+    if(q.length < 2){ out.appendChild(el('p', 'hint', 'Scrivi almeno due lettere: cerco nei titoli dei libri e nel testo del libro aperto. Tocca un risultato per ascoltare da lì.')); return; }
+    const books = (await lib.all().catch(() => [])).filter(b => (b.title + ' ' + (b.author || '')).toLowerCase().includes(q));
+    if(books.length){
+      out.appendChild(el('div', 'groupLabel', 'Libri'));
+      books.forEach(b => { const r = el('button', 'sRes'); r.append(el('small', null, b.author || (b.isPdf ? 'PDF' : 'EPUB')), el('span', null, b.title)); r.onclick = async () => { closeSheet(); if(b.key !== state.key && !(await loadBook(b.key))) return; renderLibrary(); openPlayer(); }; out.appendChild(r); });
+    }
+    if(state.total){
+      const hits = [];
+      for(let si = 0; si < state.sections.length && hits.length < 60; si++){
+        state.sections[si].sentences.forEach((x, i) => { if(hits.length < 60 && x.t.toLowerCase().includes(q)) hits.push([si, i, x.t]); });
+      }
+      out.appendChild(el('div', 'groupLabel', hits.length ? `Nel libro${hits.length >= 60 ? ' (primi 60)' : ''}` : 'Nel libro: nessun risultato'));
+      hits.forEach(([si, i, t]) => {
+        const r = el('button', 'sRes'); const k = t.toLowerCase().indexOf(q);
+        const sm = el('small', null, secLabel(si)); const sp = el('span');
+        sp.innerHTML = esc(t.slice(0, k)) + '<mark>' + esc(t.slice(k, k + q.length)) + '</mark>' + esc(t.slice(k + q.length));
+        r.append(sm, sp); r.onclick = () => { closeSheet(); jumpTo(si, i, true); openPlayer(); };
+        out.appendChild(r);
+      });
+    } else if(!books.length) out.appendChild(el('p', 'hint', 'Nessun libro trovato.'));
+  };
+  inp.oninput = () => { clearTimeout(timer); timer = setTimeout(run, 200); };
+  run(); setTimeout(() => inp.focus(), 50);
+}
+
+/* ---------- barra in basso ---------- */
+function setTab(t){ document.querySelectorAll('.tabBtn').forEach(b => b.dataset.tab === t ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current')); }
+function onTab(t){
+  if(t === 'lib'){ if(sheetKind) closeSheet(); if(reader.open) closeReader(); closePlayer(); window.scrollTo({ top: 0, behavior: 'smooth' }); setTab('lib'); return; }
+  if(t === 'search'){ openSearch(); return; }
+  if(!state.key){ setStatus('Prima scegli un libro dalla libreria.'); return; }
+  if(t === 'now') openPlayer();
+  if(t === 'browse') openReader();
+}
 
 /* ---------- segnalibri e note ---------- */
 function notes(key){ return store.get('notes:' + (key || state.key)) || []; }
@@ -2073,34 +2408,48 @@ function updateNoteCount(){ const n = state.key ? notes().length : 0; const b = 
 function bookmarkCurrent(){ if(!state.total) return; const r = addNote(state.sec, state.idx); openNoteEditor(r.note, r.isNew); }
 function openNoteEditor(note, isNew){
   const body = openSheet('note', isNew ? 'Segnalibro salvato' : 'Segnalibro');
-  body.appendChild(el('div', 'noteQuote', note.text));
-  body.appendChild(el('p', 'noteWhere', `${secLabel(note.sec)} · ${new Date(note.at).toLocaleDateString('it-IT', { day: 'numeric', month: 'long' })}`));
-  const ta = el('textarea', 'noteArea'); ta.placeholder = 'Aggiungi un commento (facoltativo)'; ta.value = note.comment || ''; ta.setAttribute('aria-label', 'Commento');
+  const qc = el('div', 'quoteCard');
+  qc.append(el('div', 'qLabel', 'Passaggio evidenziato'), el('blockquote', null, `«${note.text}»`));
+  const lr = el('button', 'listenRow'); const lp = el('span', 'lp'); lp.innerHTML = SI.play;
+  const lt = el('span', 'lt', 'Ascolta da questa frase'); lt.appendChild(el('small', null, `${secLabel(note.sec)} · ${new Date(note.at).toLocaleDateString('it-IT', { day: 'numeric', month: 'long' })}`));
+  const lc = el('span', 'chevR'); lc.innerHTML = SI.chev;
+  lr.append(lp, lt, lc); qc.appendChild(lr);
+  body.appendChild(qc);
+  const fl = el('div', 'fieldLabel', 'Commento o nota personale'); const cnt = el('span'); fl.appendChild(cnt); body.appendChild(fl);
+  const ta = el('textarea', 'noteArea'); ta.placeholder = 'Aggiungi una riflessione su questo passaggio...'; ta.value = note.comment || ''; ta.setAttribute('aria-label', 'Commento'); ta.maxLength = 1000;
+  const upd = () => { cnt.textContent = `${ta.value.length} / 1000`; };
   // il commento si salva mentre scrivi: chiudere il pannello non lo perde
   const persist = () => { const list = notes(); const n = list.find(x => x.id === note.id); if(n){ n.comment = ta.value.trim(); note.comment = n.comment; saveNotes(list); } };
-  ta.addEventListener('input', persist);
+  ta.addEventListener('input', () => { persist(); upd(); }); upd();
   body.appendChild(ta);
-  const done = el('button', 'wideBtn', 'Fatto'); done.onclick = () => { persist(); closeSheet(); };
+  lr.onclick = () => { persist(); closeSheet(); jumpTo(note.sec, note.idx, true); };
+  const done = el('button', 'wideBtn'); done.innerHTML = SI.check + '<span>Fatto</span>'; done.onclick = () => { persist(); closeSheet(); };
   body.appendChild(done);
-  body.appendChild(option('Ascolta da questa frase', secLabel(note.sec), false, () => { persist(); closeSheet(); jumpTo(note.sec, note.idx, true); }));
-  const del = el('button', 'textBtn', 'Elimina segnalibro');
+  const del = el('button', 'linkDanger'); del.innerHTML = SI.trash + '<span>Elimina segnalibro</span>';
   del.onclick = () => { saveNotes(notes().filter(x => x.id !== note.id)); markNoted(note.sec, note.idx, false); closeSheet(); setStatus('Segnalibro eliminato.'); };
   body.appendChild(del);
 }
 function openNotesList(){
   const list = notes();
   const body = openSheet('notes', 'Note e segnalibri', true);
+  bookCardEl().then(c => body.insertBefore(c, body.firstChild));
   if(!list.length){
     body.appendChild(el('p', 'hint', 'Ancora nessun segnalibro in questo libro. Tocca il segnalibro in alto nel player mentre ascolti, oppure nel testo a tutta pagina tieni premuta una frase.'));
     return;
   }
-  body.appendChild(el('p', 'hint', `${list.length} ${list.length === 1 ? 'segnalibro' : 'segnalibri'}, in ordine di lettura. Tocca per vedere, commentare o ascoltare da lì.`));
+  const lh = el('div', 'listHead'); const c1 = el('span'); c1.innerHTML = SI.mark + ` ${list.length} ${list.length === 1 ? 'segnalibro salvato' : 'segnalibri salvati'}`;
+  const c2 = el('span'); c2.innerHTML = 'Ordine di lettura ' + SI.sort; lh.append(c1, c2); body.appendChild(lh);
   list.forEach(n => {
-    const b = el('button', 'noteItem');
-    b.append(el('small', null, secLabel(n.sec)), el('q', null, n.text));
-    if(n.comment) b.appendChild(el('span', null, n.comment));
-    b.onclick = () => openNoteEditor(n, false);
-    body.appendChild(b);
+    const c = el('div', 'nCard');
+    const h = el('div', 'nHead'); const hl = el('span'); hl.append(el('b', null, secLabel(n.sec)), document.createTextNode(' · ' + new Date(n.at).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })));
+    h.append(hl, el('span', 'pillTag', `Frase ${n.idx + 1}`));
+    c.append(h, el('blockquote', null, `«${n.text}»`));
+    if(n.comment){ const nt = el('div', 'nNote'); nt.innerHTML = SI.note; nt.appendChild(el('span', null, n.comment)); c.appendChild(nt); }
+    const f = el('div', 'nFoot'); const go = el('button', 'softPill'); go.innerHTML = SI.playC + '<span>Ascolta da qui</span>';
+    go.onclick = () => { closeSheet(); jumpTo(n.sec, n.idx, true); };
+    const ed = el('button', 'ghostBtn'); ed.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>'; ed.setAttribute('aria-label', 'Modifica segnalibro'); ed.onclick = () => openNoteEditor(n, false);
+    f.append(go, ed); c.appendChild(f);
+    body.appendChild(c);
   });
 }
 // va a una frase e la fa ascoltare; se il testo è aperto, lo mostra lì
@@ -2117,7 +2466,7 @@ function chapterEl(sec){
   const wrap = el('div', 'rdChap'); wrap.dataset.sec = sec;
   const head = el('div', 'rdChapHead');
   const mins = Math.max(1, Math.round(s.sentences.reduce((a, x) => a + x.t.length + 1, 0) / cps() / 60));
-  head.append(el('div', 'rdEyebrow', state.pages ? `Pagina ${sec + 1} di ${state.sections.length}` : `${sec + 1} di ${state.sections.length}`), el('h2', 'rdChapH', state.pages ? (s.title || `Pagina ${sec + 1}`) : secLabel(sec)), el('div', 'rdChapTime', `circa ${mins} min di ascolto`));
+  head.append(el('div', 'rdEyebrow', state.pages ? `Pagina ${sec + 1}` : `Capitolo ${sec + 1}`), el('h2', 'rdChapH', state.pages ? (s.title && s.title !== `Pagina ${sec + 1}` ? s.title : `Pagina ${sec + 1}`) : secLabel(sec)), el('div', 'rdChapTime', `Ascolto stimato: ${mins} min`));
   wrap.appendChild(head);
   const marked = new Set(notes().filter(n => n.sec === sec).map(n => n.idx));
   let p = null;
@@ -2169,14 +2518,14 @@ function markReader(scroll){
 }
 function openReader(){
   if(!state.total) return;
-  reader.open = true; reader.follow = true;
+  reader.open = true; reader.follow = true; setTab('browse');
   $('reader').classList.remove('hidden'); $('rdFollow').classList.add('hidden');
   buildReaderAround(state.sec); updateNoteCount(); updatePlay();
   requestAnimationFrame(() => { const sp = document.querySelector(`#rdBody .s[data-s="${state.sec}"][data-i="${state.idx}"]`); if(sp){ sp.classList.add('on'); reader.onEl = sp; sp.scrollIntoView({ block: 'center' }); } readerTitle(); });
   const seen = store.get('rdHint') || 0;
-  if(seen < 3){ store.set('rdHint', seen + 1); $('rdHint').classList.remove('hidden'); setTimeout(() => $('rdHint').classList.add('hidden'), 6000); }
+  if(seen < 3){ store.set('rdHint', seen + 1); $('rdHint').classList.remove('hidden'); setTimeout(() => $('rdHint').classList.add('hidden'), 9000); }
 }
-function closeReader(){ reader.open = false; $('reader').classList.add('hidden'); $('rdBody').textContent = ''; reader.onEl = null; }
+function closeReader(){ setTab(document.body.classList.contains('playerOpen') ? 'now' : 'lib'); reader.open = false; $('reader').classList.add('hidden'); $('rdBody').textContent = ''; reader.onEl = null; }
 (function readerEvents(){
   const b = $('rdBody');
   b.addEventListener('scroll', () => {
@@ -2254,13 +2603,26 @@ function option(label, sub, selected, onClick){
 
 function openChapters(){
   const body = openSheet('chap', state.pages ? 'Pagine' : 'Capitoli', true);
+  const minsOf = sec => Math.max(1, Math.round(state.sections[sec].sentences.reduce((a, x) => a + x.t.length + 1, 0) / cps() / 60));
+  const tot = state.sections.reduce((a, _, i) => a + minsOf(i), 0);
+  bookCardEl(fmtRate(state.rate)).then(c => body.insertBefore(c, body.firstChild));
+  const st = el('div', 'statRow');
+  const b1 = el('div', 'statBox'); const s1 = el('small'); s1.innerHTML = SI.clock + 'Durata totale'; b1.append(s1, el('b', null, fmtMin(tot)));
+  const b2 = el('div', 'statBox'); const s2 = el('small'); s2.innerHTML = SI.mark + 'Avanzamento'; b2.append(s2, el('b', null, `${state.pages ? 'Pagina' : 'Capitolo'} ${state.sec + 1} di ${state.sections.length}`));
+  st.append(b1, b2); body.appendChild(st);
+  const lh = el('div', 'listHead'); lh.append(el('b', null, state.pages ? 'Pagine' : 'Indice dei capitoli'), el('span', null, `${state.sections.length} ${state.pages ? 'pagine' : 'capitoli'}`)); body.appendChild(lh);
   state.sections.forEach((s, i) => {
-    const label = state.pages ? `Pagina ${i + 1}` : s.title;
-    const mins = Math.max(1, Math.round(s.sentences.reduce((a, x) => a + x.t.length + 1, 0) / cps() / 60));
-    const o = option(label, `circa ${mins} min a velocità normale`, i === state.sec, () => { closeSheet(); goTo(i, 0); });
-    body.appendChild(o);
+    const cur = i === state.sec;
+    const r = el('button', 'chapRow' + (cur ? ' cur' : ''));
+    const num = el('span', 'chapNum', cur ? '' : String(i + 1).padStart(2, '0')); if(cur) num.innerHTML = '<span class="waveBars"><i></i><i></i><i></i></span>';
+    const tx = el('span', 'chapTx'); const tb = el('b', null, state.pages ? `Pagina ${i + 1}` : s.title); if(cur) tb.appendChild(el('span', 'tag', 'In corso'));
+    tx.append(tb, el('small', null, `circa ${minsOf(i)} min a velocità normale`));
+    const go = el('span', 'chapGo'); go.innerHTML = cur ? SI.wave : SI.playC;
+    r.append(num, tx, go);
+    r.onclick = () => { closeSheet(); goTo(i, 0); };
+    body.appendChild(r);
   });
-  const sel = body.querySelector('.opt.sel'); if(sel) sel.scrollIntoView({ block: 'center' });
+  const sel = body.querySelector('.chapRow.cur'); if(sel) setTimeout(() => sel.scrollIntoView({ block: 'center' }), 60);
 }
 
 function fmtRate(r){ return r.toFixed(1).replace('.', ',') + 'x'; }
@@ -2277,18 +2639,24 @@ function setRate(r, commit){
 }
 function openSpeed(){
   const body = openSheet('speed', 'Velocità');
+  bookCardEl().then(c => body.insertBefore(c, body.firstChild));
+  const card = el('div', 'speedCard');
   const bigv = el('div', 'speedBig', fmtRate(state.rate)); bigv.id = 'speedBig';
   const lab = el('label', 'sr', 'Velocità di lettura'); lab.htmlFor = 'speedRange';
   const r = el('input'); r.type = 'range'; r.id = 'speedRange'; r.min = '0.6'; r.max = '2.5'; r.step = '0.1'; r.value = state.rate;
   r.oninput = () => setRate(+r.value, false);
   r.onchange = () => setRate(+r.value, true);
+  const rl = el('div', 'rangeLabels'); rl.append(el('span', null, '0,6x'), el('span', null, 'SCORRIMENTO CONTINUO'), el('span', null, '2,5x'));
+  card.append(bigv, el('div', 'speedSub', 'Velocità di riproduzione'), lab, r, rl);
+  const lh = el('div', 'listHead'); lh.append(el('b', null, 'Scelte rapide'));
   const pre = el('div', 'presets');
   [0.8, 1, 1.2, 1.5, 1.8, 2, 2.2, 2.5].forEach(v => {
     const b = el('button', null, fmtRate(v)); b.dataset.r = v;
     b.onclick = () => { r.value = v; setRate(v, true); };
     pre.appendChild(b);
   });
-  body.append(bigv, lab, r, pre);
+  const nb = el('div', 'noteBox'); nb.innerHTML = SI.info; nb.appendChild(el('span', null, 'La velocità cambia subito, senza ricominciare la frase, e la voce mantiene il suo tono naturale.'));
+  body.append(card, lh, pre, nb);
   setRate(state.rate, false);
 }
 
@@ -2387,7 +2755,8 @@ function selectVoice(kind, id){
   else if(state.engine === 'piper' && state.total) want(upcoming(lookahead()));
 }
 function voiceRow(label, sub, selected, onPick, onTry, pid){
-  const row = el('div', 'voiceRow');
+  const row = el('div', 'voiceRow' + (selected ? ' selRow' : ''));
+  const ic = el('span', 'vIco'); ic.innerHTML = selected ? SI.check : SI.wave; row.appendChild(ic);
   const o = option(label, sub, selected, onPick);
   const t = el('button', 'smallBtn', 'Prova'); t.setAttribute('aria-label', 'Prova la voce ' + label); t.onclick = () => onTry(t);
   // se il pannello si ridisegna mentre l'anteprima suona, il nuovo pulsante resta "Ferma"
@@ -2845,27 +3214,32 @@ function openSettings(focus, keepScroll){
 }
 
 function openMore(){
-  const body = openSheet('more', state.meta ? state.meta.title : 'Opzioni');
+  const body = openSheet('more', 'Opzioni');
+  bookCardEl().then(c => body.insertBefore(c, body.firstChild));
+  const g1 = el('div', 'group');
   if(state.engine === 'piper'){
     const chaps = state.pages ? 20 : 2;
     const lastSec = Math.min(state.sections.length - 1, state.sec + chaps);
     const until = state.offsets[lastSec] + state.sections[lastSec].sentences.length - 1;
-    body.appendChild(option('Prepara in anticipo', state.pages ? 'Genera ora la voce delle prossime 20 pagine, poi le ascolti senza pause' : 'Genera ora la voce dei prossimi 2 capitoli, poi li ascolti senza pause', false, () => {
+    g1.appendChild(gRow(SI.cloud, 'Prepara in anticipo', state.pages ? 'Genera ora la voce delle prossime 20 pagine' : 'Genera ora la voce dei prossimi 2 capitoli', () => {
       closeSheet(); state.prepareTo = until; requestWake();
       want(upcoming(lookahead()));
       setStatus('Preparazione avviata. Tieni l\'app aperta, anche in pausa: l\'avanzamento è sotto la barra del player.');
     }));
   }
   const nn = notes().length;
-  body.appendChild(option('Note e segnalibri', nn ? `${nn} in questo libro` : 'Le frasi che hai segnato, con i tuoi commenti', false, () => openNotesList()));
-  body.appendChild(option('Impostazioni', 'Voci, pulsanti avanti e indietro, spazio', false, () => openSettings()));
-  body.appendChild(option('Ricomincia dall\'inizio', 'Torna alla prima frase del libro', false, () => { closeSheet(); goTo(0, 0); }));
-  body.appendChild(option('Segna come finito', 'Lo sposta tra i Finiti', false, () => { closeSheet(); stop(); savePos(true); renderLibrary(); setStatus('Segnato come finito.'); }));
-  body.appendChild(option('Rimuovi dal telefono', 'Cancella il libro e la posizione salvata', false, async () => {
+  g1.appendChild(gRow(SI.notes, 'Note e segnalibri', null, () => openNotesList(), { pill: nn ? `${nn} ${nn === 1 ? 'nota' : 'note'}` : null }));
+  g1.appendChild(gRow(SI.gear, 'Impostazioni', null, () => openSettings()));
+  const g2 = el('div', 'group');
+  g2.appendChild(gRow(SI.restart, 'Ricomincia dall\'inizio', null, () => { closeSheet(); goTo(0, 0); }, { end: SI.restart }));
+  g2.appendChild(gRow(SI.done, 'Segna come finito', null, () => { closeSheet(); stop(); savePos(true); renderLibrary(); setStatus('Segnato come finito.'); }, { end: SI.done }));
+  const g3 = el('div', 'group');
+  g3.appendChild(gRow(SI.trash, 'Rimuovi dal telefono', 'Cancella il libro, la posizione e i segnalibri', async () => {
     if(!confirm(`Rimuovere "${state.meta.title}" dal telefono?`)) return;
     const k = state.key; closeSheet(); unloadBook();
     await lib.del(k); store.del('pos:' + k); store.del('notes:' + k); acache.delBook(k); renderLibrary();
-  }));
+  }, { danger: true, end: SI.arrowR }));
+  body.append(g1, g2, g3);
 }
 
 /* ---------- eventi ---------- */
@@ -2881,6 +3255,9 @@ $('bigPlay').onclick = togglePlay;
 $('prevSent').onclick = () => skipBack();
 $('nextSent').onclick = () => skipFwd();
 $('setBtn').onclick = () => openSettings();
+$('profBtn').onclick = () => { settingsTab = 'voci'; openSettings(); };
+document.querySelectorAll('.tabBtn').forEach(b => b.onclick = () => onTab(b.dataset.tab));
+$('rdHintClose').onclick = () => $('rdHint').classList.add('hidden');
 $('prevChap').onclick = () => moveChapter(-1);
 $('nextChap').onclick = () => moveChapter(1);
 $('chapBtn').onclick = openChapters;
