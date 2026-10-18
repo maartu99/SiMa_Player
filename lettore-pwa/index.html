@@ -641,6 +641,9 @@ body.noMini #toast{bottom:calc(env(safe-area-inset-bottom) + 76px)}
 .pCoverWrap .cover.l{height:min(100cqh,80vw,360px)}
 .brandMark{overflow:hidden;border:0;background:none}
 .brandMark img{width:32px;height:32px;display:block}
+/* niente barre di scorrimento visibili */
+html,body,*{scrollbar-width:none;-ms-overflow-style:none}
+::-webkit-scrollbar{display:none;width:0;height:0;background:transparent}
 </style>
 </head>
 <body class="noMini">
@@ -772,7 +775,7 @@ body.noMini #toast{bottom:calc(env(safe-area-inset-bottom) + 76px)}
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 37;
+const APP_VERSION = 38;
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
   let hadController = !!navigator.serviceWorker.controller, reloading = false;
