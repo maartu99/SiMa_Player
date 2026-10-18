@@ -587,6 +587,44 @@ body.noMini #toast{bottom:calc(env(safe-area-inset-bottom) + 76px)}
 .sRes small{display:block;font-size:12px;color:var(--muted);margin-bottom:3px}
 .sRes span{font-family:var(--serif);font-size:16px;line-height:1.45}
 .sRes mark{background:var(--mark-bg);color:var(--mark-ink);border-radius:3px;padding:0 2px}
+
+/* v34: struttura richiesta */
+.actRow.hidden{display:none !important}
+.libHeadRow{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.libSearch{margin:0 0 14px}
+.searchBox{border-radius:10px}
+#setView{max-width:560px;margin:0 auto;padding:16px 16px calc(env(safe-area-inset-bottom) + 190px)}
+#setView .tabs{grid-template-columns:repeat(3,1fr);top:calc(env(safe-area-inset-top) + 62px);border-radius:10px;background:var(--card2);box-shadow:none;margin-bottom:8px}
+#setView .tab{border-radius:7px}
+.chip{border-radius:10px;height:40px}
+.addBtn{border-radius:10px;height:42px;padding:0 16px}
+.chapPill{border-radius:10px}
+.statusPill{border-radius:8px}
+.smallBtn{border-radius:10px}
+.wideBtn{border-radius:12px}
+.softPill{border-radius:10px}
+#sheetClose{border-radius:10px}
+.presets button{border-radius:10px}
+.recCta{border-radius:12px}
+.rdFollow{border-radius:10px}
+.tile{border-radius:12px}
+.listenRow{border-radius:10px}
+.roundBtn{border-radius:12px}
+.ctrl.round{border-radius:12px}
+.pTopLabel{border-radius:8px}
+.tag,.pillTag,.badge{border-radius:6px}
+.bookCard,.statBox,.group,.quoteCard,.nCard,.speedCard,.card{border-radius:14px}
+.row{display:flex;align-items:center;gap:6px;padding:0 8px 0 0;border-radius:14px}
+.rowMain{flex:1;min-width:0;padding:12px 4px 12px 12px;gap:14px}
+.cover.s{width:64px;height:88px;border-radius:8px}
+.row>.playCirc{flex:none}
+.kebab{width:36px;height:44px;border:0;border-radius:8px;background:none;color:var(--muted);display:flex;align-items:center;justify-content:center;flex:none}
+.kebab:active{background:var(--card2)}
+.popover{position:fixed;z-index:60;min-width:230px;padding:6px;border-radius:12px;background:var(--surface);border:1px solid var(--line2);box-shadow:var(--shadow)}
+.popItem{width:100%;display:flex;align-items:center;gap:12px;min-height:46px;padding:0 12px;border:0;border-radius:8px;background:none;color:var(--ink);font-size:15px;font-weight:500;text-align:left}
+.popItem:active{background:var(--card2)}
+.popItem svg{color:var(--muted)}
+.popItem.danger,.popItem.danger svg{color:var(--err)}
 </style>
 </head>
 <body class="noMini">
@@ -594,18 +632,17 @@ body.noMini #toast{bottom:calc(env(safe-area-inset-bottom) + 76px)}
 <!-- LIBRERIA -->
 <header class="appBar">
   <div class="brand"><span class="brandMark"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9v6M15 9v6M9 12h6"/></svg></span><span>SiMa</span></div>
-  <button class="roundBtn" id="profBtn" aria-label="Account Google e voci"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></button>
 </header>
 <main id="libView">
-  <div class="actRow">
-    <button class="roundBtn" id="setBtn" aria-label="Impostazioni"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+  <div class="actRow hidden">
     <button class="addBtn" id="addBtn" aria-label="Aggiungi libro PDF o EPUB"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Aggiungi libro</span></button>
     <input type="file" id="file" accept=".pdf,.epub,application/pdf,application/epub+zip" hidden>
   </div>
   <div class="libHead">
-    <h1>Libreria</h1>
+    <div class="libHeadRow"><h1>Libreria</h1><button class="addBtn" id="addBtn2" aria-label="Aggiungi libro PDF o EPUB"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Aggiungi libro</span></button></div>
     <span id="libCount">Nessun libro</span>
   </div>
+  <label class="searchBox libSearch"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input type="search" id="libSearch" placeholder="Cerca per titolo o autore" aria-label="Cerca nella libreria"></label>
   <div class="chips" role="group" aria-label="Filtra i libri">
     <button class="chip" data-f="all">Tutti</button>
     <button class="chip" data-f="progress">In corso</button>
@@ -613,6 +650,12 @@ body.noMini #toast{bottom:calc(env(safe-area-inset-bottom) + 76px)}
     <button class="chip" data-f="done">Finiti</button>
   </div>
   <div id="list"></div>
+</main>
+
+<!-- IMPOSTAZIONI (pagina) -->
+<main id="setView" class="hidden">
+  <div class="libHead"><h1>Impostazioni</h1></div>
+  <div id="setBody"></div>
 </main>
 
 <!-- MINI PLAYER -->
@@ -632,10 +675,8 @@ body.noMini #toast{bottom:calc(env(safe-area-inset-bottom) + 76px)}
 
 <!-- BARRA IN BASSO -->
 <nav id="tabBar" aria-label="Navigazione">
-  <button class="tabBtn" data-tab="now"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polygon fill="currentColor" points="10 8 16 12 10 16 10 8"/></svg><span>Ascolta ora</span></button>
   <button class="tabBtn" data-tab="lib" aria-current="page"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><span>Libreria</span></button>
-  <button class="tabBtn" data-tab="browse"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect height="7" width="7" x="3" y="3"/><rect height="7" width="7" x="14" y="3"/><rect height="7" width="7" x="14" y="14"/><rect height="7" width="7" x="3" y="14"/></svg><span>Sfoglia</span></button>
-  <button class="tabBtn" data-tab="search"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" x2="16.65" y1="21" y2="16.65"/></svg><span>Cerca</span></button>
+  <button class="tabBtn" data-tab="set"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span>Impostazioni</span></button>
 </nav>
 
 <!-- TESTO A TUTTA PAGINA -->
@@ -643,6 +684,7 @@ body.noMini #toast{bottom:calc(env(safe-area-inset-bottom) + 76px)}
   <div class="rdTop">
     <button class="ghostBtn" id="rdClose" aria-label="Chiudi il testo"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
     <span class="rdCenter"><small>In riproduzione</small><span class="rdChapTitle" id="rdChap"></span></span>
+    <button class="ghostBtn" id="rdSearch" aria-label="Cerca nel libro"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></button>
     <button class="ghostBtn rdNotesBtn" id="rdNotes" aria-label="Note e segnalibri"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h14v16H5z"/><path d="M9 9h6M9 13h6M9 17h3"/></svg><b id="rdNoteCount"></b></button>
   </div>
   <div id="rdBody"></div>
@@ -714,7 +756,7 @@ body.noMini #toast{bottom:calc(env(safe-area-inset-bottom) + 76px)}
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 33;
+const APP_VERSION = 34;
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
   let hadController = !!navigator.serviceWorker.controller, reloading = false;
@@ -1738,7 +1780,7 @@ function skipSeconds(d){
 function skipBack(){ const m = skipMode(); if(m === 'frase') move(-1); else skipSeconds(-(+m)); }
 function skipFwd(){ const m = skipMode(); if(m === 'frase') move(1); else skipSeconds(+m); }
 const SKIP_ICON = (n, fwd) => `<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${fwd ? '<path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M17.5 3.4v3.5H14"/>' : '<path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3"/><path d="M6.5 3.4v3.5H10"/>'}<text x="12" y="15.3" text-anchor="middle" font-size="7.6" font-weight="700" fill="currentColor" stroke="none" font-family="Figtree, system-ui, sans-serif">${n}</text></svg>`;
-const SI = {"replay": "<svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M3 12a9 9 0 1 0 3-6.7L3 8\"/><path d=\"M3 3v5h5\"/></svg>", "forward": "<svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M21 12a9 9 0 1 1-3-6.7L21 8\"/><path d=\"M21 3v5h-5\"/></svg>", "check": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M5 12.5l4.5 4.5L19 7.5\"/></svg>", "wave": "<svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M4 10v4M8 7v10M12 4v16M16 8v8M20 11v2\"/></svg>", "chev": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M9 6l6 6-6 6\"/></svg>", "clock": "<svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M12 7v5l3 2\"/></svg>", "mark": "<svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M6.5 3.5h11v17l-5.5-4-5.5 4z\"/></svg>", "cloud": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.9\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M7 18a4.5 4.5 0 0 1-.5-9A6 6 0 0 1 18 8.5a4 4 0 0 1-.5 9.5z\"/><path d=\"M12 11v6M9.5 14.5L12 17l2.5-2.5\"/></svg>", "notes": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.9\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M6.5 3.5h11v17l-5.5-4-5.5 4z\"/></svg>", "gear": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.9\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"3\"/><path d=\"M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z\"/></svg>", "restart": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.9\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M3 12a9 9 0 1 0 3-6.7L3 8\"/><path d=\"M3 3v5h5\"/></svg>", "done": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.9\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M8 12.5l2.5 2.5L16 9.5\"/></svg>", "trash": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.9\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6\"/></svg>", "arrowR": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M5 12h14M13 6l6 6-6 6\"/></svg>", "play": "<svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"currentColor\" aria-hidden=\"true\"><path d=\"M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z\"/></svg>", "playC": "<svg width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.9\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M10 8.5l5 3.5-5 3.5z\" fill=\"currentColor\"/></svg>", "note": "<svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.9\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M4 6h16M4 12h10M4 18h7\"/><path d=\"M17 15l4 4M15 21l6-6\"/></svg>", "speed": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.9\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M12 7v5l3 2\"/></svg>", "info": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.9\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M12 8h.01M11 12h1v5h1\"/></svg>", "sort": "<svg width=\"15\" height=\"15\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.9\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M7 4v16M3 8l4-4 4 4M17 20V4M13 16l4 4 4-4\"/></svg>", "search": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"11\" cy=\"11\" r=\"7\"/><path d=\"M20 20l-3.5-3.5\"/></svg>"};
+const SI = {"share": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.9\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M12 3v13M7 8l5-5 5 5\"/><path d=\"M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6\"/></svg>", "replay": "<svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M3 12a9 9 0 1 0 3-6.7L3 8\"/><path d=\"M3 3v5h5\"/></svg>", "forward": "<svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M21 12a9 9 0 1 1-3-6.7L21 8\"/><path d=\"M21 3v5h-5\"/></svg>", "check": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M5 12.5l4.5 4.5L19 7.5\"/></svg>", "wave": "<svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M4 10v4M8 7v10M12 4v16M16 8v8M20 11v2\"/></svg>", "chev": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M9 6l6 6-6 6\"/></svg>", "clock": "<svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M12 7v5l3 2\"/></svg>", "mark": "<svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M6.5 3.5h11v17l-5.5-4-5.5 4z\"/></svg>", "cloud": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.9\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M7 18a4.5 4.5 0 0 1-.5-9A6 6 0 0 1 18 8.5a4 4 0 0 1-.5 9.5z\"/><path d=\"M12 11v6M9.5 14.5L12 17l2.5-2.5\"/></svg>", "notes": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.9\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M6.5 3.5h11v17l-5.5-4-5.5 4z\"/></svg>", "gear": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.9\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"3\"/><path d=\"M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z\"/></svg>", "restart": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.9\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M3 12a9 9 0 1 0 3-6.7L3 8\"/><path d=\"M3 3v5h5\"/></svg>", "done": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.9\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M8 12.5l2.5 2.5L16 9.5\"/></svg>", "trash": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.9\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6\"/></svg>", "arrowR": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M5 12h14M13 6l6 6-6 6\"/></svg>", "play": "<svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"currentColor\" aria-hidden=\"true\"><path d=\"M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z\"/></svg>", "playC": "<svg width=\"22\" height=\"22\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.9\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M10 8.5l5 3.5-5 3.5z\" fill=\"currentColor\"/></svg>", "note": "<svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.9\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M4 6h16M4 12h10M4 18h7\"/><path d=\"M17 15l4 4M15 21l6-6\"/></svg>", "speed": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.9\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M12 7v5l3 2\"/></svg>", "info": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.9\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M12 8h.01M11 12h1v5h1\"/></svg>", "sort": "<svg width=\"15\" height=\"15\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.9\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M7 4v16M3 8l4-4 4 4M17 20V4M13 16l4 4 4-4\"/></svg>", "search": "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"11\" cy=\"11\" r=\"7\"/><path d=\"M20 20l-3.5-3.5\"/></svg>"};
 function renderSkipButtons(){
   const m = skipMode();
   const back = $('prevSent'), fwd = $('nextSent'), mini = $('miniBack');
@@ -2215,8 +2257,10 @@ async function renderLibrary(){
   try{ books = await lib.all(); }catch(e){}
   const list = $('list'); list.textContent = '';
   $('libCount').textContent = books.length ? `${books.length} ${books.length === 1 ? 'libro' : 'libri'} sul telefono` : 'Nessun libro';
+  const q = ($('libSearch').value || '').trim().toLowerCase();
   const items = books.map(b => ({ b, st: statusOf(b.key) }))
     .filter(x => filter === 'all' || x.st.kind === filter)
+    .filter(x => !q || (x.b.title + ' ' + (x.b.author || '')).toLowerCase().includes(q))
     .sort((x, y) => ((y.st.pos && y.st.pos.at) || y.b.added) - ((x.st.pos && x.st.pos.at) || x.b.added));
   if(!books.length){
     const e = el('div', 'empty');
@@ -2226,7 +2270,7 @@ async function renderLibrary(){
   }
   if(!items.length){
     const e = el('div', 'empty');
-    e.appendChild(el('p', null, filter === 'done' ? 'Nessun libro finito.' : filter === 'new' ? 'Nessun libro da iniziare.' : 'Nessun libro in corso.'));
+    e.appendChild(el('p', null, q ? 'Nessun libro trovato.' : filter === 'done' ? 'Nessun libro finito.' : filter === 'new' ? 'Nessun libro da iniziare.' : 'Nessun libro in corso.'));
     list.appendChild(e); return;
   }
   for(const { b, st } of items){
@@ -2252,7 +2296,6 @@ async function renderLibrary(){
     tx.appendChild(prog);
     main.appendChild(tx);
     main.onclick = async () => { if(b.key !== state.key && !(await loadBook(b.key))) return renderLibrary(); renderLibrary(); openPlayer(); };
-    const btns = el('div', 'rowBtns');
     const pb = el('button', 'playCirc'); pb.dataset.key = b.key;
     pb.onclick = async () => {
       unlockAudio();
@@ -2261,18 +2304,18 @@ async function renderLibrary(){
       await renderLibrary();
       play();
     };
-    const db = el('button', 'delBtn'); db.innerHTML = ICON.trash; db.setAttribute('aria-label', `Rimuovi ${b.title}`);
-    db.onclick = async () => {
+    const removeBook = async () => {
       if(!confirm(`Rimuovere "${b.title}" dal telefono?`)) return;
       if(b.key === state.key) unloadBook();
-      await lib.del(b.key); store.del('pos:' + b.key); acache.delBook(b.key);
+      await lib.del(b.key); store.del('pos:' + b.key); store.del('notes:' + b.key); acache.delBook(b.key);
       if(coverUrls.has(b.key)){ URL.revokeObjectURL(coverUrls.get(b.key)); coverUrls.delete(b.key); }
       renderLibrary();
     };
-    const foot = el('div', 'rowFoot'); const fl = el('div', 'rowFootL');
-    fl.append(pb, el('span', 'rowVoice', ''));
-    foot.append(fl, db);
-    row.append(main, foot);
+    const kb = el('button', 'kebab'); kb.setAttribute('aria-label', `Altre azioni per ${b.title}`);
+    kb.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="1.9"/><circle cx="12" cy="12" r="1.9"/><circle cx="12" cy="19" r="1.9"/></svg>';
+    kb.onclick = e => { e.stopPropagation(); openBookMenu(b, kb); };
+    b._remove = removeBook;
+    row.append(main, pb, kb);
     list.appendChild(row);
   }
   updateRowButtons();
@@ -2300,11 +2343,10 @@ function updateRowButtons(){
 function openPlayer(){
   if(!state.key) return;
   if(!playerLocked){ lockPage(); playerLocked = true; }
-  $('playerView').classList.add('open'); $('playerView').setAttribute('aria-hidden', 'false'); document.body.classList.add('playerOpen'); setTab('now');
+  $('playerView').classList.add('open'); $('playerView').setAttribute('aria-hidden', 'false'); document.body.classList.add('playerOpen');
   refreshPosition(false);
 }
 function closePlayer(){
-  setTab('lib');
   if(reader.open) closeReader();
   if(playerLocked){ unlockPage(); playerLocked = false; }
   $('playerView').classList.remove('open'); $('playerView').setAttribute('aria-hidden', 'true'); document.body.classList.remove('playerOpen');
@@ -2343,62 +2385,93 @@ function gRow(icon, title, sub, onClick, opts = {}){
   return r;
 }
 
+/* ---------- menu dei tre puntini di un libro ---------- */
+function closePop(){ const p = document.querySelector('.popover'); if(p) p.remove(); document.removeEventListener('click', closePop, true); }
+function openBookMenu(b, anchor){
+  closePop();
+  const pop = el('div', 'popover'); pop.setAttribute('role', 'menu');
+  const item = (icon, label, fn, danger) => { const it = el('button', 'popItem' + (danger ? ' danger' : '')); it.setAttribute('role', 'menuitem'); it.innerHTML = icon; it.appendChild(el('span', null, label)); it.onclick = e => { e.stopPropagation(); closePop(); fn(); }; pop.appendChild(it); };
+  const done = statusOf(b.key).kind === 'done';
+  item(SI.share, 'Condividi il file', () => shareBook(b.key));
+  item(SI.done, done ? 'Segna come non finito' : 'Contrassegna come finito', () => markDone(b.key, !done));
+  item(SI.notes, 'Clip e note', () => openNotesList(b.key));
+  item(SI.trash, 'Rimuovi file', () => b._remove(), true);
+  document.body.appendChild(pop);
+  const r = anchor.getBoundingClientRect(), h = pop.offsetHeight;
+  pop.style.right = Math.max(12, window.innerWidth - r.right) + 'px';
+  pop.style.top = (r.bottom + h + 12 > window.innerHeight - 140 ? Math.max(12, r.top - h - 6) : r.bottom + 6) + 'px';
+  setTimeout(() => document.addEventListener('click', closePop, true), 0);
+}
+async function shareBook(key){
+  const rec = await lib.get(key).catch(() => null); if(!rec || !rec.data) return setStatus('Non trovo il file di questo libro.', true);
+  const f = new File([rec.data], rec.name || `${rec.title}.${rec.isPdf ? 'pdf' : 'epub'}`, { type: rec.type || (rec.isPdf ? 'application/pdf' : 'application/epub+zip') });
+  try{
+    if(navigator.canShare && navigator.canShare({ files: [f] })) await navigator.share({ files: [f], title: rec.title });
+    else { const a = document.createElement('a'); a.href = URL.createObjectURL(f); a.download = f.name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); }
+  }catch(e){ if(e && e.name !== 'AbortError') setStatus('Condivisione non riuscita.', true); }
+}
+function markDone(key, done){
+  if(key === state.key){ if(done){ stop(); savePos(true); } else { const p = store.get('pos:' + key) || {}; p.done = false; store.set('pos:' + key, p); } }
+  else { const p = store.get('pos:' + key) || { sec: 0, idx: 0, g: 0, pct: 0 }; p.done = done; if(done) p.pct = 100; store.set('pos:' + key, p); }
+  renderLibrary(); setStatus(done ? 'Segnato come finito.' : 'Tolto dai finiti.');
+}
+
 /* ---------- cerca ---------- */
 function openSearch(){
-  const body = openSheet('search', 'Cerca', true);
+  if(!state.total) return;
+  const body = openSheet('search', 'Cerca nel libro', true);
   const box = el('label', 'searchBox'); box.innerHTML = SI.search;
-  const inp = el('input'); inp.type = 'search'; inp.placeholder = state.total ? 'Cerca nel libro e nella libreria' : 'Cerca nella libreria'; inp.setAttribute('aria-label', 'Cerca');
+  const inp = el('input'); inp.type = 'search'; inp.placeholder = 'Parola o frase'; inp.setAttribute('aria-label', 'Cerca nel libro');
   box.appendChild(inp); body.appendChild(box);
   const out = el('div'); body.appendChild(out);
   const esc = t => t.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]);
   let timer = null;
-  const run = async () => {
+  const run = () => {
     const q = inp.value.trim().toLowerCase(); out.textContent = '';
-    if(q.length < 2){ out.appendChild(el('p', 'hint', 'Scrivi almeno due lettere: cerco nei titoli dei libri e nel testo del libro aperto. Tocca un risultato per ascoltare da lì.')); return; }
-    const books = (await lib.all().catch(() => [])).filter(b => (b.title + ' ' + (b.author || '')).toLowerCase().includes(q));
-    if(books.length){
-      out.appendChild(el('div', 'groupLabel', 'Libri'));
-      books.forEach(b => { const r = el('button', 'sRes'); r.append(el('small', null, b.author || (b.isPdf ? 'PDF' : 'EPUB')), el('span', null, b.title)); r.onclick = async () => { closeSheet(); if(b.key !== state.key && !(await loadBook(b.key))) return; renderLibrary(); openPlayer(); }; out.appendChild(r); });
+    if(q.length < 2){ out.appendChild(el('p', 'hint', 'Scrivi almeno due lettere. Tocca un risultato per andare a quella frase e ascoltare da lì.')); return; }
+    const hits = [];
+    for(let si = 0; si < state.sections.length && hits.length < 80; si++){
+      state.sections[si].sentences.forEach((x, i) => { if(hits.length < 80 && x.t.toLowerCase().includes(q)) hits.push([si, i, x.t]); });
     }
-    if(state.total){
-      const hits = [];
-      for(let si = 0; si < state.sections.length && hits.length < 60; si++){
-        state.sections[si].sentences.forEach((x, i) => { if(hits.length < 60 && x.t.toLowerCase().includes(q)) hits.push([si, i, x.t]); });
-      }
-      out.appendChild(el('div', 'groupLabel', hits.length ? `Nel libro${hits.length >= 60 ? ' (primi 60)' : ''}` : 'Nel libro: nessun risultato'));
-      hits.forEach(([si, i, t]) => {
-        const r = el('button', 'sRes'); const k = t.toLowerCase().indexOf(q);
-        const sm = el('small', null, secLabel(si)); const sp = el('span');
-        sp.innerHTML = esc(t.slice(0, k)) + '<mark>' + esc(t.slice(k, k + q.length)) + '</mark>' + esc(t.slice(k + q.length));
-        r.append(sm, sp); r.onclick = () => { closeSheet(); jumpTo(si, i, true); openPlayer(); };
-        out.appendChild(r);
-      });
-    } else if(!books.length) out.appendChild(el('p', 'hint', 'Nessun libro trovato.'));
+    out.appendChild(el('div', 'groupLabel', hits.length ? `${hits.length >= 80 ? 'Primi 80 risultati' : hits.length + (hits.length === 1 ? ' risultato' : ' risultati')}` : 'Nessun risultato'));
+    hits.forEach(([si, i, t]) => {
+      const r = el('button', 'sRes'); const k = t.toLowerCase().indexOf(q);
+      const sp = el('span'); sp.innerHTML = esc(t.slice(0, k)) + '<mark>' + esc(t.slice(k, k + q.length)) + '</mark>' + esc(t.slice(k + q.length));
+      r.append(el('small', null, secLabel(si)), sp); r.onclick = () => { closeSheet(); jumpTo(si, i, true); };
+      out.appendChild(r);
+    });
   };
   inp.oninput = () => { clearTimeout(timer); timer = setTimeout(run, 200); };
   run(); setTimeout(() => inp.focus(), 50);
 }
 
 /* ---------- barra in basso ---------- */
+let view = 'lib';
 function setTab(t){ document.querySelectorAll('.tabBtn').forEach(b => b.dataset.tab === t ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current')); }
+function showView(v){
+  view = v;
+  $('libView').classList.toggle('hidden', v !== 'lib');
+  $('setView').classList.toggle('hidden', v !== 'set');
+  setTab(v);
+}
 function onTab(t){
-  if(t === 'lib'){ if(sheetKind) closeSheet(); if(reader.open) closeReader(); closePlayer(); window.scrollTo({ top: 0, behavior: 'smooth' }); setTab('lib'); return; }
-  if(t === 'search'){ openSearch(); return; }
-  if(!state.key){ setStatus('Prima scegli un libro dalla libreria.'); return; }
-  if(t === 'now') openPlayer();
-  if(t === 'browse') openReader();
+  if(sheetKind) closeSheet();
+  if(reader.open) closeReader();
+  closePlayer();
+  if(t === 'lib'){ showView('lib'); window.scrollTo(0, 0); }
+  else openSettings();
 }
 
 /* ---------- segnalibri e note ---------- */
 function notes(key){ return store.get('notes:' + (key || state.key)) || []; }
-function saveNotes(list){ store.set('notes:' + state.key, list); updateNoteCount(); }
+function saveNotes(list, key){ store.set('notes:' + (key || state.key), list); updateNoteCount(); }
 function noteAt(sec, idx){ return notes().find(n => n.sec === sec && n.idx === idx); }
 function sentenceText(sec, idx){ const s = state.sections[sec]; return s && s.sentences[idx] ? s.sentences[idx].t : ''; }
 function secLabel(sec){ const s = state.sections[sec]; return state.pages ? `Pagina ${sec + 1}` : (s ? s.title : ''); }
 // salva subito la frase come segnalibro (evidenziata); il commento si aggiunge dopo, se si vuole
 function addNote(sec, idx){
   const old = noteAt(sec, idx); if(old) return { note: old, isNew: false };
-  const note = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 5), sec, idx, text: sentenceText(sec, idx), comment: '', at: Date.now() };
+  const note = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 5), sec, idx, text: sentenceText(sec, idx), chap: secLabel(sec), comment: '', at: Date.now() };
   const list = notes(); list.push(note); list.sort((a, b) => a.sec - b.sec || a.idx - b.idx); saveNotes(list);
   markNoted(sec, idx, true);
   return { note, isNew: true };
@@ -2406,12 +2479,14 @@ function addNote(sec, idx){
 function markNoted(sec, idx, on){ const sp = document.querySelector(`#rdBody .s[data-s="${sec}"][data-i="${idx}"]`); if(sp) sp.classList.toggle('noted', on); }
 function updateNoteCount(){ const n = state.key ? notes().length : 0; const b = $('rdNoteCount'); if(b) b.textContent = n ? String(n) : ''; }
 function bookmarkCurrent(){ if(!state.total) return; const r = addNote(state.sec, state.idx); openNoteEditor(r.note, r.isNew); }
-function openNoteEditor(note, isNew){
+function openNoteEditor(note, isNew, key){
+  key = key || state.key;
+  const lab = note.chap || (key === state.key ? secLabel(note.sec) : `Frase ${note.idx + 1}`);
   const body = openSheet('note', isNew ? 'Segnalibro salvato' : 'Segnalibro');
   const qc = el('div', 'quoteCard');
   qc.append(el('div', 'qLabel', 'Passaggio evidenziato'), el('blockquote', null, `«${note.text}»`));
   const lr = el('button', 'listenRow'); const lp = el('span', 'lp'); lp.innerHTML = SI.play;
-  const lt = el('span', 'lt', 'Ascolta da questa frase'); lt.appendChild(el('small', null, `${secLabel(note.sec)} · ${new Date(note.at).toLocaleDateString('it-IT', { day: 'numeric', month: 'long' })}`));
+  const lt = el('span', 'lt', 'Ascolta da questa frase'); lt.appendChild(el('small', null, `${lab} · ${new Date(note.at).toLocaleDateString('it-IT', { day: 'numeric', month: 'long' })}`));
   const lc = el('span', 'chevR'); lc.innerHTML = SI.chev;
   lr.append(lp, lt, lc); qc.appendChild(lr);
   body.appendChild(qc);
@@ -2419,20 +2494,25 @@ function openNoteEditor(note, isNew){
   const ta = el('textarea', 'noteArea'); ta.placeholder = 'Aggiungi una riflessione su questo passaggio...'; ta.value = note.comment || ''; ta.setAttribute('aria-label', 'Commento'); ta.maxLength = 1000;
   const upd = () => { cnt.textContent = `${ta.value.length} / 1000`; };
   // il commento si salva mentre scrivi: chiudere il pannello non lo perde
-  const persist = () => { const list = notes(); const n = list.find(x => x.id === note.id); if(n){ n.comment = ta.value.trim(); note.comment = n.comment; saveNotes(list); } };
+  const persist = () => { const list = notes(key); const n = list.find(x => x.id === note.id); if(n){ n.comment = ta.value.trim(); note.comment = n.comment; saveNotes(list, key); } };
   ta.addEventListener('input', () => { persist(); upd(); }); upd();
   body.appendChild(ta);
-  lr.onclick = () => { persist(); closeSheet(); jumpTo(note.sec, note.idx, true); };
+  lr.onclick = async () => { persist(); closeSheet(); if(key !== state.key && !(await loadBook(key))) return; renderLibrary(); jumpTo(note.sec, note.idx, true); };
   const done = el('button', 'wideBtn'); done.innerHTML = SI.check + '<span>Fatto</span>'; done.onclick = () => { persist(); closeSheet(); };
   body.appendChild(done);
   const del = el('button', 'linkDanger'); del.innerHTML = SI.trash + '<span>Elimina segnalibro</span>';
-  del.onclick = () => { saveNotes(notes().filter(x => x.id !== note.id)); markNoted(note.sec, note.idx, false); closeSheet(); setStatus('Segnalibro eliminato.'); };
+  del.onclick = () => { saveNotes(notes(key).filter(x => x.id !== note.id), key); if(key === state.key) markNoted(note.sec, note.idx, false); closeSheet(); setStatus('Segnalibro eliminato.'); };
   body.appendChild(del);
 }
-function openNotesList(){
-  const list = notes();
-  const body = openSheet('notes', 'Note e segnalibri', true);
-  bookCardEl().then(c => body.insertBefore(c, body.firstChild));
+async function openNotesList(key){
+  key = key || state.key;
+  const list = notes(key);
+  const body = openSheet('notes', 'Clip e note', true);
+  const rec = await lib.get(key).catch(() => null);
+  if(key === state.key) bookCardEl().then(c => body.insertBefore(c, body.firstChild));
+  else if(rec){ const c = el('div', 'bookCard'); c.appendChild(makeCover(rec, 'xs')); const t = el('div', 'bcText'); t.append(el('div', 'bcTitle', rec.title), el('div', 'bcSub', rec.author || (rec.isPdf ? 'PDF' : 'EPUB'))); c.appendChild(t); body.appendChild(c); }
+  const lbl = n => n.chap || (key === state.key ? secLabel(n.sec) : `Frase ${n.idx + 1}`);
+  const goNote = async n => { closeSheet(); if(key !== state.key && !(await loadBook(key))) return; renderLibrary(); jumpTo(n.sec, n.idx, true); openPlayer(); };
   if(!list.length){
     body.appendChild(el('p', 'hint', 'Ancora nessun segnalibro in questo libro. Tocca il segnalibro in alto nel player mentre ascolti, oppure nel testo a tutta pagina tieni premuta una frase.'));
     return;
@@ -2441,13 +2521,13 @@ function openNotesList(){
   const c2 = el('span'); c2.innerHTML = 'Ordine di lettura ' + SI.sort; lh.append(c1, c2); body.appendChild(lh);
   list.forEach(n => {
     const c = el('div', 'nCard');
-    const h = el('div', 'nHead'); const hl = el('span'); hl.append(el('b', null, secLabel(n.sec)), document.createTextNode(' · ' + new Date(n.at).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })));
+    const h = el('div', 'nHead'); const hl = el('span'); hl.append(el('b', null, lbl(n)), document.createTextNode(' · ' + new Date(n.at).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })));
     h.append(hl, el('span', 'pillTag', `Frase ${n.idx + 1}`));
     c.append(h, el('blockquote', null, `«${n.text}»`));
     if(n.comment){ const nt = el('div', 'nNote'); nt.innerHTML = SI.note; nt.appendChild(el('span', null, n.comment)); c.appendChild(nt); }
     const f = el('div', 'nFoot'); const go = el('button', 'softPill'); go.innerHTML = SI.playC + '<span>Ascolta da qui</span>';
-    go.onclick = () => { closeSheet(); jumpTo(n.sec, n.idx, true); };
-    const ed = el('button', 'ghostBtn'); ed.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>'; ed.setAttribute('aria-label', 'Modifica segnalibro'); ed.onclick = () => openNoteEditor(n, false);
+    go.onclick = () => goNote(n);
+    const ed = el('button', 'ghostBtn'); ed.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>'; ed.setAttribute('aria-label', 'Modifica segnalibro'); ed.onclick = () => openNoteEditor(n, false, key);
     f.append(go, ed); c.appendChild(f);
     body.appendChild(c);
   });
@@ -2518,14 +2598,14 @@ function markReader(scroll){
 }
 function openReader(){
   if(!state.total) return;
-  reader.open = true; reader.follow = true; setTab('browse');
+  reader.open = true; reader.follow = true;
   $('reader').classList.remove('hidden'); $('rdFollow').classList.add('hidden');
   buildReaderAround(state.sec); updateNoteCount(); updatePlay();
   requestAnimationFrame(() => { const sp = document.querySelector(`#rdBody .s[data-s="${state.sec}"][data-i="${state.idx}"]`); if(sp){ sp.classList.add('on'); reader.onEl = sp; sp.scrollIntoView({ block: 'center' }); } readerTitle(); });
   const seen = store.get('rdHint') || 0;
   if(seen < 3){ store.set('rdHint', seen + 1); $('rdHint').classList.remove('hidden'); setTimeout(() => $('rdHint').classList.add('hidden'), 9000); }
 }
-function closeReader(){ setTab(document.body.classList.contains('playerOpen') ? 'now' : 'lib'); reader.open = false; $('reader').classList.add('hidden'); $('rdBody').textContent = ''; reader.onEl = null; }
+function closeReader(){ reader.open = false; $('reader').classList.add('hidden'); $('rdBody').textContent = ''; reader.onEl = null; }
 (function readerEvents(){
   const b = $('rdBody');
   b.addEventListener('scroll', () => {
@@ -2682,7 +2762,7 @@ previewAudio.onended = () => { if(previewAudio.src === silenceUrl) return; previ
 async function previewVoice(kind, id, btn){
   // secondo tocco sulla stessa voce: ferma l'anteprima
   if(previewId === kind + ':' + id && previewLabel !== 'Prova'){ stopPreview(); return; }
-  if(isGemId(id) && !store.get('gemKey')){ gemFrom = sheetKind === 'settings' ? 'settings' : 'voice'; openGemSetup(id, 1); return; }
+  if(isGemId(id) && !store.get('gemKey')){ gemFrom = view === 'set' && sheetKind !== 'voice' ? 'settings' : 'voice'; openGemSetup(id, 1); return; }
   if(state.playing) stop();
   stopPreview();
   const g = ++previewGen;
@@ -2733,7 +2813,7 @@ function selectVoice(kind, id){
   if(wasPlaying) stop();
   state.prepareTo = null;
   state.fallbackFrom = null; state.fallbackUntil = 0;
-  if(kind === 'piper' && isGemId(id) && !store.get('gemKey')){ if(wasPlaying){ unlockAudio(); play(); } gemFrom = sheetKind === 'settings' ? 'settings' : 'voice'; openGemSetup(id, 1); return; }
+  if(kind === 'piper' && isGemId(id) && !store.get('gemKey')){ if(wasPlaying){ unlockAudio(); play(); } gemFrom = view === 'set' && sheetKind !== 'voice' ? 'settings' : 'voice'; openGemSetup(id, 1); return; }
   if(kind === 'piper'){
     state.engine = 'piper'; state.piperVoice = id;
     audio.removeAttribute('data-key');
@@ -2766,7 +2846,7 @@ function voiceRow(label, sub, selected, onPick, onTry, pid){
 }
 function refreshVoiceUI(){
   if(sheetKind === 'voice') openVoiceSheet();
-  else if(sheetKind === 'settings') openSettings(null, true);
+  else if(view === 'set') openSettings(null, true);
 }
 function speedNote(id){
   const r = rtfOf(id);
@@ -2928,7 +3008,7 @@ function openGemSetup(voiceId, step){
   for(let i = 1; i <= 3; i++){ const d = el('span', i <= gemSetup.step ? 'on' : ''); prog.appendChild(d); }
   body.appendChild(prog);
   body.appendChild(el('div', 'groupLabel', `Passo ${gemSetup.step} di 3`));
-  const back = (to) => { const b = el('button', 'smallBtn', 'Indietro'); b.onclick = () => to ? openGemSetup(null, to) : (gemFrom === 'settings' ? openSettings('voices') : openVoiceSheet()); return b; };
+  const back = (to) => { const b = el('button', 'smallBtn', 'Indietro'); b.onclick = () => to ? openGemSetup(null, to) : (gemFrom === 'settings' ? (closeSheet(), openSettings('voices')) : openVoiceSheet()); return b; };
 
   if(gemSetup.step === 1){
     body.appendChild(el('h3', 'stepTitle', `Per usare ${v.name} serve il tuo account Google`));
@@ -2999,7 +3079,7 @@ function openGemSetup(voiceId, step){
         audio.src = URL.createObjectURL(blob); audio.dataset.key = 'gem-setup'; audio.playbackRate = state.rate;
         audio.play().catch(() => {});
         selectVoice('piper', v.id);
-        setTimeout(() => { if(sheetKind === 'gemSetup'){ if(gemFrom === 'settings') openSettings('voices'); else openVoiceSheet(); } }, 2500);
+        setTimeout(() => { if(sheetKind === 'gemSetup'){ if(gemFrom === 'settings'){ closeSheet(); openSettings('voices'); } else openVoiceSheet(); } }, 2500);
       }catch(e){
         const m = e.message || '';
         msg.className = 'stepText warn';
@@ -3050,14 +3130,17 @@ function markTextSentence(scroll){
 let settingsTab = 'voci';
 function openSettings(focus, keepScroll){
   if(focus === 'voices') settingsTab = 'voci';
-  const body = (keepScroll && sheetKind === 'settings') ? $('sheetBody') : openSheet('settings', 'Impostazioni', true);
-  const scroll = body.scrollTop; body.textContent = '';
+  // pagina a sé, come la libreria: chiude pannelli, player e testo sopra
+  if(!keepScroll){ if(sheetKind) closeSheet(); if(reader.open) closeReader(); closePlayer(); }
+  showView('set');
+  const body = $('setBody');
+  const scroll = window.scrollY; body.textContent = '';
 
   // schede
   const tabs = el('div', 'tabs'); tabs.setAttribute('role', 'tablist');
-  [['voci', 'Voci'], ['play', 'Riproduzione']].forEach(([k, label]) => {
+  [['voci', 'Voci'], ['play', 'Riproduzione'], ['gen', 'Generali']].forEach(([k, label]) => {
     const t = el('button', 'tab', label); t.setAttribute('role', 'tab'); t.setAttribute('aria-selected', settingsTab === k ? 'true' : 'false');
-    t.onclick = () => { settingsTab = k; openSettings(); };
+    t.onclick = () => { settingsTab = k; openSettings(); window.scrollTo(0, 0); };
     tabs.appendChild(t);
   });
   body.appendChild(tabs);
@@ -3188,6 +3271,18 @@ function openSettings(focus, keepScroll){
     tip.appendChild(el('p', null, 'Sull\'iPhone apri Impostazioni > Accessibilità > Lettura e voce > Voci > Italiano, tocca una voce e scarica la versione Avanzata o Premium. Poi chiudi e riapri l\'app: le trovi qui.'));
     ci.appendChild(tip);
 
+  } else if(settingsTab === 'play'){
+    const cb = card('Pulsanti accanto a play', 'Valgono anche per cuffie e schermata di blocco.');
+    [['frase', 'Una frase'], ['15', '15 secondi'], ['30', '30 secondi']].forEach(([k, label]) => {
+      cb.appendChild(option(label, null, skipMode() === k, () => { prefs.skip = k; store.set('prefs', prefs); renderSkipButtons(); openSettings(null, true); }));
+    });
+    const cc = card('Pulsanti esterni');
+    cc.appendChild(famRow('Capitolo precedente e successivo', 'A metà capitolo, Indietro torna prima al suo inizio.', null));
+  } else {
+    const ct = card('Aspetto', 'Automatico segue il tema scelto sull\'iPhone. Chiaro e Scuro restano fissi.');
+    [['auto', 'Automatico', 'Come l\'iPhone'], ['light', 'Chiaro', null], ['dark', 'Scuro', null]].forEach(([k, label, sub]) => {
+      ct.appendChild(option(label, sub, (prefs.theme || 'auto') === k, () => { prefs.theme = k; store.set('prefs', prefs); applyTheme(); openSettings(null, true); }));
+    });
     // spazio
     const cs = card('Spazio');
     const audioMb = Math.round((store.get('audioBytes') || 0) / 1048576);
@@ -3196,21 +3291,10 @@ function openSettings(focus, keepScroll){
     const tot = famRow('Spazio usato dall\'app', '...', null);
     cs.appendChild(tot);
     if(navigator.storage && navigator.storage.estimate) navigator.storage.estimate().then(e => { tot.querySelector('.famSub').textContent = Math.round((e.usage || 0) / 1048576) + ' MB tra libri, voci e audio'; }).catch(() => {});
-  } else {
-    const cb = card('Pulsanti accanto a play', 'Valgono anche per cuffie e schermata di blocco.');
-    [['frase', 'Una frase'], ['15', '15 secondi'], ['30', '30 secondi']].forEach(([k, label]) => {
-      cb.appendChild(option(label, null, skipMode() === k, () => { prefs.skip = k; store.set('prefs', prefs); renderSkipButtons(); openSettings(null, true); }));
-    });
-    const ct = card('Aspetto', 'Automatico segue il tema scelto sull\'iPhone. Chiaro e Scuro restano fissi.');
-    [['auto', 'Automatico', 'Come l\'iPhone'], ['light', 'Chiaro', null], ['dark', 'Scuro', null]].forEach(([k, label, sub]) => {
-      ct.appendChild(option(label, sub, (prefs.theme || 'auto') === k, () => { prefs.theme = k; store.set('prefs', prefs); applyTheme(); openSettings(null, true); }));
-    });
-    const cc = card('Pulsanti esterni');
-    cc.appendChild(famRow('Capitolo precedente e successivo', 'A metà capitolo, Indietro torna prima al suo inizio.', null));
     body.appendChild(el('p', 'version', `SiMa Player, versione ${APP_VERSION}. Si aggiorna da sola quando c'è connessione.`));
   }
 
-  if(keepScroll) body.scrollTop = scroll;
+  if(keepScroll) window.scrollTo(0, scroll); else window.scrollTo(0, 0);
 }
 
 function openMore(){
@@ -3228,7 +3312,7 @@ function openMore(){
     }));
   }
   const nn = notes().length;
-  g1.appendChild(gRow(SI.notes, 'Note e segnalibri', null, () => openNotesList(), { pill: nn ? `${nn} ${nn === 1 ? 'nota' : 'note'}` : null }));
+  g1.appendChild(gRow(SI.notes, 'Clip e note', null, () => openNotesList(), { pill: nn ? `${nn} ${nn === 1 ? 'nota' : 'note'}` : null }));
   g1.appendChild(gRow(SI.gear, 'Impostazioni', null, () => openSettings()));
   const g2 = el('div', 'group');
   g2.appendChild(gRow(SI.restart, 'Ricomincia dall\'inizio', null, () => { closeSheet(); goTo(0, 0); }, { end: SI.restart }));
@@ -3254,9 +3338,10 @@ $('pMore').onclick = openMore;
 $('bigPlay').onclick = togglePlay;
 $('prevSent').onclick = () => skipBack();
 $('nextSent').onclick = () => skipFwd();
-$('setBtn').onclick = () => openSettings();
-$('profBtn').onclick = () => { settingsTab = 'voci'; openSettings(); };
 document.querySelectorAll('.tabBtn').forEach(b => b.onclick = () => onTab(b.dataset.tab));
+$('addBtn2').onclick = () => $('file').click();
+$('rdSearch').onclick = openSearch;
+$('libSearch').addEventListener('input', () => renderLibrary());
 $('rdHintClose').onclick = () => $('rdHint').classList.add('hidden');
 $('prevChap').onclick = () => moveChapter(-1);
 $('nextChap').onclick = () => moveChapter(1);
