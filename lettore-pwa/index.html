@@ -829,7 +829,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 48;
+const APP_VERSION = 49;
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
   let hadController = !!navigator.serviceWorker.controller, reloading = false;
@@ -3759,6 +3759,8 @@ if(prefs.rate) state.rate = +prefs.rate;
 $('speedLabel').textContent = fmtRate(state.rate);
 restoreVoice();
 if('speechSynthesis' in window) speechSynthesis.onvoiceschanged = () => { if(!state.playing) restoreVoice(); refreshVoiceUI(); };
+// iPhone aggiorna l'elenco delle voci solo quando la pagina si riapre: rileggo la lista ogni volta che torno nell'app
+document.addEventListener('visibilitychange', () => { if(!document.hidden && 'speechSynthesis' in window){ speechSynthesis.getVoices(); setTimeout(() => { if(view === 'set') openSettings(null, true); refreshVoiceUI(); }, 400); } });
 updatePlay();
 renderSkipButtons();
 renderChips();
