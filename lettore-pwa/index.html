@@ -655,6 +655,7 @@ html,body,*{scrollbar-width:none;-ms-overflow-style:none}
 #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px) + 134px)}
 body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px) + 62px)}
 #libView,#setView{padding-bottom:calc(env(safe-area-inset-bottom) + 160px)}
+.card>.famRow:last-child{border-bottom:0}
 </style>
 </head>
 <body class="noMini">
@@ -666,7 +667,8 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 <main id="libView">
   <div class="actRow hidden">
     <button class="addBtn" id="addBtn" aria-label="Aggiungi libro PDF o EPUB"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Aggiungi libro</span></button>
-    <input type="file" id="file" accept=".pdf,.epub,application/pdf,application/epub+zip" hidden>
+    <input type="file" id="bkFile" hidden>
+<input type="file" id="file" accept=".pdf,.epub,application/pdf,application/epub+zip" hidden>
   </div>
   <div class="libHead">
     <div class="libHeadRow"><h1>Libreria</h1><button class="addBtn" id="addBtn2" aria-label="Aggiungi libro PDF o EPUB"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Aggiungi libro</span></button></div>
@@ -786,7 +788,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 41;
+const APP_VERSION = 42;
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
   let hadController = !!navigator.serviceWorker.controller, reloading = false;
@@ -3161,6 +3163,80 @@ function markTextSentence(scroll){
   if(sp){ sp.classList.add('on'); if(scroll) sp.scrollIntoView({ block: 'center', behavior: reduceMotion ? 'auto' : 'smooth' }); }
 }
 
+
+/* ---------- backup: libri, posizioni, note e impostazioni in un solo file ---------- */
+// formato: riga "SIMA-BACKUP 1", riga con la lunghezza dell'intestazione, intestazione JSON, poi i file dei libri in fila
+const BK_MAGIC = 'SIMA-BACKUP 1\n';
+const BK_SKIP = k => k === 'gemKey' || k === 'audioBytes' || k === 'readyVoices' || k === 'lastBackup' || /^gemDone:/.test(k);
+async function makeBackup(){
+  const bins = [], parts = []; let off = 0;
+  const pack = async v => {
+    if(v instanceof Blob){ bins.push({ off, len: v.size, type: v.type, blob: 1 }); parts.push(v); off += v.size; return { $bin: bins.length - 1 }; }
+    if(v instanceof ArrayBuffer || ArrayBuffer.isView(v)){ const b = v instanceof ArrayBuffer ? v : v.buffer.slice(v.byteOffset, v.byteOffset + v.byteLength); bins.push({ off, len: b.byteLength }); parts.push(b); off += b.byteLength; return { $bin: bins.length - 1 }; }
+    if(Array.isArray(v)) return Promise.all(v.map(pack));
+    if(v && typeof v === 'object'){ const o = {}; for(const k of Object.keys(v)) o[k] = await pack(v[k]); return o; }
+    return v;
+  };
+  const db = await lib.open();
+  const raw = await new Promise((res, rej) => { const t = db.transaction('books', 'readonly'); const r = t.objectStore('books').getAll(); r.onsuccess = () => res(r.result || []); r.onerror = () => rej(r.error); });
+  const books = []; for(const b of raw) books.push(await pack(b));
+  const ls = {};
+  for(let i = 0; i < localStorage.length; i++){
+    const k = localStorage.key(i); if(!k || k.indexOf('lettore:') !== 0) continue;
+    const kk = k.slice(8); if(!BK_SKIP(kk)) ls[kk] = localStorage.getItem(k);
+  }
+  const head = JSON.stringify({ v: 1, app: APP_VERSION, at: Date.now(), ls, books, bins });
+  const hb = new TextEncoder().encode(head);
+  return { blob: new Blob([BK_MAGIC, hb.byteLength + '\n', hb, ...parts], { type: 'application/octet-stream' }), n: books.length };
+}
+async function saveBackup(btn){
+  if(btn){ btn.disabled = true; btn.textContent = 'Preparo...'; }
+  try{
+    const { blob, n } = await makeBackup();
+    const d = new Date(), pad = x => String(x).padStart(2, '0');
+    const f = new File([blob], `SiMa-backup-${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}.simabackup`, { type: 'application/octet-stream' });
+    let ok = false;
+    if(navigator.canShare && navigator.canShare({ files: [f] })){
+      try{ await navigator.share({ files: [f], title: 'Backup SiMa' }); ok = true; }
+      catch(e){ if(e && e.name === 'AbortError'){ return; } }
+    }
+    if(!ok){ const a = document.createElement('a'); a.href = URL.createObjectURL(f); a.download = f.name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 60000); }
+    store.set('lastBackup', Date.now());
+    setStatus(`Backup pronto: ${n} ${n === 1 ? 'libro' : 'libri'}, posizioni, note e impostazioni.`);
+  }catch(e){ console.error(e); setStatus('Non sono riuscito a preparare il backup.', true); }
+  finally{ if(view === 'set') openSettings(null, true); }
+}
+async function restoreBackup(file){
+  try{
+    const magic = await file.slice(0, BK_MAGIC.length).text();
+    if(magic !== BK_MAGIC) return setStatus('Questo file non è un backup di SiMa.', true);
+    const lenTxt = await file.slice(BK_MAGIC.length, BK_MAGIC.length + 24).text();
+    const nl = lenTxt.indexOf('\n'), hlen = parseInt(lenTxt.slice(0, nl), 10);
+    const hStart = BK_MAGIC.length + nl + 1, dStart = hStart + hlen;
+    const head = JSON.parse(await file.slice(hStart, dStart).text());
+    const nb = (head.books || []).length;
+    if(!confirm(`Ripristinare il backup del ${new Date(head.at).toLocaleDateString('it-IT')}? Contiene ${nb} ${nb === 1 ? 'libro' : 'libri'} con posizioni e note. I libri già presenti restano, quelli uguali vengono sostituiti dalla copia del backup.`)) return;
+    setStatus('Ripristino il backup...', false, true);
+    const unpack = async v => {
+      if(v && typeof v === 'object' && !Array.isArray(v) && typeof v.$bin === 'number' && Object.keys(v).length === 1){
+        const b = head.bins[v.$bin], part = file.slice(dStart + b.off, dStart + b.off + b.len, b.type || '');
+        return b.blob ? new Blob([await part.arrayBuffer()], { type: b.type || '' }) : await part.arrayBuffer();
+      }
+      if(Array.isArray(v)) return Promise.all(v.map(unpack));
+      if(v && typeof v === 'object'){ const o = {}; for(const k of Object.keys(v)) o[k] = await unpack(v[k]); return o; }
+      return v;
+    };
+    for(const b of head.books || []) await lib.put(await unpack(b));
+    for(const [k, v] of Object.entries(head.ls || {})){ if(!BK_SKIP(k)) try{ localStorage.setItem('lettore:' + k, v); }catch(e){} }
+    prefs = store.get('prefs') || {}; applyTheme();
+    filter = store.get('filter') || 'all'; renderChips();
+    setStatus(`Backup ripristinato: ${nb} ${nb === 1 ? 'libro' : 'libri'}.` + (store.get('gemKey') ? '' : ' Per le voci Google incolla di nuovo la chiave.'));
+    const last = store.get('lastBook'); if(last && !state.key) await loadBook(last).catch(() => {});
+    await renderLibrary();
+    if(view === 'set') openSettings(null, true);
+  }catch(e){ console.error(e); setStatus('Non riesco a leggere questo backup. Potrebbe essere incompleto.', true); }
+}
+
 let settingsTab = 'voci';
 function openSettings(focus, keepScroll){
   if(focus === 'voices') settingsTab = 'voci';
@@ -3313,6 +3389,11 @@ function openSettings(focus, keepScroll){
     const cc = card('Pulsanti esterni');
     cc.appendChild(famRow('Capitolo precedente e successivo', 'A metà capitolo, Indietro torna prima al suo inizio.', null));
   } else {
+    const cbk = card('Backup', 'Salva in un file i libri, il punto in cui sei arrivato, le note e le impostazioni. Tienilo in File o su iCloud Drive: se togli l\'app dalla Home o cambi telefono, lo ripristini da qui. La chiave Google non viene salvata nel file.');
+    const lb = store.get('lastBackup');
+    const bkRow = famRow('Salva un backup', lb ? 'Ultimo: ' + new Date(lb).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' }) : 'Non hai ancora fatto un backup.', 'Salva', e => saveBackup(e.currentTarget));
+    cbk.appendChild(bkRow);
+    cbk.appendChild(famRow('Ripristina da un backup', 'Scegli il file .simabackup salvato prima.', 'Scegli', () => $('bkFile').click()));
     const ct = card('Aspetto', 'Automatico segue il tema scelto sull\'iPhone. Chiaro e Scuro restano fissi.');
     [['auto', 'Automatico', 'Come l\'iPhone'], ['light', 'Chiaro', null], ['dark', 'Scuro', null]].forEach(([k, label, sub]) => {
       ct.appendChild(option(label, sub, (prefs.theme || 'auto') === k, () => { prefs.theme = k; store.set('prefs', prefs); applyTheme(); openSettings(null, true); }));
@@ -3362,6 +3443,7 @@ function openMore(){
 
 /* ---------- eventi ---------- */
 $('addBtn').onclick = () => $('file').click();
+$('bkFile').onchange = e => { const f = e.target.files[0]; if(f) restoreBackup(f); e.target.value = ''; };
 $('file').onchange = e => { const f = e.target.files[0]; if(f) addFile(f); e.target.value = ''; };
 document.querySelectorAll('.chip').forEach(c => c.onclick = () => { filter = c.dataset.f; renderChips(); renderLibrary(); });
 $('miniOpen').onclick = openPlayer;
