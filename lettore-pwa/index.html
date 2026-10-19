@@ -688,6 +688,8 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 .sBar{width:100%;max-width:18px;border-radius:6px 6px 2px 2px;background:var(--accent);min-height:0}
 .sLab{font-size:10px;color:var(--muted);height:16px;line-height:16px;margin-top:4px;white-space:nowrap;overflow:visible}
 .tabBtn span{white-space:nowrap}
+.sVoiceWrap{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:12px 0 0;padding:10px 14px;border-radius:14px;background:var(--surface);border:1px solid var(--line);font-size:14px;color:var(--muted)}
+.sSel{flex:1;min-width:0;max-width:65%;height:34px;border:0;background:none;color:var(--ink);font:inherit;font-weight:600;text-align:right;text-align-last:right;appearance:auto}
 </style>
 </head>
 <body class="noMini">
@@ -741,6 +743,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 <main id="statsView" class="hidden">
   <div class="libHead"><div class="libHeadRow"><h1>Statistiche</h1></div></div>
   <div class="sRange" id="sRange" role="group" aria-label="Periodo"></div>
+  <label class="sVoiceWrap"><span>Voce</span><select id="sVoice" class="sSel" aria-label="Filtra per voce"></select></label>
   <div class="sTotal"><div class="sBig" id="sBig"></div><div class="sSub" id="sSub"></div></div>
   <div class="sChart" id="sChart" aria-hidden="true"></div>
   <h3 class="cardTitle">Libri ascoltati</h3>
@@ -826,7 +829,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 45;
+const APP_VERSION = 46;
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
   let hadController = !!navigator.serviceWorker.controller, reloading = false;
@@ -3292,32 +3295,40 @@ async function restoreBackup(file){
 
 
 /* ---------- statistiche di ascolto: tempo di riproduzione reale, sul telefono, senza costi ---------- */
-// per giorno (ora locale): secondi per ora e secondi per libro. Solo numeri interi, pochi byte.
+// per giorno (ora locale): secondi per ora e per voce (v), secondi per libro e per voce (b). Solo numeri interi.
 const STATS_KEEP_DAYS = 400;
 let statsPending = [], statsLast = 0;
 function localDay(d){ d = d || new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+function statsVoiceId(){ return state.engine === 'sys' ? 'sys:' + (state.sysVoice ? state.sysVoice.voiceURI : 'iphone') : (state.piperVoice || 'nessuna'); }
+function statsVoiceCat(vid){ return vid === 'legacy' ? 'none' : vid.startsWith('sys:') ? 'sys' : isGemId(vid) ? 'gem' : 'piper'; }
 function statsAdd(key, title, secs){
-  const day = localDay(), hr = new Date().getHours();
-  const p = statsPending.find(x => x.day === day && x.key === key);
-  if(p){ p.s += secs; p.h = hr; } else statsPending.push({ day, key, title, s: secs, h: hr });
+  const day = localDay(), hr = new Date().getHours(), vid = statsVoiceId(), vname = voiceName() || 'Voce';
+  const p = statsPending.find(x => x.day === day && x.key === key && x.vid === vid && x.h === hr);
+  if(p) p.s += secs; else statsPending.push({ day, key, title, vid, vname, h: hr, s: secs });
+}
+function statsApply(st, p){
+  const r = st[p.day] || { v: {}, b: {} };
+  if(!r.v) r.v = {};
+  if(!r.v[p.vid]) r.v[p.vid] = Array(24).fill(0);
+  r.v[p.vid][p.h] = (r.v[p.vid][p.h] || 0) + p.s;
+  if(!r.b) r.b = {};
+  if(!r.b[p.key]) r.b[p.key] = {};
+  r.b[p.key][p.vid] = (r.b[p.key][p.vid] || 0) + p.s;
+  st[p.day] = r;
 }
 function statsFlush(){
   if(!statsPending.length) return;
   try{
-    const st = store.get('stats') || {}, titles = store.get('statsTitles') || {};
-    for(const p of statsPending){
-      const r = st[p.day] || { h: Array(24).fill(0), b: {} };
-      r.h[p.h] = (r.h[p.h] || 0) + p.s; r.b[p.key] = (r.b[p.key] || 0) + p.s;
-      st[p.day] = r; if(p.title) titles[p.key] = p.title;
-    }
+    const st = statsNormalize(store.get('stats') || {}), titles = store.get('statsTitles') || {}, voices = store.get('statsVoices') || {};
+    for(const p of statsPending){ statsApply(st, p); if(p.title) titles[p.key] = p.title; voices[p.vid] = p.vname; }
     statsPending = [];
-    // conta i secondi interi; scarta i giorni più vecchi di un anno
     const cutoff = localDay(new Date(Date.now() - STATS_KEEP_DAYS * 864e5));
     for(const d of Object.keys(st)){
       if(d < cutoff){ delete st[d]; continue; }
-      st[d].h = st[d].h.map(Math.round); for(const k of Object.keys(st[d].b)) st[d].b[k] = Math.round(st[d].b[k]);
+      for(const vid of Object.keys(st[d].v || {})) st[d].v[vid] = st[d].v[vid].map(Math.round);
+      for(const k of Object.keys(st[d].b || {})) for(const vid of Object.keys(st[d].b[k])) st[d].b[k][vid] = Math.round(st[d].b[k][vid]);
     }
-    store.set('stats', st); store.set('statsTitles', titles);
+    store.set('stats', st); store.set('statsTitles', titles); store.set('statsVoices', voices);
   }catch(e){}
 }
 // un tick ogni secondo: conta solo mentre la lettura è in corso; i buchi lunghi (schermo spento, app sospesa) non vengono contati
@@ -3330,18 +3341,39 @@ document.addEventListener('visibilitychange', () => { if(document.hidden) statsF
 addEventListener('pagehide', statsFlush);
 
 let statsRange = store.get('statsRange') || 'oggi';
-function statsCollect(){
-  // ricostruisce dal salvataggio più le parti ancora in memoria
-  const st = JSON.parse(JSON.stringify(store.get('stats') || {}));
-  for(const p of statsPending){
-    const r = st[p.day] || { h: Array(24).fill(0), b: {} };
-    r.h[p.h] = (r.h[p.h] || 0) + p.s; r.b[p.key] = (r.b[p.key] || 0) + p.s; st[p.day] = r;
+let statsVoice = store.get('statsVoice') || 'all';
+// legge un giorno applicando il filtro voce: ore, libri
+function statsPick(r, filter){
+  const hours = Array(24).fill(0), books = {};
+  const match = vid => filter === 'all' ? true
+    : filter.startsWith('cat:') ? statsVoiceCat(vid) === filter.slice(4)
+    : vid === filter.slice(2);
+  for(const vid of Object.keys(r.v || {})) if(match(vid)) r.v[vid].forEach((x, h) => hours[h] += x);
+  for(const k of Object.keys(r.b || {})){ for(const vid of Object.keys(r.b[k])) if(match(vid)) books[k] = (books[k] || 0) + r.b[k][vid]; }
+  return { hours, books, total: hours.reduce((a, b) => a + b, 0) };
+}
+// i dati della versione 45 (senza voce) diventano "voce non registrata"
+function statsNormalize(st){
+  for(const d of Object.keys(st)){
+    const r = st[d];
+    if(r.h && !r.v){ r.v = { legacy: r.h }; delete r.h; }
+    if(r.b){ for(const k of Object.keys(r.b)) if(typeof r.b[k] === 'number') r.b[k] = { legacy: r.b[k] }; }
   }
   return st;
 }
+function statsCollect(){
+  const st = statsNormalize(JSON.parse(JSON.stringify(store.get('stats') || {})));
+  for(const p of statsPending) statsApply(st, p);
+  return st;
+}
 function renderStats(){
-  const st = statsCollect(), titles = store.get('statsTitles') || {};
+  const st = statsCollect(), titles = store.get('statsTitles') || {}, voices = store.get('statsVoices') || {};
   const now = new Date();
+  // voci usate nei dati salvati, raggruppate per tipo
+  const used = new Set();
+  Object.values(st).forEach(r => Object.keys(r.v || {}).forEach(v => used.add(v)));
+  const cats = [['gem', 'Voci Google'], ['piper', 'Voci sul telefono'], ['sys', 'Voci dell\'iPhone']].filter(([c]) => [...used].some(v => statsVoiceCat(v) === c));
+  if(statsVoice !== 'all' && !(statsVoice.startsWith('cat:') ? cats.some(([c]) => 'cat:' + c === statsVoice) : used.has(statsVoice.slice(2)))) statsVoice = 'all';
   const ranges = [['oggi', 'Oggi'], ['7', '7 giorni'], ['30', '30 giorni'], ['tutto', 'Tutto']];
   const rb = $('sRange'); rb.textContent = '';
   ranges.forEach(([k, label]) => {
@@ -3349,27 +3381,37 @@ function renderStats(){
     b.onclick = () => { statsRange = k; store.set('statsRange', k); renderStats(); };
     rb.appendChild(b);
   });
+  const sel = $('sVoice'); sel.textContent = '';
+  const addOpt = (val, label, parent) => { const o = el('option', null, label); o.value = val; if(statsVoice === val) o.selected = true; (parent || sel).appendChild(o); };
+  addOpt('all', 'Tutte le voci');
+  cats.forEach(([c, label]) => {
+    const g = el('optgroup'); g.label = label; addOpt('cat:' + c, 'Tutte le voci di questo gruppo', g); sel.appendChild(g);
+    [...used].filter(v => statsVoiceCat(v) === c).sort().forEach(v => addOpt('v:' + v, voices[v] || 'Voce', g));
+  });
+  if(used.has('legacy')) addOpt('v:legacy', 'Ascolti prima del filtro voci');
   const chart = $('sChart'); chart.textContent = '';
-  const bars = []; // {label, v}
+  const bars = [];
   let days = [];
   if(statsRange === 'oggi'){
-    const r = st[localDay(now)] || { h: Array(24).fill(0), b: {} };
-    for(let h = 0; h < 24; h++) bars.push({ label: h % 6 === 0 ? String(h) : '', v: r.h[h] || 0 });
-    days = [r];
+    const r = st[localDay(now)] || {};
+    const pk = statsPick(r, statsVoice);
+    pk.hours.forEach((v, h) => bars.push({ label: h % 6 === 0 ? String(h) : '', v }));
+    days = [pk];
   } else if(statsRange === 'tutto'){
     const months = {};
-    for(const d of Object.keys(st)){ const m = d.slice(0, 7); months[m] = months[m] || { v: 0, days: [] }; months[m].v += st[d].h.reduce((a, b) => a + b, 0); months[m].days.push(st[d]); days.push(st[d]); }
-    const keys = Object.keys(months).sort();
-    keys.forEach(m => bars.push({ label: new Date(m + '-01').toLocaleDateString('it-IT', { month: 'short' }).replace('.', ''), v: months[m].v }));
+    for(const d of Object.keys(st)){
+      const m = d.slice(0, 7), pk = statsPick(st[d], statsVoice);
+      months[m] = months[m] || 0; months[m] += pk.total; days.push(pk);
+    }
+    Object.keys(months).sort().forEach(m => bars.push({ label: new Date(m + '-01').toLocaleDateString('it-IT', { month: 'short' }).replace('.', ''), v: months[m] }));
   } else {
     const n = +statsRange;
     for(let i = n - 1; i >= 0; i--){
       const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
-      const r = st[localDay(d)] || { h: Array(24).fill(0), b: {} };
-      days.push(r);
-      const v = r.h.reduce((a, b) => a + b, 0);
+      const pk = statsPick(st[localDay(d)] || {}, statsVoice);
+      days.push(pk);
       const label = n === 7 ? d.toLocaleDateString('it-IT', { weekday: 'short' }).replace('.', '') : (d.getDate() % 5 === 0 || i === 0 ? String(d.getDate()) : '');
-      bars.push({ label, v });
+      bars.push({ label, v: pk.total });
     }
   }
   const max = Math.max(1, ...bars.map(b => b.v));
@@ -3382,11 +3424,10 @@ function renderStats(){
   $('sBig').textContent = total ? fmtDur(total) : 'Nessun ascolto';
   const label = { oggi: 'oggi', '7': 'negli ultimi 7 giorni', '30': 'negli ultimi 30 giorni', tutto: 'in tutto' }[statsRange];
   let sub = label;
-  if(statsRange === '7' || statsRange === '30'){ const active = days.filter(r => r.h.some(x => x > 0)).length; if(active) sub += ` · in media ${fmtDur(total / 1 / Math.max(1, active))} nei giorni in cui hai ascoltato`; }
+  if(statsRange === '7' || statsRange === '30'){ const active = days.filter(p => p.total > 0).length; if(active) sub += ` · in media ${fmtDur(total / active)} nei giorni in cui hai ascoltato`; }
   $('sSub').textContent = sub;
-  // libri nel periodo
   const per = {};
-  days.forEach(r => { for(const k of Object.keys(r.b || {})) per[k] = (per[k] || 0) + r.b[k]; });
+  days.forEach(p => { for(const k of Object.keys(p.books)) per[k] = (per[k] || 0) + p.books[k]; });
   const list = $('sBooks'); list.textContent = '';
   const entries = Object.entries(per).sort((a, b) => b[1] - a[1]);
   if(!entries.length) list.appendChild(el('p', 'cardNote', 'Nessun ascolto in questo periodo.'));
@@ -3396,10 +3437,10 @@ function renderStats(){
     row.appendChild(t); list.appendChild(row);
   });
 }
-function statsSize(){ try{ return new Blob([JSON.stringify([store.get('stats') || {}, store.get('statsTitles') || {}])]).size; }catch(e){ return 0; } }
+function statsSize(){ try{ return new Blob([JSON.stringify([store.get('stats') || {}, store.get('statsTitles') || {}, store.get('statsVoices') || {}])]).size; }catch(e){ return 0; } }
 function clearStats(){
   if(!confirm('Cancellare tutte le statistiche di ascolto? Non si possono recuperare.')) return;
-  statsPending = []; store.del('stats'); store.del('statsTitles');
+  statsPending = []; store.del('stats'); store.del('statsTitles'); store.del('statsVoices');
   setStatus('Statistiche cancellate.'); openSettings(null, true);
 }
 
@@ -3611,6 +3652,7 @@ function openMore(){
 
 /* ---------- eventi ---------- */
 $('addBtn').onclick = () => $('file').click();
+$('sVoice').onchange = e => { statsVoice = e.target.value; store.set('statsVoice', statsVoice); renderStats(); };
 $('bkFile').onchange = e => { const f = e.target.files[0]; if(f) restoreBackup(f); e.target.value = ''; };
 $('file').onchange = e => { const f = e.target.files[0]; if(f) addFile(f); e.target.value = ''; };
 document.querySelectorAll('.chip').forEach(c => c.onclick = () => { filter = c.dataset.f; renderChips(); renderLibrary(); });
