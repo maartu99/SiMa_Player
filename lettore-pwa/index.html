@@ -675,6 +675,19 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 /* v44: riga "Pronti circa..." staccata dai controlli, spazio sempre riservato così niente salta */
 #bufInfo,#bufInfo:empty{min-height:16px;line-height:16px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pCtrls{padding-top:24px}
+
+/* v45: scheda Statistiche */
+#statsView{padding:16px 16px calc(env(safe-area-inset-bottom) + 190px)}
+.sRange{display:flex;gap:8px;margin:16px 0 0;overflow-x:auto;scrollbar-width:none}
+.sRange .chip{flex:1 0 auto;width:auto;min-width:72px;height:36px;padding:0 14px;font-size:13px;white-space:nowrap}
+.sTotal{text-align:center;margin-top:22px}
+.sBig{font-family:var(--serif);font-size:38px;font-weight:600;letter-spacing:-.5px;color:var(--ink);font-variant-numeric:tabular-nums}
+.sSub{font-size:13px;color:var(--muted);margin-top:4px}
+.sChart{display:flex;align-items:flex-end;gap:3px;height:160px;margin:22px 0 4px;padding:0 2px;border-bottom:1px solid var(--line)}
+.sCol{flex:1 1 0;min-width:0;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center}
+.sBar{width:100%;max-width:18px;border-radius:6px 6px 2px 2px;background:var(--accent);min-height:0}
+.sLab{font-size:10px;color:var(--muted);height:16px;line-height:16px;margin-top:4px;white-space:nowrap;overflow:visible}
+.tabBtn span{white-space:nowrap}
 </style>
 </head>
 <body class="noMini">
@@ -725,8 +738,18 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 </div>
 
 <!-- BARRA IN BASSO -->
+<main id="statsView" class="hidden">
+  <div class="libHead"><div class="libHeadRow"><h1>Statistiche</h1></div></div>
+  <div class="sRange" id="sRange" role="group" aria-label="Periodo"></div>
+  <div class="sTotal"><div class="sBig" id="sBig"></div><div class="sSub" id="sSub"></div></div>
+  <div class="sChart" id="sChart" aria-hidden="true"></div>
+  <h3 class="cardTitle">Libri ascoltati</h3>
+  <div class="setSection"><div class="card" id="sBooks"></div></div>
+</main>
+
 <nav id="tabBar" aria-label="Navigazione">
   <button class="tabBtn" data-tab="lib" aria-current="page"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><span>Libreria</span></button>
+  <button class="tabBtn" data-tab="stats"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 20h18"/><path d="M6 16v-5M11 16V7M16 16v-9"/></svg><span>Statistiche</span></button>
   <button class="tabBtn" data-tab="set"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span>Impostazioni</span></button>
 </nav>
 
@@ -803,7 +826,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 44;
+const APP_VERSION = 45;
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
   let hadController = !!navigator.serviceWorker.controller, reloading = false;
@@ -2515,6 +2538,7 @@ function showView(v){
   view = v;
   $('libView').classList.toggle('hidden', v !== 'lib');
   $('setView').classList.toggle('hidden', v !== 'set');
+  $('statsView').classList.toggle('hidden', v !== 'stats');
   setTab(v);
 }
 function onTab(t){
@@ -2522,6 +2546,7 @@ function onTab(t){
   if(reader.open) closeReader();
   closePlayer();
   if(t === 'lib'){ showView('lib'); window.scrollTo(0, 0); }
+  else if(t === 'stats'){ showView('stats'); renderStats(); window.scrollTo(0, 0); }
   else openSettings();
 }
 
@@ -3265,6 +3290,119 @@ async function restoreBackup(file){
   }catch(e){ console.error(e); setStatus('Non riesco a leggere questo backup. Potrebbe essere incompleto.', true); }
 }
 
+
+/* ---------- statistiche di ascolto: tempo di riproduzione reale, sul telefono, senza costi ---------- */
+// per giorno (ora locale): secondi per ora e secondi per libro. Solo numeri interi, pochi byte.
+const STATS_KEEP_DAYS = 400;
+let statsPending = [], statsLast = 0;
+function localDay(d){ d = d || new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+function statsAdd(key, title, secs){
+  const day = localDay(), hr = new Date().getHours();
+  const p = statsPending.find(x => x.day === day && x.key === key);
+  if(p){ p.s += secs; p.h = hr; } else statsPending.push({ day, key, title, s: secs, h: hr });
+}
+function statsFlush(){
+  if(!statsPending.length) return;
+  try{
+    const st = store.get('stats') || {}, titles = store.get('statsTitles') || {};
+    for(const p of statsPending){
+      const r = st[p.day] || { h: Array(24).fill(0), b: {} };
+      r.h[p.h] = (r.h[p.h] || 0) + p.s; r.b[p.key] = (r.b[p.key] || 0) + p.s;
+      st[p.day] = r; if(p.title) titles[p.key] = p.title;
+    }
+    statsPending = [];
+    // conta i secondi interi; scarta i giorni più vecchi di un anno
+    const cutoff = localDay(new Date(Date.now() - STATS_KEEP_DAYS * 864e5));
+    for(const d of Object.keys(st)){
+      if(d < cutoff){ delete st[d]; continue; }
+      st[d].h = st[d].h.map(Math.round); for(const k of Object.keys(st[d].b)) st[d].b[k] = Math.round(st[d].b[k]);
+    }
+    store.set('stats', st); store.set('statsTitles', titles);
+  }catch(e){}
+}
+// un tick ogni secondo: conta solo mentre la lettura è in corso; i buchi lunghi (schermo spento, app sospesa) non vengono contati
+setInterval(() => {
+  const now = Date.now(), gap = statsLast ? now - statsLast : 0; statsLast = now;
+  if(state.playing && state.key && gap > 0 && gap < 5000){ statsAdd(state.key, state.meta && state.meta.title, gap / 1000); }
+  if(statsPending.length && (now % 15000) < 1000) statsFlush();
+}, 1000);
+document.addEventListener('visibilitychange', () => { if(document.hidden) statsFlush(); });
+addEventListener('pagehide', statsFlush);
+
+let statsRange = store.get('statsRange') || 'oggi';
+function statsCollect(){
+  // ricostruisce dal salvataggio più le parti ancora in memoria
+  const st = JSON.parse(JSON.stringify(store.get('stats') || {}));
+  for(const p of statsPending){
+    const r = st[p.day] || { h: Array(24).fill(0), b: {} };
+    r.h[p.h] = (r.h[p.h] || 0) + p.s; r.b[p.key] = (r.b[p.key] || 0) + p.s; st[p.day] = r;
+  }
+  return st;
+}
+function renderStats(){
+  const st = statsCollect(), titles = store.get('statsTitles') || {};
+  const now = new Date();
+  const ranges = [['oggi', 'Oggi'], ['7', '7 giorni'], ['30', '30 giorni'], ['tutto', 'Tutto']];
+  const rb = $('sRange'); rb.textContent = '';
+  ranges.forEach(([k, label]) => {
+    const b = el('button', 'chip', label); b.setAttribute('aria-pressed', statsRange === k ? 'true' : 'false');
+    b.onclick = () => { statsRange = k; store.set('statsRange', k); renderStats(); };
+    rb.appendChild(b);
+  });
+  const chart = $('sChart'); chart.textContent = '';
+  const bars = []; // {label, v}
+  let days = [];
+  if(statsRange === 'oggi'){
+    const r = st[localDay(now)] || { h: Array(24).fill(0), b: {} };
+    for(let h = 0; h < 24; h++) bars.push({ label: h % 6 === 0 ? String(h) : '', v: r.h[h] || 0 });
+    days = [r];
+  } else if(statsRange === 'tutto'){
+    const months = {};
+    for(const d of Object.keys(st)){ const m = d.slice(0, 7); months[m] = months[m] || { v: 0, days: [] }; months[m].v += st[d].h.reduce((a, b) => a + b, 0); months[m].days.push(st[d]); days.push(st[d]); }
+    const keys = Object.keys(months).sort();
+    keys.forEach(m => bars.push({ label: new Date(m + '-01').toLocaleDateString('it-IT', { month: 'short' }).replace('.', ''), v: months[m].v }));
+  } else {
+    const n = +statsRange;
+    for(let i = n - 1; i >= 0; i--){
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+      const r = st[localDay(d)] || { h: Array(24).fill(0), b: {} };
+      days.push(r);
+      const v = r.h.reduce((a, b) => a + b, 0);
+      const label = n === 7 ? d.toLocaleDateString('it-IT', { weekday: 'short' }).replace('.', '') : (d.getDate() % 5 === 0 || i === 0 ? String(d.getDate()) : '');
+      bars.push({ label, v });
+    }
+  }
+  const max = Math.max(1, ...bars.map(b => b.v));
+  bars.forEach(b => {
+    const col = el('div', 'sCol'); const bar = el('div', 'sBar'); bar.style.height = Math.max(b.v ? 3 : 0, Math.round(b.v / max * 100)) + '%';
+    bar.title = fmtDur(b.v);
+    col.appendChild(bar); col.appendChild(el('span', 'sLab', b.label)); chart.appendChild(col);
+  });
+  const total = bars.reduce((a, b) => a + b.v, 0);
+  $('sBig').textContent = total ? fmtDur(total) : 'Nessun ascolto';
+  const label = { oggi: 'oggi', '7': 'negli ultimi 7 giorni', '30': 'negli ultimi 30 giorni', tutto: 'in tutto' }[statsRange];
+  let sub = label;
+  if(statsRange === '7' || statsRange === '30'){ const active = days.filter(r => r.h.some(x => x > 0)).length; if(active) sub += ` · in media ${fmtDur(total / 1 / Math.max(1, active))} nei giorni in cui hai ascoltato`; }
+  $('sSub').textContent = sub;
+  // libri nel periodo
+  const per = {};
+  days.forEach(r => { for(const k of Object.keys(r.b || {})) per[k] = (per[k] || 0) + r.b[k]; });
+  const list = $('sBooks'); list.textContent = '';
+  const entries = Object.entries(per).sort((a, b) => b[1] - a[1]);
+  if(!entries.length) list.appendChild(el('p', 'cardNote', 'Nessun ascolto in questo periodo.'));
+  entries.slice(0, 8).forEach(([k, v]) => {
+    const row = el('div', 'famRow');
+    const t = el('div', 'famText'); t.appendChild(el('div', 'famTitle', titles[k] || 'Libro')); t.appendChild(el('div', 'famSub', fmtDur(v)));
+    row.appendChild(t); list.appendChild(row);
+  });
+}
+function statsSize(){ try{ return new Blob([JSON.stringify([store.get('stats') || {}, store.get('statsTitles') || {}])]).size; }catch(e){ return 0; } }
+function clearStats(){
+  if(!confirm('Cancellare tutte le statistiche di ascolto? Non si possono recuperare.')) return;
+  statsPending = []; store.del('stats'); store.del('statsTitles');
+  setStatus('Statistiche cancellate.'); openSettings(null, true);
+}
+
 let settingsTab = 'voci';
 function openSettings(focus, keepScroll){
   if(focus === 'voices') settingsTab = 'voci';
@@ -3431,6 +3569,8 @@ function openSettings(focus, keepScroll){
     const audioMb = Math.round((store.get('audioBytes') || 0) / 1048576);
     const aheadMin = isGem() ? readyAheadMinutes() : 0;
     cs.appendChild(famRow('Audio già preparato', audioMb + ' MB' + (aheadMin ? ` · circa ${fmtMin(aheadMin)} pronti da ascoltare nel libro aperto` : '') + '. Quello già ascoltato si cancella per primo quando serve spazio.', audioMb ? 'Svuota' : null, clearAudioCache));
+    const sb = Math.round(statsSize() / 1024);
+    cs.appendChild(famRow('Statistiche di ascolto', (sb < 1 ? 'Meno di 1 KB' : sb + ' KB') + '. Servono per la scheda Statistiche.', sb ? 'Svuota' : null, clearStats));
     const tot = famRow('Spazio usato dall\'app', '...', null);
     cs.appendChild(tot);
     if(navigator.storage && navigator.storage.estimate) navigator.storage.estimate().then(e => { tot.querySelector('.famSub').textContent = Math.round((e.usage || 0) / 1048576) + ' MB tra libri, voci e audio'; }).catch(() => {});
