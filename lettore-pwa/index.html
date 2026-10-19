@@ -829,7 +829,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 49;
+const APP_VERSION = 50;
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
   let hadController = !!navigator.serviceWorker.controller, reloading = false;
@@ -3603,6 +3603,10 @@ function openSettings(focus, keepScroll){
       const sel = state.engine === 'sys' && state.sysVoice && state.sysVoice.voiceURI === v.voiceURI;
       ci.appendChild(voiceRow(v.name, /enhanced|premium|avanzat|migliorat/i.test(v.name) ? 'Avanzata' : 'Di sistema', sel, () => selectVoice('sys', v.voiceURI), b => previewVoice('sys', v.voiceURI, b), 'sys:' + v.voiceURI));
     });
+    // diagnostica: quante voci vede davvero il telefono, in tutte le lingue
+    const allV = 'speechSynthesis' in window ? speechSynthesis.getVoices() : [];
+    const langs = [...new Set(allV.map(v => v.lang))].sort();
+    ci.appendChild(el('p', 'cardNote', `Il telefono mi dà ${allV.length} voci in totale, ${it.length} in italiano. Lingue viste: ${langs.join(', ') || 'nessuna'}.`));
     const tip = el('details', 'tip');
     tip.appendChild(el('summary', null, 'Come averne di più naturali'));
     tip.appendChild(el('p', null, 'Sull\'iPhone apri Impostazioni > Accessibilità > Lettura e voce > Voci > Italiano, tocca una voce e scarica la versione Avanzata o Premium. Poi chiudi e riapri l\'app: le trovi qui.'));
