@@ -656,6 +656,22 @@ html,body,*{scrollbar-width:none;-ms-overflow-style:none}
 body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px) + 62px)}
 #libView,#setView{padding-bottom:calc(env(safe-area-inset-bottom) + 160px)}
 .card>.famRow:last-child{border-bottom:0}
+
+/* v43: player più pulito, come Audible */
+#nowText{display:none!important}
+.pMeta{padding:12px 0 0;gap:2px}
+.chapPill{margin-top:8px;height:36px;padding:0 10px;border:0;background:none;box-shadow:none;color:var(--muted);font-size:14px;font-weight:500;gap:6px}
+.chapPill .acc{color:var(--muted)}
+.seekWrap{margin-top:auto;padding-top:16px}
+.seekLabels{display:grid;grid-template-columns:1fr auto 1fr;align-items:baseline;font-variant-numeric:tabular-nums}
+.seekLabels #seekLeft{text-align:left}
+.seekLabels #seekMid{text-align:center;font-weight:600;color:var(--ink)}
+.seekLabels #seekRight{text-align:right;font-weight:500;color:var(--ink2)}
+.pBottom{grid-template-columns:repeat(4,minmax(0,1fr));padding-top:14px}
+.tile{padding:0 4px}
+.tile b{font-size:14px}
+.pCoverWrap{padding:14px 0 6px}
+.pCoverWrap .cover.l{height:min(100cqh,86vw,400px)}
 </style>
 </head>
 <body class="noMini">
@@ -736,7 +752,6 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
       <button class="ghostBtn" id="pClose" aria-label="Chiudi e torna alla libreria"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
       <span class="statusPill"><span class="waveBars" aria-hidden="true"><i></i><i></i><i></i></span><span id="pTopLabel">In ascolto</span></span>
       <div class="pTopRight">
-        <button class="ghostBtn" id="pMark" aria-label="Segnalibro sulla frase in lettura"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 3.5h11v17l-5.5-4-5.5 4z"/></svg></button>
         <button class="ghostBtn" id="pMore" aria-label="Altre opzioni"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.9"/><circle cx="12" cy="12" r="1.9"/><circle cx="19" cy="12" r="1.9"/></svg></button>
       </div>
     </div>
@@ -746,13 +761,9 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
       <span id="pAuthor"></span>
       <button class="chapPill" id="chapBtn"><span class="acc"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/></svg></span><span id="chapLabel"></span><span class="dim"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></span></button>
     </div>
-    <button id="nowText" aria-label="Apri il testo del libro a tutta pagina">
-      <span class="nowQuote" id="nowQuote"></span>
-      <span class="nowNext" id="nowNext"></span>
-      <span class="nowFoot">Tocca per aprire il testo completo <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
-    </button>
+    <div id="nowText" hidden><span id="nowQuote"></span><span id="nowNext"></span></div>
     <div class="seekWrap">
-      <div class="seekLabels"><span id="seekLeft"></span><b id="seekRight"></b></div>
+      <div class="seekLabels"><span id="seekLeft"></span><b id="seekMid"></b><span id="seekRight"></span></div>
       <label class="sr" for="seek">Posizione nel libro</label>
       <input type="range" id="seek" min="0" max="0" step="1" value="0">
       <div id="bufInfo" aria-live="polite"></div>
@@ -768,6 +779,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
       <button class="tile" id="speedBtn"><span class="tileTop"><span class="acc"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 14l4-4"/><path d="M3.5 17a9 9 0 1 1 17 0"/></svg></span><b id="speedLabel">1,0x</b></span><small>Velocità</small></button>
       <button class="tile" id="voiceBtn"><span class="tileTop"><span class="acc"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 11v2"/></svg></span><b id="voiceLabel">Sara</b></span><small>Voce</small></button>
       <button class="tile" id="textBtn"><span class="tileTop"><span class="acc"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 5.5A2 2 0 0 1 4.5 4H10a2 2 0 0 1 2 2v14a1.5 1.5 0 0 0-1.5-1.5h-8z"/><path d="M21.5 5.5A2 2 0 0 0 19.5 4H14a2 2 0 0 0-2 2v14a1.5 1.5 0 0 1 1.5-1.5h8z"/></svg></span><b>Leggi</b></span><small>Testo</small></button>
+      <button class="tile" id="pMark"><span class="tileTop"><span class="acc"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 3.5h11v17l-5.5-4-5.5 4z"/><path d="M12 7.5v6M9 10.5h6"/></svg></span><b>Clip</b></span><small>Segnalibro</small></button>
     </div>
   </div>
 </section>
@@ -788,7 +800,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 42;
+const APP_VERSION = 43;
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
   let hadController = !!navigator.serviceWorker.controller, reloading = false;
@@ -1906,6 +1918,17 @@ function voiceName(){
   if(state.engine === 'piper'){ const v = PIPER_VOICES.find(x => x.id === state.piperVoice) || GEM_VOICES.find(x => x.id === state.piperVoice); return v ? v.name : ''; }
   return state.sysVoice ? state.sysVoice.name.replace(/\s*\(.*\)\s*/, '') : 'iPhone';
 }
+// tempo stimato, senza costi: caratteri diviso la velocità di lettura misurata della voce e la velocità scelta
+function fmtDur(sec){ const m = Math.round(sec / 60); if(m < 1) return '< 1 min'; return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')} min`; }
+function seekText(g){
+  const pct = Math.min(100, Math.round((g + 1) * 100 / state.total));
+  $('seekMid').textContent = `${pct}%`;
+  const c = state.cum;
+  if(!c || c.length !== state.total + 1){ $('seekLeft').textContent = `Frase ${g + 1}`; $('seekRight').textContent = `di ${state.total}`; return; }
+  const k = cps() * (state.rate || 1);
+  $('seekLeft').textContent = fmtDur(c[g] / k);
+  $('seekRight').textContent = '-' + fmtDur((c[state.total] - c[g]) / k);
+}
 function refreshPosition(scrollText){
   if(!state.total) return;
   const g = gIndex();
@@ -1916,8 +1939,7 @@ function refreshPosition(scrollText){
   const seek = $('seek');
   if(!seeking){ seek.max = state.total - 1; seek.value = g; }
   seek.style.setProperty('--p', (state.total > 1 ? (seek.value / (state.total - 1)) * 100 : 0) + '%');
-  $('seekLeft').textContent = `Frase ${(+seek.value) + 1} di ${state.total}`;
-  $('seekRight').textContent = `${pct}% del libro`;
+  seekText(+seek.value);
   // frase in lettura con la successiva
   const s = state.sections[state.sec];
   $('nowQuote').textContent = s.sentences[state.idx] ? `“${s.sentences[state.idx].t}”` : '';
@@ -2247,6 +2269,8 @@ async function loadBook(key){
   state.offsets = []; let acc = 0;
   for(const s of secs){ state.offsets.push(acc); acc += s.sentences.length; }
   state.total = acc;
+  // caratteri dall'inizio del libro a ogni frase: servono per stimare il tempo ascoltato e quello che manca
+  state.cum = new Float64Array(acc + 1); { let i = 0; for(const s of secs) for(const it of s.sentences){ state.cum[i + 1] = state.cum[i] + it.t.length + 1; i++; } }
   audio.removeAttribute('data-key');
   want([]);
   const pos = store.get('pos:' + key);
@@ -2745,6 +2769,7 @@ function fmtRate(r){ return r.toFixed(1).replace('.', ',') + 'x'; }
 function setRate(r, commit){
   state.rate = Math.round(r * 10) / 10;
   $('speedLabel').textContent = fmtRate(state.rate);
+  if(state.total) seekText(seeking ? +$('seek').value : gIndex());
   if($('speedBig')) $('speedBig').textContent = fmtRate(state.rate);
   document.querySelectorAll('.presets button').forEach(b => b.setAttribute('aria-pressed', +b.dataset.r === state.rate ? 'true' : 'false'));
   if(state.engine === 'piper') audio.playbackRate = state.rate; // cambia al volo, senza ricominciare
@@ -3481,8 +3506,7 @@ seekEl.addEventListener('input', () => {
   seeking = true;
   const g = +seekEl.value;
   seekEl.style.setProperty('--p', (state.total > 1 ? g / (state.total - 1) * 100 : 0) + '%');
-  $('seekLeft').textContent = `Frase ${g + 1} di ${state.total}`;
-  $('seekRight').textContent = `${Math.round((g + 1) * 100 / state.total)}% del libro`;
+  seekText(g);
 });
 seekEl.addEventListener('change', () => {
   seeking = false;
