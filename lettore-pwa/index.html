@@ -672,6 +672,9 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 .tile b{font-size:14px}
 .pCoverWrap{padding:14px 0 6px}
 .pCoverWrap .cover.l{height:min(100cqh,86vw,400px)}
+/* v44: riga "Pronti circa..." staccata dai controlli, spazio sempre riservato così niente salta */
+#bufInfo,#bufInfo:empty{min-height:16px;line-height:16px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pCtrls{padding-top:24px}
 </style>
 </head>
 <body class="noMini">
@@ -800,7 +803,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 43;
+const APP_VERSION = 44;
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
   let hadController = !!navigator.serviceWorker.controller, reloading = false;
