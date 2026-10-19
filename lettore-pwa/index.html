@@ -829,7 +829,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 52;
+const APP_VERSION = 53;
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
   let hadController = !!navigator.serviceWorker.controller, reloading = false;
@@ -3030,7 +3030,7 @@ async function verifyVoices(){
 // i download in corso si ricordano: se iPhone li interrompe quando esci dall'app, ripartono da soli al ritorno
 function dlPending(){ return store.get('dlPending') || []; }
 function dlRemember(g){ const l = dlPending().filter(x => x.key !== g.key); l.push({ key: g.key, ids: g.ids, title: g.title, n: g.n || 0 }); store.set('dlPending', l); }
-function dlForget(){ const l = dlPending().filter(x => !x.ids.every(id => readyVoices.has(id))); store.set('dlPending', l); }
+function dlForget(){ const l = dlPending().filter(x => !readyVoices.has(x.ids[0])); store.set('dlPending', l); }
 function downloadGroup(g){
   if(downloading.has(g.key)) return;
   downloading.add(g.key); dlRemember(g);
@@ -3040,7 +3040,9 @@ function downloadGroup(g){
 }
 // riparte dal punto in cui si era fermato: i file già scaricati restano nella cache del telefono
 function dlResume(){
-  const list = dlPending().filter(g => !g.ids.every(id => readyVoices.has(id)));
+  // non tocco il motore mentre legge o genera: sarebbe proprio la voce che stai ascoltando
+  if(state.playing || busy) return;
+  const list = dlPending().filter(g => !readyVoices.has(g.ids[0]));
   if(!list.length) return;
   const g = list[0], fam = familyOf(g.ids[0]);
   // dopo tanti tentativi a vuoto smetto, così non riprova a ogni apertura
