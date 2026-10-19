@@ -829,7 +829,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 46;
+const APP_VERSION = 47;
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
   let hadController = !!navigator.serviceWorker.controller, reloading = false;
@@ -3385,7 +3385,7 @@ function renderStats(){
   const addOpt = (val, label, parent) => { const o = el('option', null, label); o.value = val; if(statsVoice === val) o.selected = true; (parent || sel).appendChild(o); };
   addOpt('all', 'Tutte le voci');
   cats.forEach(([c, label]) => {
-    const g = el('optgroup'); g.label = label; addOpt('cat:' + c, 'Tutte le voci di questo gruppo', g); sel.appendChild(g);
+    const g = el('optgroup'); g.label = label; addOpt('cat:' + c, 'Tutte ' + ({ gem: '(Google)', piper: '(telefono)', sys: '(iPhone)' })[c], g); sel.appendChild(g);
     [...used].filter(v => statsVoiceCat(v) === c).sort().forEach(v => addOpt('v:' + v, voices[v] || 'Voce', g));
   });
   if(used.has('legacy')) addOpt('v:legacy', 'Ascolti prima del filtro voci');
