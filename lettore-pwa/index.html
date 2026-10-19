@@ -829,7 +829,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 51;
+const APP_VERSION = 52;
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
   let hadController = !!navigator.serviceWorker.controller, reloading = false;
@@ -888,6 +888,10 @@ const GEM_STYLES = {
   calma: { label: 'Calma', text: 'Lettura calma e rilassata di un audiolibro in italiano, voce morbida, ritmo lento e pause naturali.' },
   espressiva: { label: 'Espressiva', text: 'Lettura espressiva di un audiolibro in italiano, che interpreta con vivacità emozioni, tensione e dialoghi tra i personaggi.' }
 };
+// il telefono su cui gira l'app: le istruzioni cambiano tra iPhone e Android
+const IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent || '');
+const IS_ANDROID = /Android/.test(navigator.userAgent || '');
+const SYS_NAME = IS_IOS ? 'iPhone' : IS_ANDROID ? 'Android' : 'telefono';
 const isGemId = id => !!id && id.startsWith('gem-');
 const isGem = () => state.engine === 'piper' && isGemId(state.piperVoice);
 const state = {
@@ -2975,7 +2979,7 @@ function openVoiceSheet(){
   }
   const it = systemVoices();
   if(it.length){
-    body.appendChild(el('div', 'groupLabel', 'Voci dell\'iPhone'));
+    body.appendChild(el('div', 'groupLabel', 'Voci di sistema'));
     it.forEach(v => {
       const sel = state.engine === 'sys' && state.sysVoice && state.sysVoice.voiceURI === v.voiceURI;
       body.appendChild(voiceRow(v.name, /enhanced|premium|avanzat|migliorat/i.test(v.name) ? 'Avanzata' : 'Di sistema', sel, () => selectVoice('sys', v.voiceURI), b => previewVoice('sys', v.voiceURI, b), 'sys:' + v.voiceURI));
@@ -3392,7 +3396,7 @@ function renderStats(){
   // voci usate nei dati salvati, raggruppate per tipo
   const used = new Set();
   Object.values(st).forEach(r => Object.keys(r.v || {}).forEach(v => used.add(v)));
-  const cats = [['gem', 'Voci Google'], ['piper', 'Voci sul telefono'], ['sys', 'Voci dell\'iPhone']].filter(([c]) => [...used].some(v => statsVoiceCat(v) === c));
+  const cats = [['gem', 'Voci Google'], ['piper', 'Voci sul telefono'], ['sys', 'Voci di sistema']].filter(([c]) => [...used].some(v => statsVoiceCat(v) === c));
   if(statsVoice !== 'all' && !(statsVoice.startsWith('cat:') ? cats.some(([c]) => 'cat:' + c === statsVoice) : used.has(statsVoice.slice(2)))) statsVoice = 'all';
   const ranges = [['oggi', 'Oggi'], ['7', '7 giorni'], ['30', '30 giorni'], ['tutto', 'Tutto']];
   const rb = $('sRange'); rb.textContent = '';
@@ -3598,13 +3602,13 @@ function openSettings(focus, keepScroll){
 
     // iPhone
     const it = systemVoices();
-    const ci = card('Voci dell\'iPhone', 'Sempre pronte.');
+    const ci = card(IS_IOS ? 'Voci dell\'iPhone' : 'Voci di sistema', 'Sempre pronte.');
     it.forEach(v => {
       const sel = state.engine === 'sys' && state.sysVoice && state.sysVoice.voiceURI === v.voiceURI;
       ci.appendChild(voiceRow(v.name, /enhanced|premium|avanzat|migliorat/i.test(v.name) ? 'Avanzata' : 'Di sistema', sel, () => selectVoice('sys', v.voiceURI), b => previewVoice('sys', v.voiceURI, b), 'sys:' + v.voiceURI));
     });
     // iPhone passa alle pagine web solo alcune voci: lo dico chiaro, senza istruzioni che non funzionano
-    ci.appendChild(el('p', 'cardNote', it.length ? `Qui compaiono le voci italiane che iPhone passa a SiMa: ora ${it.length === 1 ? 'una' : it.length}. Le voci aggiunte in Impostazioni di iPhone non sempre arrivano alle app web.` : 'iPhone non passa a SiMa nessuna voce italiana. Le voci aggiunte in Impostazioni di iPhone non sempre arrivano alle app web.'));
+    ci.appendChild(el('p', 'cardNote', it.length ? `Qui compaiono le voci italiane che ${SYS_NAME} passa a SiMa: ora ${it.length === 1 ? 'una' : it.length}.${IS_IOS ? ' Le voci aggiunte in Impostazioni di iPhone non sempre arrivano alle app web.' : ''}` : `${SYS_NAME} non passa a SiMa nessuna voce italiana.${IS_IOS ? ' Le voci aggiunte in Impostazioni di iPhone non sempre arrivano alle app web.' : ' Aggiungine una nelle impostazioni di sintesi vocale del telefono e riapri l\'app.'}`));
 
   } else if(settingsTab === 'play'){
     const cb = card('Pulsanti accanto a play', 'Valgono anche per cuffie e schermata di blocco.');
