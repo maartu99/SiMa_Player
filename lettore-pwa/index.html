@@ -648,12 +648,12 @@ html,body,*{scrollbar-width:none;-ms-overflow-style:none}
 /* v39: filtri allineati ai bordi, barra in basso più bassa */
 .chips{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:0 0 16px;padding:0;overflow:visible}
 .chip{width:100%;min-width:0;padding:0 4px;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center}
-#tabBar{align-items:center;padding:2px 8px max(calc(env(safe-area-inset-bottom) - 16px), 4px)}
-.tabBtn{min-height:44px;gap:2px;font-size:10px}
-.tabBtn svg{width:22px;height:22px}
-#mini{bottom:calc(max(calc(env(safe-area-inset-bottom) - 16px), 4px) + 54px)}
-#toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 16px), 4px) + 132px)}
-body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 16px), 4px) + 60px)}
+#tabBar{align-items:center;padding:8px 8px max(calc(env(safe-area-inset-bottom) - 14px), 8px)}
+.tabBtn{min-height:0;height:38px;gap:3px;font-size:10px;line-height:12px}
+.tabBtn svg{width:22px;height:22px;flex:none}
+#mini{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px) + 56px)}
+#toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px) + 134px)}
+body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px) + 62px)}
 #libView,#setView{padding-bottom:calc(env(safe-area-inset-bottom) + 160px)}
 </style>
 </head>
@@ -786,7 +786,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 16px), 4px
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 39;
+const APP_VERSION = 40;
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
   let hadController = !!navigator.serviceWorker.controller, reloading = false;
