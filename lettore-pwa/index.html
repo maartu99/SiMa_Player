@@ -829,7 +829,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 55;
+const APP_VERSION = 56;
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
   let hadController = !!navigator.serviceWorker.controller, reloading = false;
@@ -3586,8 +3586,15 @@ function openSettings(focus, keepScroll){
         const state = lf <= 0 ? (used >= GEM_RPD ? 'Limite raggiunto' : 'Disponibile') : gemUnavailable(m) ? 'Non disponibile sul tuo account' : lf > 5 * 60000 ? `Bloccato fino alle ${gemResetTime()}` : 'In pausa un minuto';
         ca.appendChild(famRow(GEM_MODEL_NAMES[m] || m, `${used} di ${GEM_RPD} richieste usate. ${state}.`, null));
         const er = (store.get('gemErr') || {})[m];
+        if(lf > 0 && !(er && /^429/.test(er.s) && tNow - er.at < 2 * 864e5)) ca.appendChild(el('div', 'modelErr', 'Motivo del blocco non registrato: il blocco è stato salvato da una versione precedente. Usa "Sblocca e riprova" qui sotto: se Google rifiuta ancora, vedrai il motivo esatto.'));
         if(er && /^429/.test(er.s) && tNow - er.at < 2 * 864e5) ca.appendChild(el('div', 'modelErr', `Ultimo rifiuto di Google, ${new Date(er.at).toLocaleString('it-IT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}: ${quotaWhy(er.t)}. Testo: ${er.t.slice(0, 260)}`));
       });
+      const unb = el('button', 'wideBtn inCard', 'Sblocca e riprova');
+      unb.onclick = () => {
+        if(!confirm('Tolgo i blocchi salvati su questo telefono. Alla prossima lettura con voce Google l\'app prova di nuovo, e se Google rifiuta salvo il motivo. Procedo?')) return;
+        store.del('gemBlocked'); store.del('gemErr'); setStatus('Blocchi tolti. Premi play con una voce Google: se Google rifiuta, il motivo comparirà qui.'); openSettings(null, true);
+      };
+      ca.appendChild(unb);
       const lg = (store.get('gemLog') || []).slice(-8).reverse();
       ca.appendChild(el('div', 'innerLabel', 'Ultime richieste'));
       if(!lg.length) ca.appendChild(el('p', 'cardNote', 'Ancora nessuna richiesta registrata. Da qui in poi le vedi qui.'));
