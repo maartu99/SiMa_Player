@@ -829,7 +829,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 54;
+const APP_VERSION = 55;
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
   let hadController = !!navigator.serviceWorker.controller, reloading = false;
@@ -1349,7 +1349,7 @@ async function wavSeconds(blob){
   try{ const h = new DataView(await blob.slice(0, 44).arrayBuffer()); const sr = h.getUint32(24, true) || 24000; return (blob.size - 44) / 2 / sr; }catch(e){ return 0; }
 }
 // ultimo errore di ogni modello, per capire perché uno non viene usato
-function noteGemErr(model, status, text){ const e = store.get('gemErr') || {}; e[model] = { s: status, t: String(text || '').replace(/\s+/g, ' ').slice(0, 220), at: Date.now() }; store.set('gemErr', e); }
+function noteGemErr(model, status, text){ const e = store.get('gemErr') || {}; e[model] = { s: status, t: String(text || '').replace(/\s+/g, ' ').slice(0, 700), at: Date.now() }; store.set('gemErr', e); }
 function clearGemErr(model){ const e = store.get('gemErr') || {}; if(e[model]){ delete e[model]; store.set('gemErr', e); } }
 // due modi di chiedere l'audio a Google: l'API Interactions e la classica generateContent.
 // Se un modello non accetta il primo, provo il secondo e me lo ricordo.
@@ -3573,10 +3573,20 @@ function openSettings(focus, keepScroll){
       // monitoraggio: per modello, ultime richieste, ultimi giorni
       ca.appendChild(el('div', 'innerLabel', 'Richieste di oggi per modello'));
       const stNow = gemStats(), blNow = store.get('gemBlocked') || {}, tNow = Date.now();
+      // cosa ha risposto Google: tipo di limite (richieste o token, al minuto o al giorno) e valore
+      const quotaWhy = t => {
+        const id = (/"quotaId"\s*:\s*"([^"]+)"/.exec(t) || /quotaId\W+([\w-]+)/.exec(t) || [])[1];
+        const lim = (/limit:\s*(\d+)/i.exec(t) || /"quotaValue"\s*:\s*"(\d+)"/.exec(t) || [])[1];
+        const kind = /PerDay|per day|daily/i.test(t) ? 'al giorno' : /PerMinute|per minute/i.test(t) ? 'al minuto' : 'periodo non indicato';
+        const what = /token/i.test(t) ? 'token' : 'richieste';
+        return `${what}, ${kind}${lim ? `, limite ${lim}` : ''}${id ? ` (${id})` : ''}`;
+      };
       GEM_MODELS.forEach(m => {
         const used = stNow.req[m] || 0, until = blNow[m] || 0, lf = until - tNow;
         const state = lf <= 0 ? (used >= GEM_RPD ? 'Limite raggiunto' : 'Disponibile') : gemUnavailable(m) ? 'Non disponibile sul tuo account' : lf > 5 * 60000 ? `Bloccato fino alle ${gemResetTime()}` : 'In pausa un minuto';
         ca.appendChild(famRow(GEM_MODEL_NAMES[m] || m, `${used} di ${GEM_RPD} richieste usate. ${state}.`, null));
+        const er = (store.get('gemErr') || {})[m];
+        if(er && /^429/.test(er.s) && tNow - er.at < 2 * 864e5) ca.appendChild(el('div', 'modelErr', `Ultimo rifiuto di Google, ${new Date(er.at).toLocaleString('it-IT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}: ${quotaWhy(er.t)}. Testo: ${er.t.slice(0, 260)}`));
       });
       const lg = (store.get('gemLog') || []).slice(-8).reverse();
       ca.appendChild(el('div', 'innerLabel', 'Ultime richieste'));

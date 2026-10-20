@@ -1,7 +1,7 @@
 // Service worker: rende l'app installabile e utilizzabile offline.
 // File dell'app: sempre la versione più nuova se c'è connessione, la copia salvata se sei offline.
 // Librerie e voci: salvate dopo il primo download.
-const VERSION = 54;
+const VERSION = 55;
 const CORE = 'lettore-core-v' + VERSION;
 const RUNTIME = 'lettore-runtime-v1';
 const CORE_FILES = ['./', './index.html', './tts-worker.js', './kokoro-worker.js', './supertonic-worker.js', './manifest.webmanifest',
