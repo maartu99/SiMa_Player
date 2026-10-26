@@ -829,7 +829,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 60;
+const APP_VERSION = 61;
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
   let hadController = !!navigator.serviceWorker.controller, reloading = false;
@@ -1325,6 +1325,9 @@ function blockModel(m, until){ const b = store.get('gemBlocked') || {}; b[m] = u
 // un modello conta come gratuito se non è fermo per un errore diverso dal limite (es. non disponibile)
 function gemUnavailable(m){ const b = store.get('gemBlocked') || {}, e = (store.get('gemErr') || {})[m]; return !!(b[m] && b[m] > Date.now() && e && !/^429/.test(e.s) && !/^200/.test(e.s)) || !!(e && /limit:\s*0\b/i.test(e.t) && b[m] > Date.now()); }
 function gemModelsFree(){ return GEM_MODELS.filter(m => !gemUnavailable(m)); }
+// rifiuto giornaliero confermato da Google oggi: solo questo vale come "finito". Gli altri blocchi salvati si possono riprovare.
+function gemConfirmedDaily(m){ const e = (store.get('gemErr') || {})[m]; return !!(e && e.d && e.at > gemResetDate().getTime() - 864e5); }
+let gemLastProbe = 0;
 function gemModelsLeft(){ const bl = gemBlocked(); return GEM_MODELS.filter(m => !bl.includes(m)).length; }
 function findAudio(o){
   // cerca nella risposta l'ultimo blocco audio in base64
@@ -1352,7 +1355,7 @@ async function wavSeconds(blob){
   try{ const h = new DataView(await blob.slice(0, 44).arrayBuffer()); const sr = h.getUint32(24, true) || 24000; return (blob.size - 44) / 2 / sr; }catch(e){ return 0; }
 }
 // ultimo errore di ogni modello, per capire perché uno non viene usato
-function noteGemErr(model, status, text){ const e = store.get('gemErr') || {}; e[model] = { s: status, t: String(text || '').replace(/\s+/g, ' ').slice(0, 700), at: Date.now() }; store.set('gemErr', e); }
+function noteGemErr(model, status, text){ const e = store.get('gemErr') || {}; e[model] = { s: status, t: String(text || '').replace(/\s+/g, ' ').slice(0, 700), at: Date.now(), d: status && /^429/.test(String(status)) && /per ?day|PerDay|daily/i.test(String(text || '')) && !/per ?minute|PerMinute/i.test(String(text || '')) }; store.set('gemErr', e); }
 function clearGemErr(model){ const e = store.get('gemErr') || {}; if(e[model]){ delete e[model]; store.set('gemErr', e); } }
 // due modi di chiedere l'audio a Google: l'API Interactions e la classica generateContent.
 // Se un modello non accetta il primo, provo il secondo e me lo ricordo.
@@ -1437,7 +1440,12 @@ async function geminiTTSOnce(text, voiceId, keyOverride){
   const voice = voiceId.slice(4);
   let lastErr = null, tried = 0;
   // verifica della chiave: ignoro i blocchi salvati e chiedo davvero a Google
-  const blocked = keyOverride ? [] : gemBlocked();
+  let blocked = keyOverride ? [] : gemBlocked();
+  if(!keyOverride && blocked.length >= GEM_MODELS.length && Date.now() - gemLastProbe > 45000){
+    // tutti fermi nella memoria dell'app: chiedo davvero a Google per i modelli senza un rifiuto giornaliero confermato (un rifiuto non consuma richieste)
+    const probe = GEM_MODELS.filter(m => !gemConfirmedDaily(m));
+    if(probe.length){ gemLastProbe = Date.now(); blocked = blocked.filter(m => !probe.includes(m)); }
+  }
   const apis = store.get('gemApi') || {};
   for(const model of GEM_MODELS){
     if(blocked.includes(model)) continue;
@@ -1460,6 +1468,7 @@ async function geminiTTSOnce(text, voiceId, keyOverride){
       if(!blob){ noteGemErr(model, '200 ' + usedApi, 'nessun audio nella risposta'); lastErr = new Error('nessun audio nella risposta'); continue; }
       if(apis[model] !== usedApi){ apis[model] = usedApi; store.set('gemApi', apis); }
       clearGemErr(model); gemStatReq(model);
+      { const bb = store.get('gemBlocked') || {}; if(bb[model]){ delete bb[model]; store.set('gemBlocked', bb); } }
       return blob;
     }
     if(r.status === 429 && /limit:\s*0\b/i.test(t)){
@@ -1761,7 +1770,7 @@ function enterFallback(){
   const b = store.get('gemBlocked') || {};
   const times = GEM_MODELS.map(m => b[m]).filter(t => t && t > Date.now());
   state.fallbackFrom = state.piperVoice;
-  state.fallbackUntil = times.length ? Math.min(...times) : Date.now() + 60000;
+  state.fallbackUntil = times.length ? Math.min(...times) : Date.now() + 60000; state.fallbackAt = Date.now();
   if(fb.kind === 'piper'){ state.engine = 'piper'; state.piperVoice = fb.id; }
   else { state.engine = 'sys'; state.sysVoice = fb.voice; }
   audio.removeAttribute('data-key');
@@ -1783,7 +1792,7 @@ function leaveFallback(){
 }
 // a ogni nuova frase controllo se si può tornare alla voce Google
 function maybeLeaveFallback(){
-  if(state.fallbackFrom && Date.now() >= state.fallbackUntil && gemModelsLeft()){ leaveFallback(); setStatus('Il limite Google si è azzerato: torno alla voce Google.'); }
+  if(state.fallbackFrom && ((Date.now() >= state.fallbackUntil && gemModelsLeft()) || (Date.now() - (state.fallbackAt || 0) > 180000 && GEM_MODELS.some(m => !gemConfirmedDaily(m))))){ leaveFallback(); setStatus('Riprovo con la voce Google.'); }
 }
 
 /* ---------- voci di sistema ---------- */
