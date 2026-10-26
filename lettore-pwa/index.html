@@ -829,7 +829,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 62;
+const APP_VERSION = 63;
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
   let hadController = !!navigator.serviceWorker.controller, reloading = false;
@@ -1380,7 +1380,7 @@ function audioFrom(j){
   return pcmToWav(bytes, m ? +m[1] : 24000);
 }
 const isUnsupported = t => /not (found|supported)|unsupported|does not support|is not available|no longer available|invalid (model|argument).*model|unknown (name|field)/i.test(t);
-const isTooLong = t => /token|too long|exceed|maximum|max_output|length/i.test(t);
+const isTooLong = t => /too long|exceeds the maximum|maximum (input|context|number of tokens)|input token count/i.test(t);
 // consumo di oggi (il giorno di Google, che cambia a mezzanotte della California): richieste per modello e audio ricevuto
 const GEM_RPD = 10;
 function gemDay(){ try{ return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' }); }catch(e){ return new Date().toISOString().slice(0, 10); } }
@@ -1519,7 +1519,7 @@ function gemErrorText(msg){
 const chunkCache = new Map();
 // lunghezza dei blocchi in caratteri: circa 7-8 minuti di ascolto; si accorcia da sola se Google taglia l'audio
 const gemTarget = () => store.get('gemChunk') || 6500;
-const GEM_FIRST = 900; // primo blocco dopo una partenza: circa 1 minuto di audio
+const GEM_FIRST = 1800; // primo blocco dopo una partenza: circa 2 minuti di audio, pronto in 15-20 secondi
 // tetto: la lunghezza più grande che Google regge (scende quando taglia, dopo una settimana si riprova)
 const GEM_CEIL = 15000;
 function gemCeil(){ const c = store.get('gemCeil'); return c && c.until > Date.now() ? c.v : GEM_CEIL; }
@@ -1583,7 +1583,7 @@ function chunksFor(sec){
     let Tt = T;
     if(anchor >= 0){
       if(i < anchor) stopAt = Math.min(stopAt, anchor);
-      else Tt = Math.min(T, Math.max(GEM_FIRST, run * 3));
+      else Tt = Math.min(T, run ? Math.max(GEM_FIRST * 4, run * 4) : GEM_FIRST);
     }
     let len = 0, j = i, lastPara = -1;
     while(j < stopAt){
@@ -1606,6 +1606,10 @@ function chunksFor(sec){
   chunkCache.set(ck, out);
   return out;
 }
+const GEM_TINY = 400;
+function secChars(sec){ const s = state.sections[sec]; return s ? s.sentences.reduce((a, x) => a + x.t.length + 1, 0) : 0; }
+// prossima sezione da leggere con la voce Google: salto quelle di poche parole
+function nextGemSec(sec){ let n = sec + 1; while(n < state.sections.length - 1 && secChars(n) < GEM_TINY) n++; return n < state.sections.length ? n : -1; }
 function chunkAt(sec, idx){ return chunksFor(sec).find(c => idx >= c.start && idx <= c.end); }
 function chunkKey(c){ return `${state.piperVoice}|${state.key}|${c.sec}|c${c.start}-${c.end}`; }
 function chunkText(c){ return state.sections[c.sec].sentences.slice(c.start, c.end + 1).map(x => x.t).join(' '); }
@@ -1614,7 +1618,7 @@ function upcomingChunks(n){
   while(c && list.length < n){
     list.push({ key: chunkKey(c), text: chunkText(c), chunk: c });
     const arr = chunksFor(c.sec), i = arr.indexOf(c);
-    c = i < arr.length - 1 ? arr[i + 1] : (c.sec < state.sections.length - 1 ? chunksFor(c.sec + 1)[0] : null);
+    if(i < arr.length - 1) c = arr[i + 1]; else { const ns = nextGemSec(c.sec); c = ns >= 0 ? chunksFor(ns)[0] : null; }
   }
   return list;
 }
@@ -1821,7 +1825,7 @@ function speakCurrent(fromAdvance){ maybeLeaveFallback(); if(state.engine === 'p
 function advance(){
   const s = state.sections[state.sec];
   if(state.idx < s.sentences.length - 1){ state.idx++; speakCurrent(true); }
-  else if(state.sec < state.sections.length - 1){ state.sec++; state.idx = 0; speakCurrent(true); }
+  else if(state.sec < state.sections.length - 1){ state.sec = isGem() ? nextGemSec(state.sec) : state.sec + 1; state.idx = 0; speakCurrent(true); }
   else { stop(); savePos(true); renderLibrary(); setStatus('Hai finito il libro.'); }
 }
 function stop(){
