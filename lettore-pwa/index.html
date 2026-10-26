@@ -829,7 +829,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 59;
+const APP_VERSION = 60;
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
   let hadController = !!navigator.serviceWorker.controller, reloading = false;
@@ -1422,7 +1422,7 @@ function isMinuteBlock(m){ const b = store.get('gemBlocked') || {}; return b[m] 
 async function geminiTTS(text, voiceId, keyOverride, retry = 0){
   try{ return await geminiTTSOnce(text, voiceId, keyOverride); }
   catch(e){
-    if(!/limite/.test(e.message || '') || retry >= 8) throw e;
+    if(keyOverride || !/limite/.test(e.message || '') || retry >= 8) throw e;
     const b = store.get('gemBlocked') || {}, now = Date.now();
     const soon = Math.min(...GEM_MODELS.map(m => b[m] || 0).filter(t => t > now));
     if(!isFinite(soon) || soon - now > 400000) throw e;
@@ -1436,7 +1436,8 @@ async function geminiTTSOnce(text, voiceId, keyOverride){
   const style = (GEM_STYLES[prefs.gemStyle] || GEM_STYLES.narrativa).text;
   const voice = voiceId.slice(4);
   let lastErr = null, tried = 0;
-  const blocked = gemBlocked();
+  // verifica della chiave: ignoro i blocchi salvati e chiedo davvero a Google
+  const blocked = keyOverride ? [] : gemBlocked();
   const apis = store.get('gemApi') || {};
   for(const model of GEM_MODELS){
     if(blocked.includes(model)) continue;
@@ -3263,7 +3264,7 @@ function openGemSetup(voiceId, step){
         const m = e.message || '';
         msg.className = 'stepText warn';
         msg.textContent = /chiave/.test(m) ? 'Google non accetta questa chiave. Controlla di averla copiata tutta, oppure creane una nuova dalla pagina di Google.'
-          : /limite/.test(m) ? 'La chiave è giusta, ma il limite gratuito di oggi è finito. L\'ho salvata: riprova più tardi.'
+          : /limite/.test(m) ? 'Google ha risposto che il limite gratuito di oggi è finito, quindi non posso provare la voce adesso. Ho salvato la chiave: non serve inserirla di nuovo.'
           : /rete/.test(m) ? 'Non riesco a raggiungere Google: controlla la connessione e riprova.'
           : 'Qualcosa non ha funzionato (' + m + '). Riprova tra poco.';
         if(/limite/.test(m)){ store.set('gemKey', k); store.del('gemSetup'); }
