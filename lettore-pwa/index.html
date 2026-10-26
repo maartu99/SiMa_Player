@@ -829,7 +829,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 57;
+const APP_VERSION = 58;
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
   let hadController = !!navigator.serviceWorker.controller, reloading = false;
@@ -1361,8 +1361,8 @@ async function gemCall(model, api, text, voice, style, key){
   const body = api === 'generate'
     ? { contents: [{ parts: [{ text }] }], generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } } } }
     : { model, input: [{ type: 'user_input', content: [{ type: 'text', text, annotations: [{ type: 'speech_metadata', style }] }] }], response_format: { type: 'audio' }, generation_config: { speech_config: [{ voice }] } };
-  // tempo massimo: una richiesta ferma non deve bloccare tutta la coda (blocco corto: circa 1.5 min, lungo: fino a qualche minuto)
-  const ac = new AbortController(), tm = setTimeout(() => ac.abort(), 60000 + text.length * 40);
+  // tempo massimo: Google risponde in 13-25 secondi per 1-3 minuti di audio, quindi oltre 45 s + 10 ms per carattere la richiesta è ferma
+  const ac = new AbortController(), tm = setTimeout(() => ac.abort(), 45000 + text.length * 10);
   try{
     return await fetch(url, { method: 'POST', headers: { 'x-goog-api-key': key, 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: ac.signal });
   }catch(e){
@@ -1398,6 +1398,9 @@ function gemStats(){
 }
 let gemLastModel = '';
 function gemStatReq(model){ gemLastModel = model; const st = gemStats(); st.req[model] = (st.req[model] || 0) + 1; store.set('gemStats', st); }
+function gemLogFail(model, status, chars, ms){
+  const lg = store.get('gemLog') || []; lg.push({ t: Date.now(), m: model, c: chars || 0, s: 0, cut: false, ms: Math.round(ms || 0), err: String(status) }); store.set('gemLog', lg.slice(-40));
+}
 function gemStatAudio(secs, cut, chars, ms){
   // registro delle ultime richieste: quando, quale modello, quanto testo e quanto audio è tornato, quanto ci ha messo
   const lg = store.get('gemLog') || []; lg.push({ t: Date.now(), m: gemLastModel, c: chars || 0, s: Math.round(secs || 0), cut: !!cut, ms: ms || 0 }); store.set('gemLog', lg.slice(-40));
@@ -1439,11 +1442,13 @@ async function geminiTTSOnce(text, voiceId, keyOverride){
     const order = apis[model] === 'generate' ? ['generate', 'interactions'] : ['interactions', 'generate'];
     let r = null, t = '', usedApi = null;
     for(const api of order){
+      const tq = performance.now();
       r = await gemCall(model, api, text, voice, style, key);
       usedApi = api;
       if(r.ok) break;
       t = await r.text().catch(() => '');
       noteGemErr(model, r.status + ' ' + api, t);
+      gemLogFail(model, r.status, text.length, performance.now() - tq);
       // con l'altro metodo ha senso riprovare solo se questo non è supportato per il modello
       if(!(r.status === 404 || (r.status === 400 && isUnsupported(t)))) break;
     }
@@ -3621,7 +3626,7 @@ function openSettings(focus, keepScroll){
       const lg = (store.get('gemLog') || []).slice(-8).reverse();
       ca.appendChild(el('div', 'innerLabel', 'Ultime richieste'));
       if(!lg.length) ca.appendChild(el('p', 'cardNote', 'Ancora nessuna richiesta registrata. Da qui in poi le vedi qui.'));
-      lg.forEach(r => ca.appendChild(famRow(`${new Date(r.t).toLocaleString('it-IT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} · ${GEM_MODEL_NAMES[r.m] || r.m || 'modello'}`, (r.cut ? `${r.c} caratteri inviati, tornati solo ${fmtM(r.s / 60)} min di audio: Google ha tagliato.` : `${r.c} caratteri inviati, ${fmtM(r.s / 60)} min di audio.`) + (r.ms ? ` Risposta in ${r.ms < 90000 ? Math.round(r.ms / 1000) + ' s' : fmtM(r.ms / 60000) + ' min'}.` : ''), null)));
+      lg.forEach(r => ca.appendChild(famRow(`${new Date(r.t).toLocaleString('it-IT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} · ${GEM_MODEL_NAMES[r.m] || r.m || 'modello'}`, (r.err ? `${r.c} caratteri inviati, rifiutata da Google (${r.err === '408' ? 'nessuna risposta in tempo' : 'errore ' + r.err}).` : r.cut ? `${r.c} caratteri inviati, tornati solo ${fmtM(r.s / 60)} min di audio: Google ha tagliato.` : `${r.c} caratteri inviati, ${fmtM(r.s / 60)} min di audio.`) + (r.ms ? ` Risposta in ${r.ms < 90000 ? Math.round(r.ms / 1000) + ' s' : fmtM(r.ms / 60000) + ' min'}.` : ''), null)));
       const hist = store.get('gemHist') || {}, days = Object.keys(hist).sort().slice(-7).reverse();
       if(days.length){
         ca.appendChild(el('div', 'innerLabel', 'Ultimi giorni'));
