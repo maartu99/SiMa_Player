@@ -829,7 +829,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 58;
+const APP_VERSION = 59;
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
   let hadController = !!navigator.serviceWorker.controller, reloading = false;
@@ -1218,8 +1218,10 @@ async function pump(){
   const id = ++reqId; inflight.set(id, { key: next.key, t: performance.now() });
   const vid = next.key.split('|')[0];
   if(isGemId(vid)){
-    const t0 = performance.now();
-    geminiTTS(en.text, vid)
+    // al massimo una richiesta ogni 21 secondi: il limite gratuito è di 3 al minuto
+    const gap = Math.max(0, gemLastStart + 21000 - Date.now());
+    const t0 = performance.now() + gap;
+    new Promise(r => setTimeout(r, gap)).then(() => { gemLastStart = Date.now(); return geminiTTS(en.text, vid); })
       .then(async blob => {
         const chunky = /\|c\d+-\d+$/.test(next.key);
         const secs = await wavSeconds(blob);
@@ -1396,7 +1398,7 @@ function gemStats(){
   }
   return fresh;
 }
-let gemLastModel = '';
+let gemLastModel = '', gemLastStart = 0;
 function gemStatReq(model){ gemLastModel = model; const st = gemStats(); st.req[model] = (st.req[model] || 0) + 1; store.set('gemStats', st); }
 function gemLogFail(model, status, chars, ms){
   const lg = store.get('gemLog') || []; lg.push({ t: Date.now(), m: model, c: chars || 0, s: 0, cut: false, ms: Math.round(ms || 0), err: String(status) }); store.set('gemLog', lg.slice(-40));
@@ -1420,10 +1422,10 @@ function isMinuteBlock(m){ const b = store.get('gemBlocked') || {}; return b[m] 
 async function geminiTTS(text, voiceId, keyOverride, retry = 0){
   try{ return await geminiTTSOnce(text, voiceId, keyOverride); }
   catch(e){
-    if(!/limite/.test(e.message || '') || retry >= 3) throw e;
+    if(!/limite/.test(e.message || '') || retry >= 8) throw e;
     const b = store.get('gemBlocked') || {}, now = Date.now();
     const soon = Math.min(...GEM_MODELS.map(m => b[m] || 0).filter(t => t > now));
-    if(!isFinite(soon) || soon - now > 120000) throw e;
+    if(!isFinite(soon) || soon - now > 400000) throw e;
     await new Promise(r => setTimeout(r, soon - now + 500));
     return geminiTTS(text, voiceId, keyOverride, retry + 1);
   }
@@ -1469,7 +1471,7 @@ async function geminiTTSOnce(text, voiceId, keyOverride){
       const rd = /retry(?:Delay)?"?\s*[:in]+\s*"?(\d+(?:\.\d+)?)\s*s/i.exec(t);
       const perDay = /per ?day|PerDay|daily/i.test(t), perMin = /per ?minute|PerMinute/i.test(t);
       const wait = rd && +rd[1] < 600 ? Math.ceil(+rd[1]) * 1000 + 3000 : 65000;
-      blockModel(model, perDay && !perMin ? gemResetDate().getTime() : (perMin || rd) ? Date.now() + wait : gemResetDate().getTime());
+      blockModel(model, perDay && !perMin ? gemResetDate().getTime() : (perMin || rd) ? Date.now() + wait : Date.now() + 90000);
       lastErr = new Error('limite'); continue;
     }
     if(r.status === 401 || /API[_ ]?key not valid|API_KEY_INVALID|invalid api key/i.test(t)) throw new Error('chiave');
@@ -1623,7 +1625,7 @@ audio.addEventListener('timeupdate', () => {
   if(c.start + j !== state.idx && c.sec === state.sec){ state.idx = c.start + j; refreshPosition(false); savePos(); }
 });
 
-const GEM_AHEAD_CHARS = 81000; // circa 90 minuti a velocità normale
+const GEM_AHEAD_CHARS = 27000; // circa 30 minuti a velocità normale: abbastanza per non fermarsi, poco da sprecare
 const gemAheadOn = () => prefs.gemAhead !== false;
 // minuti di ascolto già pronti dopo il punto attuale (per le voci Google)
 function readyAheadMinutes(){
@@ -1646,7 +1648,7 @@ function upcoming(n){
     // blocchi lunghi: preparo solo quello in corso e il successivo, per non consumare richieste inutili
     let k = 2;
     if(gemAheadOn() && gemModelsLeft()){
-      // preparazione automatica: circa un'ora e mezza di ascolto oltre il punto attuale, finché il limite di oggi lo consente
+      // preparazione automatica: circa mezz'ora di ascolto oltre il punto attuale, finché il limite di oggi lo consente
       const u = upcomingChunks(40); let sum = 0, i = 0;
       while(i < u.length && sum < GEM_AHEAD_CHARS){ sum += u[i].chunk.len; i++; }
       k = Math.max(k, i);
@@ -1955,11 +1957,27 @@ audio.addEventListener('play', () => {
   state.playing = true; updatePlay(); requestWake();
   if(audio.src === holdUrl || audio.ended) piperSpeakCurrent();
 });
+// interruzioni di iOS (notifica WhatsApp, chiamata): quando finiscono, riprendo da sola
+let audioInterrupted = false;
+try{
+  if(navigator.audioSession){
+    navigator.audioSession.type = 'playback';
+    navigator.audioSession.addEventListener('statechange', () => {
+      const st = navigator.audioSession.state;
+      if(st === 'interrupted'){ if(state.playing) audioInterrupted = true; }
+      else if(st === 'active' && audioInterrupted){
+        audioInterrupted = false;
+        if(state.playing && audio.paused && !audio.ended) audio.play().catch(() => {});
+      }
+    });
+  }
+}catch(e){}
 audio.addEventListener('pause', () => {
   // messo in pausa da fuori: controllo poco dopo, perché il cambio di frase non è una pausa
   if(!state.playing || state.engine !== 'piper') return;
+  if(audioInterrupted) return;
   setTimeout(() => {
-    if(state.playing && audio.paused && !audio.ended){
+    if(state.playing && audio.paused && !audio.ended && !audioInterrupted){
       state.playing = false; state.gen++;
       if(audio.src === holdUrl) audio.loop = false;
       updatePlay(); savePos(); releaseWake();
@@ -3635,7 +3653,7 @@ function openSettings(focus, keepScroll){
       const save = () => { store.set('prefs', prefs); openSettings(null, true); };
       const ahead = isGem() ? readyAheadMinutes() : 0;
       ca.appendChild(switchRow('Prepara in anticipo da sola',
-        `Con l'app aperta, anche in pausa, preparo fino a un'ora e mezza oltre il punto in cui sei: il limite non usato oggi lo ascolti domani.${gemAheadOn() && ahead ? ' Ora pronti circa ' + fmtMin(ahead) + '.' : ''}`,
+        `Con l'app aperta, anche in pausa, preparo circa mezz'ora oltre il punto in cui sei, così la voce non si ferma e non consumo richieste per parti che forse non ascolti.${gemAheadOn() && ahead ? ' Ora pronti circa ' + fmtMin(ahead) + '.' : ''}`,
         gemAheadOn(), on => { prefs.gemAhead = on; save(); if(on) setTimeout(gemTick, 300); }));
       ca.appendChild(switchRow('Se finisce il limite, continua con un\'altra voce',
         'La lettura non si ferma; quando il limite si azzera torno da sola alla voce Google.',
