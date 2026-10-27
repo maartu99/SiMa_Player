@@ -678,8 +678,33 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 
 /* v45: scheda Statistiche */
 #statsView{padding:16px 16px calc(env(safe-area-inset-bottom) + 190px)}
-.sRange{display:flex;gap:8px;margin:16px 0 0;overflow-x:auto;scrollbar-width:none}
-.sRange .chip{flex:1 0 auto;width:auto;min-width:72px;height:36px;padding:0 14px;font-size:13px;white-space:nowrap}
+.sPeriod{position:static;grid-template-columns:repeat(4,1fr);margin:16px 0 0;box-shadow:none}
+.sPeriod .tab{font-size:14px;height:36px}
+.sNav{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:12px 0 0}
+.sArrow{width:40px;height:40px;flex:none;display:flex;align-items:center;justify-content:center;border:0;border-radius:20px;background:none;color:var(--ink)}
+.sArrow:disabled{opacity:.25}
+.sDate{flex:1;min-width:0;height:40px;border:0;background:none;color:var(--ink);font:inherit;font-size:16px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sFilters{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0 0}
+.sPill{display:flex;align-items:center;justify-content:center;gap:6px;min-width:0;height:36px;padding:0 12px;border-radius:18px;border:1px solid var(--line);background:var(--surface);color:var(--ink2);font:inherit;font-size:13px;font-weight:500}
+.sPill.on{border-color:var(--ink);color:var(--ink);font-weight:600}
+.sPillText{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sPill svg{flex:none;opacity:.7}
+.sChart.dense{gap:2px}
+.sCal{padding:0 0 8px}
+.sCalHead{display:flex;align-items:center;justify-content:space-between;margin:0 0 8px}
+.sCalHead b{font-size:16px;font-weight:600}
+.sCalGrid{display:grid;grid-template-columns:repeat(7,1fr);row-gap:4px;text-align:center}
+.sCalWd{font-size:12px;color:var(--muted);height:24px;line-height:24px}
+.sCalDay{position:relative;height:40px;border:0;background:none;color:var(--ink);font:inherit;font-size:15px;font-variant-numeric:tabular-nums}
+.sCalDay:disabled{color:var(--muted);opacity:.4}
+.sCalDay.in{background:color-mix(in srgb,var(--accent) 18%,transparent)}
+.sCalDay.a{border-radius:20px 0 0 20px}.sCalDay.b{border-radius:0 20px 20px 0}.sCalDay.a.b{border-radius:20px}
+.sCalDay.a,.sCalDay.b{background:var(--accent);color:var(--accent-ink);font-weight:700}
+.sCalDay.has::after{content:'';position:absolute;left:50%;bottom:4px;width:4px;height:4px;margin-left:-2px;border-radius:2px;background:var(--accent)}
+.sCalDay.a.has::after,.sCalDay.b.has::after{background:var(--accent-ink)}
+.sCalNote{font-size:13px;color:var(--muted);text-align:center;margin:12px 0}
+.sCal .wideBtn.soft{justify-content:center}
+#sBooks > .cardNote{margin:0;padding:16px 0}
 .sTotal{text-align:center;margin-top:22px}
 .sBig{font-family:var(--serif);font-size:38px;font-weight:600;letter-spacing:-.5px;color:var(--ink);font-variant-numeric:tabular-nums}
 .sSub{font-size:13px;color:var(--muted);margin-top:4px}
@@ -688,8 +713,6 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 .sBar{width:100%;max-width:18px;border-radius:6px 6px 2px 2px;background:var(--accent);min-height:0}
 .sLab{font-size:10px;color:var(--muted);height:16px;line-height:16px;margin-top:4px;white-space:nowrap;overflow:visible}
 .tabBtn span{white-space:nowrap}
-.sVoiceWrap{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:12px 0 0;padding:10px 14px;border-radius:14px;background:var(--surface);border:1px solid var(--line);font-size:14px;color:var(--muted)}
-.sSel{flex:1;min-width:0;max-width:65%;height:34px;border:0;background:none;color:var(--ink);font:inherit;font-weight:600;text-align:right;text-align-last:right;appearance:auto}
 </style>
 </head>
 <body class="noMini">
@@ -742,9 +765,13 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 <!-- BARRA IN BASSO -->
 <main id="statsView" class="hidden">
   <div class="libHead"><div class="libHeadRow"><h1>Statistiche</h1></div></div>
-  <div class="sRange" id="sRange" role="group" aria-label="Periodo"></div>
-  <label class="sVoiceWrap"><span>Voce</span><select id="sVoice" class="sSel" aria-label="Filtra per voce"></select></label>
-  <label class="sVoiceWrap"><span>Libro</span><select id="sBook" class="sSel" aria-label="Filtra per libro"></select></label>
+  <div class="tabs sPeriod" id="sPeriod" role="tablist" aria-label="Periodo"></div>
+  <div class="sNav">
+    <button class="sArrow" id="sPrev" aria-label="Periodo precedente"></button>
+    <button class="sDate" id="sDate" aria-label="Scegli le date"><span id="sDateText"></span></button>
+    <button class="sArrow" id="sNext" aria-label="Periodo successivo"></button>
+  </div>
+  <div class="sFilters"><button class="sPill" id="sVoiceBtn" aria-label="Filtra per voce"></button><button class="sPill" id="sBookBtn" aria-label="Filtra per libro"></button></div>
   <div class="sTotal"><div class="sBig" id="sBig"></div><div class="sSub" id="sSub"></div></div>
   <div class="sChart" id="sChart" aria-hidden="true"></div>
   <h3 class="cardTitle">Libri ascoltati</h3>
@@ -830,7 +857,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 64;
+const APP_VERSION = 65;
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
   let hadController = !!navigator.serviceWorker.controller, reloading = false;
@@ -3445,7 +3472,6 @@ setInterval(() => {
 document.addEventListener('visibilitychange', () => { if(document.hidden) statsFlush(); });
 addEventListener('pagehide', statsFlush);
 
-let statsRange = store.get('statsRange') || 'oggi';
 let statsVoice = store.get('statsVoice') || 'all';
 let statsBook = store.get('statsBook') || 'all';
 // legge un giorno applicando il filtro voce: ore, libri
@@ -3478,73 +3504,134 @@ function statsCollect(){
   for(const p of statsPending) statsApply(st, p);
   return st;
 }
+// periodo delle statistiche: giorno, settimana, mese, anno, oppure date scelte dal calendario
+let statsMode = ['day', 'week', 'month', 'year', 'custom'].includes(store.get('statsMode')) ? store.get('statsMode') : 'day';
+if(statsMode === 'custom') statsMode = 'day';
+let statsRef = new Date(), statsFrom = null, statsTo = null;
+const dOnly = d => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+const sameDay = (a, b) => localDay(a) === localDay(b);
+const IT_MONTHS = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'];
+const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+function statsSpan(){
+  const r = dOnly(statsRef);
+  if(statsMode === 'week'){ const off = (r.getDay() + 6) % 7, from = addDays(r, -off); return { from, to: addDays(from, 6), unit: 'day' }; }
+  if(statsMode === 'month') return { from: new Date(r.getFullYear(), r.getMonth(), 1), to: new Date(r.getFullYear(), r.getMonth() + 1, 0), unit: 'day' };
+  if(statsMode === 'year') return { from: new Date(r.getFullYear(), 0, 1), to: new Date(r.getFullYear(), 11, 31), unit: 'month' };
+  if(statsMode === 'custom'){ const n = Math.round((statsTo - statsFrom) / 864e5) + 1; return { from: statsFrom, to: statsTo, unit: n === 1 ? 'hour' : n <= 62 ? 'day' : 'month' }; }
+  return { from: r, to: r, unit: 'hour' };
+}
+function fmtShort(d, withYear){ return `${d.getDate()} ${IT_MONTHS[d.getMonth()].slice(0, 3)}${withYear ? ' ' + d.getFullYear() : ''}`; }
+function statsSpanLabel(sp){
+  const today = dOnly(new Date()), yr = today.getFullYear();
+  if(statsMode === 'day'){
+    if(sameDay(sp.from, today)) return 'Oggi';
+    if(sameDay(sp.from, addDays(today, -1))) return 'Ieri';
+    return cap(sp.from.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: sp.from.getFullYear() !== yr ? 'numeric' : undefined }));
+  }
+  if(statsMode === 'week'){
+    const thisMon = addDays(today, -((today.getDay() + 6) % 7));
+    if(sameDay(sp.from, thisMon)) return 'Questa settimana';
+    if(sameDay(sp.from, addDays(thisMon, -7))) return 'Settimana scorsa';
+  }
+  if(statsMode === 'month') return cap(IT_MONTHS[sp.from.getMonth()]) + (sp.from.getFullYear() !== yr ? ' ' + sp.from.getFullYear() : '');
+  if(statsMode === 'year') return String(sp.from.getFullYear());
+  if(sameDay(sp.from, sp.to)) return fmtShort(sp.from, sp.from.getFullYear() !== yr);
+  const yrs = sp.from.getFullYear() !== sp.to.getFullYear() || sp.to.getFullYear() !== yr;
+  if(!yrs && sp.from.getMonth() === sp.to.getMonth()) return `${sp.from.getDate()} - ${fmtShort(sp.to)}`;
+  return `${fmtShort(sp.from, yrs)} - ${fmtShort(sp.to, yrs)}`;
+}
+function statsShift(dir){
+  const r = dOnly(statsRef);
+  if(statsMode === 'day') statsRef = addDays(r, dir);
+  else if(statsMode === 'week') statsRef = addDays(r, 7 * dir);
+  else if(statsMode === 'month') statsRef = new Date(r.getFullYear(), r.getMonth() + dir, 1);
+  else if(statsMode === 'year') statsRef = new Date(r.getFullYear() + dir, 0, 1);
+  else { const n = Math.round((statsTo - statsFrom) / 864e5) + 1; statsFrom = addDays(statsFrom, n * dir); statsTo = addDays(statsTo, n * dir); }
+  renderStats();
+}
+const CHEV = d => `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d}"/></svg>`;
+const CHEV_L = CHEV('M15 5l-7 7 7 7'), CHEV_R = CHEV('M9 5l7 7-7 7'), CHEV_D = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
 function renderStats(){
   const st = statsCollect(), titles = store.get('statsTitles') || {}, voices = store.get('statsVoices') || {};
-  const now = new Date();
-  // voci usate nei dati salvati, raggruppate per tipo
-  const used = new Set();
-  Object.values(st).forEach(r => Object.keys(r.v || {}).forEach(v => used.add(v)));
-  const cats = [['gem', 'Voci Google'], ['piper', 'Voci sul telefono'], ['sys', 'Voci di sistema']].filter(([c]) => [...used].some(v => statsVoiceCat(v) === c));
+  // voci e libri presenti nei dati salvati
+  const used = new Set(), usedBooks = new Set();
+  Object.values(st).forEach(r => { Object.keys(r.v || {}).forEach(v => used.add(v)); Object.keys(r.b || {}).forEach(k => usedBooks.add(k)); });
+  const cats = [['gem', 'Voci Google', 'Tutte le voci Google'], ['piper', 'Voci sul telefono', 'Tutte le voci sul telefono'], ['sys', 'Voci di sistema', 'Tutte le voci di sistema']].filter(([c]) => [...used].some(v => statsVoiceCat(v) === c));
   if(statsVoice !== 'all' && !(statsVoice.startsWith('cat:') ? cats.some(([c]) => 'cat:' + c === statsVoice) : used.has(statsVoice.slice(2)))) statsVoice = 'all';
-  const ranges = [['oggi', 'Oggi'], ['7', '7 giorni'], ['30', '30 giorni'], ['tutto', 'Tutto']];
-  const rb = $('sRange'); rb.textContent = '';
-  ranges.forEach(([k, label]) => {
-    const b = el('button', 'chip', label); b.setAttribute('aria-pressed', statsRange === k ? 'true' : 'false');
-    b.onclick = () => { statsRange = k; store.set('statsRange', k); renderStats(); };
-    rb.appendChild(b);
-  });
-  const sel = $('sVoice'); sel.textContent = '';
-  const addOpt = (val, label, parent) => { const o = el('option', null, label); o.value = val; if(statsVoice === val) o.selected = true; (parent || sel).appendChild(o); };
-  addOpt('all', 'Tutte le voci');
-  cats.forEach(([c, label]) => {
-    const g = el('optgroup'); g.label = label; addOpt('cat:' + c, 'Tutte ' + ({ gem: '(Google)', piper: '(telefono)', sys: '(iPhone)' })[c], g); sel.appendChild(g);
-    [...used].filter(v => statsVoiceCat(v) === c).sort().forEach(v => addOpt('v:' + v, voices[v] || 'Voce', g));
-  });
-  if(used.has('legacy')) addOpt('v:legacy', 'Ascolti prima del filtro voci');
-  // libri con ascolti salvati, in ordine alfabetico
-  const usedBooks = new Set(); Object.values(st).forEach(r => Object.keys(r.b || {}).forEach(k => usedBooks.add(k)));
   if(statsBook !== 'all' && !usedBooks.has(statsBook)) statsBook = 'all';
-  const bsel = $('sBook'); bsel.textContent = '';
-  const addB = (val, label) => { const o = el('option', null, label); o.value = val; if(statsBook === val) o.selected = true; bsel.appendChild(o); };
-  addB('all', 'Tutti i libri');
-  [...usedBooks].sort((a, b) => (titles[a] || '').localeCompare(titles[b] || '', 'it')).forEach(k => addB(k, titles[k] || 'Libro'));
+  // periodo
+  const pb = $('sPeriod'); pb.textContent = '';
+  [['day', 'Giorno'], ['week', 'Settimana'], ['month', 'Mese'], ['year', 'Anno']].forEach(([k, label]) => {
+    const t = el('button', 'tab', label); t.setAttribute('role', 'tab'); t.setAttribute('aria-selected', statsMode === k ? 'true' : 'false');
+    t.onclick = () => { if(statsMode === 'custom') statsRef = statsTo || new Date(); statsMode = k; store.set('statsMode', k); renderStats(); };
+    pb.appendChild(t);
+  });
+  const sp = statsSpan(), today = dOnly(new Date());
+  $('sDateText').textContent = statsSpanLabel(sp);
+  $('sNext').disabled = sp.to >= today;
+  // filtri
+  const voiceLabel = statsVoice === 'all' ? 'Tutte le voci' : statsVoice.startsWith('cat:') ? (cats.find(([c]) => 'cat:' + c === statsVoice) || [, , 'Voci'])[2] : statsVoice === 'v:legacy' ? 'Voce non registrata' : (voices[statsVoice.slice(2)] || 'Voce');
+  $('sVoiceBtn').innerHTML = ''; $('sVoiceBtn').append(el('span', 'sPillText', voiceLabel)); $('sVoiceBtn').insertAdjacentHTML('beforeend', CHEV_D);
+  $('sVoiceBtn').classList.toggle('on', statsVoice !== 'all');
+  $('sBookBtn').innerHTML = ''; $('sBookBtn').append(el('span', 'sPillText', statsBook === 'all' ? 'Tutti i libri' : (titles[statsBook] || 'Libro'))); $('sBookBtn').insertAdjacentHTML('beforeend', CHEV_D);
+  $('sBookBtn').classList.toggle('on', statsBook !== 'all');
+  $('sVoiceBtn').onclick = () => {
+    const body = openSheet('statsVoice', 'Voce', true);
+    const pick = v => () => { statsVoice = v; store.set('statsVoice', v); closeSheet(); renderStats(); };
+    body.appendChild(option('Tutte le voci', null, statsVoice === 'all', pick('all')));
+    cats.forEach(([c, label, all]) => {
+      body.appendChild(el('div', 'innerLabel', label));
+      body.appendChild(option(all, null, statsVoice === 'cat:' + c, pick('cat:' + c)));
+      [...used].filter(v => statsVoiceCat(v) === c).sort((a, b) => (voices[a] || '').localeCompare(voices[b] || '', 'it')).forEach(v => body.appendChild(option(voices[v] || 'Voce', null, statsVoice === 'v:' + v, pick('v:' + v))));
+    });
+    if(used.has('legacy')) body.appendChild(option('Voce non registrata', 'Ascolti di prima che l\'app salvasse la voce', statsVoice === 'v:legacy', pick('v:legacy')));
+  };
+  $('sBookBtn').onclick = () => {
+    const body = openSheet('statsBook', 'Libro', true);
+    const pick = k => () => { statsBook = k; store.set('statsBook', k); closeSheet(); renderStats(); };
+    body.appendChild(option('Tutti i libri', null, statsBook === 'all', pick('all')));
+    [...usedBooks].sort((a, b) => (titles[a] || '').localeCompare(titles[b] || '', 'it')).forEach(k => body.appendChild(option(titles[k] || 'Libro', null, statsBook === k, pick(k))));
+  };
+  // dati del periodo
   const chart = $('sChart'); chart.textContent = '';
-  const bars = [];
-  let days = [];
-  if(statsRange === 'oggi'){
-    const r = st[localDay(now)] || {};
-    const pk = statsPick(r, statsVoice, statsBook);
+  const bars = [], days = [];
+  if(sp.unit === 'hour'){
+    const pk = statsPick(st[localDay(sp.from)] || {}, statsVoice, statsBook);
     pk.hours.forEach((v, h) => bars.push({ label: h % 6 === 0 ? String(h) : '', v }));
-    days = [pk];
-  } else if(statsRange === 'tutto'){
-    const months = {};
-    for(const d of Object.keys(st)){
-      const m = d.slice(0, 7), pk = statsPick(st[d], statsVoice, statsBook);
-      months[m] = months[m] || 0; months[m] += pk.total; days.push(pk);
-    }
-    Object.keys(months).sort().forEach(m => bars.push({ label: new Date(m + '-01').toLocaleDateString('it-IT', { month: 'short' }).replace('.', ''), v: months[m] }));
-  } else {
-    const n = +statsRange;
-    for(let i = n - 1; i >= 0; i--){
-      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
-      const pk = statsPick(st[localDay(d)] || {}, statsVoice, statsBook);
+    days.push(pk);
+  } else if(sp.unit === 'day'){
+    const n = Math.round((sp.to - sp.from) / 864e5) + 1;
+    for(let i = 0; i < n; i++){
+      const d = addDays(sp.from, i), pk = statsPick(st[localDay(d)] || {}, statsVoice, statsBook);
       days.push(pk);
-      const label = n === 7 ? d.toLocaleDateString('it-IT', { weekday: 'short' }).replace('.', '') : (d.getDate() % 5 === 0 || i === 0 ? String(d.getDate()) : '');
+      const label = n <= 7 ? d.toLocaleDateString('it-IT', { weekday: 'short' }).replace('.', '') : (d.getDate() === 1 || d.getDate() % 5 === 0 ? String(d.getDate()) : '');
       bars.push({ label, v: pk.total });
+    }
+  } else {
+    let m = new Date(sp.from.getFullYear(), sp.from.getMonth(), 1);
+    const many = (sp.to.getFullYear() - sp.from.getFullYear()) * 12 + sp.to.getMonth() - sp.from.getMonth() > 12;
+    while(m <= sp.to){
+      let v = 0;
+      for(let d = new Date(m); d.getMonth() === m.getMonth() && d <= sp.to; d = addDays(d, 1)){
+        if(d < sp.from) continue;
+        const pk = statsPick(st[localDay(d)] || {}, statsVoice, statsBook); days.push(pk); v += pk.total;
+      }
+      bars.push({ label: many && m.getMonth() % 3 ? '' : IT_MONTHS[m.getMonth()].slice(0, 1).toUpperCase() + (many ? '' : IT_MONTHS[m.getMonth()].slice(1, 3)), v });
+      m = new Date(m.getFullYear(), m.getMonth() + 1, 1);
     }
   }
   const max = Math.max(1, ...bars.map(b => b.v));
+  chart.classList.toggle('dense', bars.length > 16);
   bars.forEach(b => {
     const col = el('div', 'sCol'); const bar = el('div', 'sBar'); bar.style.height = Math.max(b.v ? 3 : 0, Math.round(b.v / max * 100)) + '%';
     bar.title = fmtDur(b.v);
     col.appendChild(bar); col.appendChild(el('span', 'sLab', b.label)); chart.appendChild(col);
   });
-  const total = statsRange === 'oggi' ? days.reduce((a, p) => a + p.total, 0) : bars.reduce((a, b) => a + b.v, 0);
+  const total = days.reduce((a, p) => a + p.total, 0);
   $('sBig').textContent = total ? fmtDur(total) : 'Nessun ascolto';
-  const label = { oggi: 'oggi', '7': 'negli ultimi 7 giorni', '30': 'negli ultimi 30 giorni', tutto: 'in tutto' }[statsRange];
-  let sub = label;
-  if(statsRange === '7' || statsRange === '30'){ const active = days.filter(p => p.total > 0).length; if(active) sub += ` · in media ${fmtDur(total / active)} nei giorni in cui hai ascoltato`; }
-  $('sSub').textContent = sub;
+  const active = days.filter(p => p.total > 0).length;
+  $('sSub').textContent = sp.unit !== 'hour' && active ? `${active} ${active === 1 ? 'giorno' : 'giorni'} di ascolto · in media ${fmtDur(total / active)} al giorno` : ' ';
   const per = {};
   days.forEach(p => { for(const k of Object.keys(p.books)) per[k] = (per[k] || 0) + p.books[k]; });
   const list = $('sBooks'); list.textContent = '';
@@ -3555,6 +3642,56 @@ function renderStats(){
     const t = el('div', 'famText'); t.appendChild(el('div', 'famTitle', titles[k] || 'Libro')); t.appendChild(el('div', 'famSub', fmtDur(v)));
     row.appendChild(t); list.appendChild(row);
   });
+}
+
+// calendario: un tocco sceglie un giorno, un secondo tocco la fine del periodo
+function openStatsCalendar(){
+  const st = statsCollect(), sp = statsSpan(), today = dOnly(new Date());
+  let a = sp.from, b = sp.to > today ? today : sp.to, view = new Date(b.getFullYear(), b.getMonth(), 1), picking = false;
+  const body = openSheet('statsCal', 'Scegli le date', true);
+  const draw = () => {
+    body.textContent = '';
+    const wrap = el('div', 'sCal');
+    const head = el('div', 'sCalHead');
+    const pv = el('button', 'sArrow'); pv.innerHTML = CHEV_L; pv.setAttribute('aria-label', 'Mese precedente'); pv.onclick = () => { view = new Date(view.getFullYear(), view.getMonth() - 1, 1); draw(); };
+    const nx = el('button', 'sArrow'); nx.innerHTML = CHEV_R; nx.setAttribute('aria-label', 'Mese successivo'); nx.onclick = () => { view = new Date(view.getFullYear(), view.getMonth() + 1, 1); draw(); };
+    nx.disabled = view.getFullYear() === today.getFullYear() && view.getMonth() === today.getMonth();
+    head.append(pv, el('b', null, cap(IT_MONTHS[view.getMonth()]) + ' ' + view.getFullYear()), nx); wrap.appendChild(head);
+    const grid = el('div', 'sCalGrid');
+    ['L', 'M', 'M', 'G', 'V', 'S', 'D'].forEach(w => grid.appendChild(el('div', 'sCalWd', w)));
+    const lead = (view.getDay() + 6) % 7; for(let i = 0; i < lead; i++) grid.appendChild(el('div'));
+    const last = new Date(view.getFullYear(), view.getMonth() + 1, 0).getDate();
+    for(let n = 1; n <= last; n++){
+      const d = new Date(view.getFullYear(), view.getMonth(), n), key = localDay(d);
+      const btn = el('button', 'sCalDay', String(n));
+      if(d > today) btn.disabled = true;
+      if(st[key] && Object.values(st[key].v || {}).some(h => h.some(x => x > 0))) btn.classList.add('has');
+      if(d >= a && d <= b) btn.classList.add('in');
+      if(sameDay(d, a)) btn.classList.add('a');
+      if(sameDay(d, b)) btn.classList.add('b');
+      btn.onclick = () => { if(!picking){ a = d; b = d; picking = true; } else { if(d < a){ b = a; a = d; } else b = d; picking = false; } draw(); };
+      grid.appendChild(btn);
+    }
+    wrap.appendChild(grid);
+    const n = Math.round((b - a) / 864e5) + 1;
+    wrap.appendChild(el('p', 'sCalNote', picking ? 'Tocca un altro giorno per scegliere un periodo, oppure Mostra per vedere solo questo giorno.' : (n === 1 ? 'Un giorno' : `${n} giorni`) + ' selezionati'));
+    const show = el('button', 'wideBtn', 'Mostra');
+    show.onclick = () => {
+      if(sameDay(a, b)){ statsMode = 'day'; statsRef = a; store.set('statsMode', 'day'); }
+      else { statsMode = 'custom'; statsFrom = a; statsTo = b; }
+      closeSheet(); renderStats();
+    };
+    wrap.appendChild(show);
+    const all = el('button', 'wideBtn soft', 'Tutto lo storico');
+    all.onclick = () => {
+      const ks = Object.keys(st).filter(k => Object.values(st[k].v || {}).some(h => h.some(x => x > 0))).sort();
+      const f = ks.length ? new Date(ks[0] + 'T12:00:00') : today;
+      statsMode = 'custom'; statsFrom = dOnly(f); statsTo = today; closeSheet(); renderStats();
+    };
+    wrap.appendChild(all);
+    body.appendChild(wrap);
+  };
+  draw();
 }
 function statsSize(){ try{ return new Blob([JSON.stringify([store.get('stats') || {}, store.get('statsTitles') || {}, store.get('statsVoices') || {}])]).size; }catch(e){ return 0; } }
 function clearStats(){
@@ -3803,8 +3940,9 @@ function openMore(){
 
 /* ---------- eventi ---------- */
 $('addBtn').onclick = () => $('file').click();
-$('sVoice').onchange = e => { statsVoice = e.target.value; store.set('statsVoice', statsVoice); renderStats(); };
-$('sBook').onchange = e => { statsBook = e.target.value; store.set('statsBook', statsBook); renderStats(); };
+$('sPrev').innerHTML = CHEV_L; $('sNext').innerHTML = CHEV_R;
+$('sPrev').onclick = () => statsShift(-1); $('sNext').onclick = () => statsShift(1);
+$('sDate').onclick = () => openStatsCalendar();
 $('bkFile').onchange = e => { const f = e.target.files[0]; if(f) restoreBackup(f); e.target.value = ''; };
 $('file').onchange = e => { const f = e.target.files[0]; if(f) addFile(f); e.target.value = ''; };
 document.querySelectorAll('.chip').forEach(c => c.onclick = () => { filter = c.dataset.f; renderChips(); renderLibrary(); });
