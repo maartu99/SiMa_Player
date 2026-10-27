@@ -744,6 +744,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
   <div class="libHead"><div class="libHeadRow"><h1>Statistiche</h1></div></div>
   <div class="sRange" id="sRange" role="group" aria-label="Periodo"></div>
   <label class="sVoiceWrap"><span>Voce</span><select id="sVoice" class="sSel" aria-label="Filtra per voce"></select></label>
+  <label class="sVoiceWrap"><span>Libro</span><select id="sBook" class="sSel" aria-label="Filtra per libro"></select></label>
   <div class="sTotal"><div class="sBig" id="sBig"></div><div class="sSub" id="sSub"></div></div>
   <div class="sChart" id="sChart" aria-hidden="true"></div>
   <h3 class="cardTitle">Libri ascoltati</h3>
@@ -829,7 +830,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 63;
+const APP_VERSION = 64;
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
   let hadController = !!navigator.serviceWorker.controller, reloading = false;
@@ -3412,6 +3413,11 @@ function statsApply(st, p){
   if(!r.b) r.b = {};
   if(!r.b[p.key]) r.b[p.key] = {};
   r.b[p.key][p.vid] = (r.b[p.key][p.vid] || 0) + p.s;
+  // ore di ascolto per libro, per il filtro libro nel grafico di oggi
+  if(!r.bh) r.bh = {};
+  if(!r.bh[p.key]) r.bh[p.key] = {};
+  if(!r.bh[p.key][p.vid]) r.bh[p.key][p.vid] = Array(24).fill(0);
+  r.bh[p.key][p.vid][p.h] = (r.bh[p.key][p.vid][p.h] || 0) + p.s;
   st[p.day] = r;
 }
 function statsFlush(){
@@ -3425,6 +3431,7 @@ function statsFlush(){
       if(d < cutoff){ delete st[d]; continue; }
       for(const vid of Object.keys(st[d].v || {})) st[d].v[vid] = st[d].v[vid].map(Math.round);
       for(const k of Object.keys(st[d].b || {})) for(const vid of Object.keys(st[d].b[k])) st[d].b[k][vid] = Math.round(st[d].b[k][vid]);
+      for(const k of Object.keys(st[d].bh || {})) for(const vid of Object.keys(st[d].bh[k])) st[d].bh[k][vid] = st[d].bh[k][vid].map(Math.round);
     }
     store.set('stats', st); store.set('statsTitles', titles); store.set('statsVoices', voices);
   }catch(e){}
@@ -3440,15 +3447,22 @@ addEventListener('pagehide', statsFlush);
 
 let statsRange = store.get('statsRange') || 'oggi';
 let statsVoice = store.get('statsVoice') || 'all';
+let statsBook = store.get('statsBook') || 'all';
 // legge un giorno applicando il filtro voce: ore, libri
-function statsPick(r, filter){
+function statsPick(r, filter, book = 'all'){
   const hours = Array(24).fill(0), books = {};
   const match = vid => filter === 'all' ? true
     : filter.startsWith('cat:') ? statsVoiceCat(vid) === filter.slice(4)
     : vid === filter.slice(2);
-  for(const vid of Object.keys(r.v || {})) if(match(vid)) r.v[vid].forEach((x, h) => hours[h] += x);
-  for(const k of Object.keys(r.b || {})){ for(const vid of Object.keys(r.b[k])) if(match(vid)) books[k] = (books[k] || 0) + r.b[k][vid]; }
-  return { hours, books, total: hours.reduce((a, b) => a + b, 0) };
+  for(const k of Object.keys(r.b || {})){ if(book !== 'all' && k !== book) continue; for(const vid of Object.keys(r.b[k])) if(match(vid)) books[k] = (books[k] || 0) + r.b[k][vid]; }
+  if(book === 'all'){
+    for(const vid of Object.keys(r.v || {})) if(match(vid)) r.v[vid].forEach((x, h) => hours[h] += x);
+    return { hours, books, total: hours.reduce((a, b) => a + b, 0) };
+  }
+  // un libro solo: le ore ci sono dagli ascolti registrati con questa versione in poi, il totale c'è sempre
+  const bh = (r.bh || {})[book] || {};
+  for(const vid of Object.keys(bh)) if(match(vid)) bh[vid].forEach((x, h) => hours[h] += x);
+  return { hours, books, total: books[book] || 0 };
 }
 // i dati della versione 45 (senza voce) diventano "voce non registrata"
 function statsNormalize(st){
@@ -3487,18 +3501,25 @@ function renderStats(){
     [...used].filter(v => statsVoiceCat(v) === c).sort().forEach(v => addOpt('v:' + v, voices[v] || 'Voce', g));
   });
   if(used.has('legacy')) addOpt('v:legacy', 'Ascolti prima del filtro voci');
+  // libri con ascolti salvati, in ordine alfabetico
+  const usedBooks = new Set(); Object.values(st).forEach(r => Object.keys(r.b || {}).forEach(k => usedBooks.add(k)));
+  if(statsBook !== 'all' && !usedBooks.has(statsBook)) statsBook = 'all';
+  const bsel = $('sBook'); bsel.textContent = '';
+  const addB = (val, label) => { const o = el('option', null, label); o.value = val; if(statsBook === val) o.selected = true; bsel.appendChild(o); };
+  addB('all', 'Tutti i libri');
+  [...usedBooks].sort((a, b) => (titles[a] || '').localeCompare(titles[b] || '', 'it')).forEach(k => addB(k, titles[k] || 'Libro'));
   const chart = $('sChart'); chart.textContent = '';
   const bars = [];
   let days = [];
   if(statsRange === 'oggi'){
     const r = st[localDay(now)] || {};
-    const pk = statsPick(r, statsVoice);
+    const pk = statsPick(r, statsVoice, statsBook);
     pk.hours.forEach((v, h) => bars.push({ label: h % 6 === 0 ? String(h) : '', v }));
     days = [pk];
   } else if(statsRange === 'tutto'){
     const months = {};
     for(const d of Object.keys(st)){
-      const m = d.slice(0, 7), pk = statsPick(st[d], statsVoice);
+      const m = d.slice(0, 7), pk = statsPick(st[d], statsVoice, statsBook);
       months[m] = months[m] || 0; months[m] += pk.total; days.push(pk);
     }
     Object.keys(months).sort().forEach(m => bars.push({ label: new Date(m + '-01').toLocaleDateString('it-IT', { month: 'short' }).replace('.', ''), v: months[m] }));
@@ -3506,7 +3527,7 @@ function renderStats(){
     const n = +statsRange;
     for(let i = n - 1; i >= 0; i--){
       const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
-      const pk = statsPick(st[localDay(d)] || {}, statsVoice);
+      const pk = statsPick(st[localDay(d)] || {}, statsVoice, statsBook);
       days.push(pk);
       const label = n === 7 ? d.toLocaleDateString('it-IT', { weekday: 'short' }).replace('.', '') : (d.getDate() % 5 === 0 || i === 0 ? String(d.getDate()) : '');
       bars.push({ label, v: pk.total });
@@ -3518,7 +3539,7 @@ function renderStats(){
     bar.title = fmtDur(b.v);
     col.appendChild(bar); col.appendChild(el('span', 'sLab', b.label)); chart.appendChild(col);
   });
-  const total = bars.reduce((a, b) => a + b.v, 0);
+  const total = statsRange === 'oggi' ? days.reduce((a, p) => a + p.total, 0) : bars.reduce((a, b) => a + b.v, 0);
   $('sBig').textContent = total ? fmtDur(total) : 'Nessun ascolto';
   const label = { oggi: 'oggi', '7': 'negli ultimi 7 giorni', '30': 'negli ultimi 30 giorni', tutto: 'in tutto' }[statsRange];
   let sub = label;
@@ -3783,6 +3804,7 @@ function openMore(){
 /* ---------- eventi ---------- */
 $('addBtn').onclick = () => $('file').click();
 $('sVoice').onchange = e => { statsVoice = e.target.value; store.set('statsVoice', statsVoice); renderStats(); };
+$('sBook').onchange = e => { statsBook = e.target.value; store.set('statsBook', statsBook); renderStats(); };
 $('bkFile').onchange = e => { const f = e.target.files[0]; if(f) restoreBackup(f); e.target.value = ''; };
 $('file').onchange = e => { const f = e.target.files[0]; if(f) addFile(f); e.target.value = ''; };
 document.querySelectorAll('.chip').forEach(c => c.onclick = () => { filter = c.dataset.f; renderChips(); renderLibrary(); });
