@@ -852,7 +852,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 73;
+const APP_VERSION = 74;
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
   let hadController = !!navigator.serviceWorker.controller, reloading = false;
@@ -4047,7 +4047,8 @@ function openMore(){
   const body = openSheet('more', 'Opzioni');
   bookCardEl().then(c => body.insertBefore(c, body.firstChild));
   const g1 = el('div', 'group');
-  if(state.engine === 'piper'){
+  // con le voci Google non c'è: l'app prepara già da sola circa mezz'ora mentre ascolti, senza spendere richieste in blocco
+  if(state.engine === 'piper' && !isGem()){
     const chaps = state.pages ? 20 : 2;
     const lastSec = Math.min(state.sections.length - 1, state.sec + chaps);
     const until = state.offsets[lastSec] + state.sections[lastSec].sentences.length - 1;
