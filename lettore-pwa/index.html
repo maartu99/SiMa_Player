@@ -852,7 +852,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 75;
+const APP_VERSION = 76;
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
   let hadController = !!navigator.serviceWorker.controller, reloading = false;
@@ -1591,10 +1591,11 @@ function gemErrorText(msg){
 // Gemini legge a blocchi di più frasi: meno richieste, intonazione più naturale
 const chunkCache = new Map();
 // lunghezza dei blocchi in caratteri: circa 7-8 minuti di ascolto; si accorcia da sola se Google taglia l'audio
-const gemTarget = () => store.get('gemChunk') || 6500;
+// pezzi mai oltre circa 8 minuti: più lunghi, la voce di Google accelera, si abbassa e salta parole all'inizio e alla fine
+const gemTarget = () => Math.min(store.get('gemChunk') || 6500, 7000);
 const GEM_FIRST = 2500; // primo blocco dopo una partenza: circa 3 minuti di audio, pronto in 15-25 secondi
 // tetto: la lunghezza più grande che Google regge (scende quando taglia, dopo una settimana si riprova)
-const GEM_CEIL = 15000;
+const GEM_CEIL = 7000;
 function gemCeil(){ const c = store.get('gemCeil'); return c && c.until > Date.now() ? c.v : GEM_CEIL; }
 function shrinkGemChunks(failedLen){
   // metà della lunghezza che Google non ha accettato; se più blocchi falliscono insieme, non accorcio due volte
