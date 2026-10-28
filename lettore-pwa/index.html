@@ -852,7 +852,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 70;
+const APP_VERSION = 71;
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
   let hadController = !!navigator.serviceWorker.controller, reloading = false;
@@ -1243,9 +1243,11 @@ async function pump(){
   const vid = next.key.split('|')[0];
   if(isGemId(vid)){
     // una richiesta alla volta, al massimo una ogni 21 secondi: resta sempre sotto il limite di Google (3 al minuto)
-    const gap = Math.max(0, gemLastStart + 21000 - Date.now());
+    const sent = gemSent.filter(x => Date.now() - x.t < 60000);
+    let gap = Math.max(0, gemLastStart + 21000 - Date.now());
+    if(sent.length && sent.reduce((a, x) => a + x.c, 0) + en.text.length > 24000) gap = Math.max(gap, sent[0].t + 61000 - Date.now());
     const t0 = performance.now() + gap, redo = isDoneKey(next.key);
-    (gap ? (gemWait = { phase: 'gap', until: Date.now() + gap }, new Promise(r => setTimeout(r, gap))) : Promise.resolve()).then(() => { gemLastStart = Date.now(); gemStarts = gemStarts.filter(t => Date.now() - t < 60000).concat(Date.now()); return geminiTTS(en.text, vid); })
+    (gap ? (gemWait = { phase: 'gap', until: Date.now() + gap }, new Promise(r => setTimeout(r, gap))) : Promise.resolve()).then(() => { gemLastStart = Date.now(); gemSent = gemSent.filter(x => Date.now() - x.t < 60000).concat({ t: Date.now(), c: en.text.length }); return geminiTTS(en.text, vid); })
       .then(async blob => {
         const chunky = /\|c\d+-\d+$/.test(next.key);
         const secs = await wavSeconds(blob);
@@ -1429,7 +1431,7 @@ function gemStats(){
 }
 let gemLastModel = '', gemLastStart = 0;
 // cosa sta aspettando l'app in questo momento, per dirlo a chi ascolta: richiesta in corso, attesa chiesta da Google, distanza tra richieste
-let gemWait = null, gemSusp = 0, gemStarts = [], gemAbort = null;
+let gemWait = null, gemSusp = 0, gemSent = [], gemAbort = null;
 function gemStatReq(model){ gemLastModel = model; const st = gemStats(); st.req[model] = (st.req[model] || 0) + 1; store.set('gemStats', st); }
 function gemLogFail(model, status, chars, ms){
   const lg = store.get('gemLog') || []; lg.push({ t: Date.now(), m: model, c: chars || 0, s: 0, cut: false, ms: Math.round(ms || 0), err: String(status) }); store.set('gemLog', lg.slice(-40));
@@ -1460,6 +1462,12 @@ function gemForecast(){
 function isMinuteBlock(m){ const b = store.get('gemBlocked') || {}; return b[m] && b[m] - Date.now() < 5 * 60000; }
 // se tutti i modelli sono fermi solo per il limite al minuto, aspetto invece di dire che il limite è finito
 async function geminiTTS(text, voiceId, keyOverride, retry = 0){
+  if(!keyOverride){
+    // il modello migliore ancora disponibile oggi è fermo solo per meno di un minuto e mezzo: lo aspetto
+    const b = store.get('gemBlocked') || {}, now = Date.now();
+    const best = GEM_MODELS.find(m => !(b[m] > now) || b[m] - now < 90000);
+    if(best && b[best] > now){ gemWait = { phase: 'wait', until: b[best] + 500 }; await new Promise(r => setTimeout(r, b[best] - now + 500)); }
+  }
   try{ return await geminiTTSOnce(text, voiceId, keyOverride); }
   catch(e){
     if(keyOverride || !/limite/.test(e.message || '') || retry >= 8) throw e;
@@ -1520,8 +1528,12 @@ async function geminiTTSOnce(text, voiceId, keyOverride){
       const rd = /retry(?:Delay)?"?\s*[:in]+\s*"?(\d+(?:\.\d+)?)\s*s/i.exec(t);
       const perDay = /per ?day|PerDay|daily/i.test(t), perMin = /per ?minute|PerMinute/i.test(t);
       const wait = rd && +rd[1] < 600 ? Math.ceil(+rd[1]) * 1000 + 3000 : 65000;
-      blockModel(model, perDay && !perMin ? gemResetDate().getTime() : (perMin || rd) ? Date.now() + wait : Date.now() + 90000);
-      lastErr = new Error('limite'); continue;
+      const temp = !(perDay && !perMin) && (perMin || rd);
+      blockModel(model, perDay && !perMin ? gemResetDate().getTime() : temp ? Date.now() + wait : Date.now() + 90000);
+      lastErr = new Error('limite');
+      // rifiuto solo per questo minuto: invece di passare a un modello più lento, aspetto e riprovo questo
+      if(temp && !keyOverride) break;
+      continue;
     }
     if(r.status === 401 || /API[_ ]?key not valid|API_KEY_INVALID|invalid api key/i.test(t)) throw new Error('chiave');
     if(r.status === 400 && isTooLong(t) && !isUnsupported(t)) throw new Error('richiesta: ' + t.slice(0, 160));
@@ -1948,7 +1960,7 @@ const estDur = g => { const p = fromG(g); const it = state.sections[p.sec].sente
 // salto di qualche secondo: dentro l'audio già pronto quando possibile, altrimenti stimando la durata delle frasi
 function skipSeconds(d){
   if(!state.total) return;
-  const ch = isGem() ? state.curChunk : null;
+  const ch = isGem() ? (state.curChunk || chunkAt(state.sec, state.idx)) : null;
   const curKey = ch ? chunkKey(ch) : `${state.piperVoice}|${state.key}|${state.sec}|${state.idx}`;
   const audioOn = state.engine === 'piper' && audio.dataset.key === curKey && audio.duration && isFinite(audio.duration);
   if(audioOn){
@@ -1968,7 +1980,26 @@ function skipSeconds(d){
     if(g < 0) g = 0;
   }
   const p = fromG(g);
+  if(d < 0 && ch && !gemHasAudio(p.sec, p.idx)){
+    // più indietro c'è testo mai scaricato: mi fermo all'inizio dell'audio scaricato, senza nuove richieste
+    const st = gemRegionStart(ch.sec, ch.start);
+    if(st === ch.start && audioOn) audio.currentTime = 0; else goTo(ch.sec, st);
+    setStatus('Inizio dell\'audio già scaricato. Per andare più indietro scegli il capitolo dall\'indice.');
+    return;
+  }
   goTo(p.sec, p.idx);
+}
+// c'è audio Google (scaricato o in preparazione) per questo punto?
+function gemHasAudio(sec, idx){
+  const pre = state.piperVoice + '|' + state.key + '|' + sec + '|c';
+  const live = [...entries.entries()].filter(([k, en]) => en.st !== 'queued' && en.st !== 'error' && k.startsWith(pre)).map(([k]) => k.slice(pre.length).split('-').map(Number));
+  return doneChunks(sec).concat(live).some(([a, b]) => a <= idx && idx <= b);
+}
+// inizio del tratto continuo di audio scaricato che contiene il pezzo che parte da start
+function gemRegionStart(sec, start){
+  const done = doneChunks(sec); let s = start, prev;
+  while((prev = done.find(([, b]) => b === s - 1))) s = prev[0];
+  return s;
 }
 function skipBack(){ const m = skipMode(); if(m === 'frase') move(-1); else skipSeconds(-(+m)); }
 function skipFwd(){ const m = skipMode(); if(m === 'frase') move(1); else skipSeconds(+m); }
