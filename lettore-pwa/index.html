@@ -852,7 +852,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 72;
+const APP_VERSION = 73;
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
   let hadController = !!navigator.serviceWorker.controller, reloading = false;
@@ -1281,6 +1281,13 @@ function readyAhead(){
   for(let i = 1; i < wanted.length; i++){ if(isReady(wanted[i].key)) n++; else break; }
   return n;
 }
+// stato della richiesta in corso, in breve: quale parte, quale modello, da quanto
+function gemWaitShort(part, of){
+  if(!gemWait) return '';
+  const now = Date.now(), mmss = ms => { const x = Math.max(0, Math.round(ms / 1000)); return x < 60 ? `${x} s` : `${Math.floor(x / 60)} min ${String(x % 60).padStart(2, '0')} s`; };
+  if(gemWait.phase === 'req') return ` · ${part ? `parte ${part} di ${of} ` : ''}con ${(GEM_MODEL_NAMES[gemWait.model] || 'Google').replace(', il principale', '').replace(', anteprima', '')} da ${mmss(now - gemWait.since)}`;
+  return gemWait.phase === 'gap' ? ` · prossima parte tra ${mmss(gemWait.until - now)}` : ` · riprovo tra ${mmss(gemWait.until - now)}`;
+}
 let bufTimer = null;
 function updateBuf(){
   if(bufTimer) return;
@@ -1292,12 +1299,20 @@ function updateBuf(){
     if(state.prepareTo != null){
       const g = gIndex(), tot = state.prepareTo - g;
       const done = wanted.filter(w => isReady(w.key)).length;
-      b.textContent = done >= wanted.length ? 'Preparazione completata: le prossime frasi sono pronte.' : `Preparo in anticipo: ${done} di ${Math.min(wanted.length, tot + 1)} frasi pronte`;
+      if(isGem()){
+        // voci Google: in minuti di ascolto, con la parte in preparazione e da quanto
+        const m = c => c / cps() / 60 / (state.rate || 1);
+        const all = wanted.reduce((a, w) => a + (w.chunk ? w.chunk.len : 0), 0);
+        const ready = wanted.reduce((a, w) => a + (w.chunk && isReady(w.key) ? w.chunk.len : 0), 0);
+        const part = wanted.findIndex(w => !isReady(w.key)) + 1;
+        b.textContent = done >= wanted.length ? `Preparazione completata: pronti ${fmtMin(Math.round(m(all)))} di ascolto.`
+          : `Preparo in anticipo: pronti ${fmtMin(Math.round(m(ready)))} su ${fmtMin(Math.round(m(all)))}${gemWaitShort(part, wanted.length)}`;
+      } else b.textContent = done >= wanted.length ? 'Preparazione completata: le prossime frasi sono pronte.' : `Preparo in anticipo: ${done} di ${Math.min(wanted.length, tot + 1)} frasi pronte`;
       if(done >= wanted.length) state.prepareTo = null;
     } else {
       if(isGem()){
         const min = readyAheadMinutes();
-        b.textContent = min >= 1 ? `Pronti circa ${fmtMin(min)} di ascolto${busy ? ', ne preparo altri' : ''}` : (busy ? 'Google sta preparando la prossima parte...' : '');
+        b.textContent = min >= 1 ? `Pronti circa ${fmtMin(min)} di ascolto${busy ? ', ne preparo altri' + gemWaitShort() : ''}` : (busy ? 'Google sta preparando la prossima parte' + gemWaitShort() : '');
       }
       else b.textContent = n ? `${n} ${n === 1 ? 'frase pronta' : 'frasi pronte'} in anticipo` : (busy ? 'Preparo le prossime frasi...' : '');
     }
@@ -3545,6 +3560,7 @@ document.addEventListener('visibilitychange', () => {
 setInterval(() => {
   const now = Date.now(), gap = now - gemTickLast; gemTickLast = now;
   if(gemWait && gemWait.phase === 'req' && gap > 10000) gemSusp += gap; // l'app era ferma: iPhone l'ha sospesa
+  if(gemWait && isGem()) updateBuf();
   if(!state.playing || !isGem() || !gemWait) return;
   const cur = wanted[0] && entries.get(wanted[0].key);
   if(!cur || cur.st === 'ready' || cur.st === 'stored') return;
@@ -3559,7 +3575,7 @@ setInterval(() => {
   } else if(gemWait.phase === 'wait'){
     t = `Google ha chiesto di aspettare un momento: riprovo tra ${mmss(gemWait.until - now)}. Non consuma richieste.`;
   } else {
-    t = `Riprovo tra ${mmss(gemWait.until - now)}: Google accetta al massimo 3 richieste al minuto.`;
+    t = `Prossima parte tra ${mmss(gemWait.until - now)}: Google accetta al massimo 3 richieste al minuto.`;
   }
   setStatus(t, false, true);
 }, 1000);
@@ -4035,7 +4051,18 @@ function openMore(){
     const chaps = state.pages ? 20 : 2;
     const lastSec = Math.min(state.sections.length - 1, state.sec + chaps);
     const until = state.offsets[lastSec] + state.sections[lastSec].sentences.length - 1;
-    g1.appendChild(gRow(SI.cloud, 'Prepara in anticipo', state.pages ? 'Genera ora la voce delle prossime 20 pagine' : 'Genera ora la voce dei prossimi 2 capitoli', () => {
+    let sub = state.pages ? 'Genera ora la voce delle prossime 20 pagine' : 'Genera ora la voce dei prossimi 2 capitoli';
+    if(isGem()){
+      // voci Google: prima di partire dico quanto ascolto e quante richieste servono
+      try{
+        const p = fromG(until), u = upcomingChunks(400);
+        const k = u.findIndex(x => x.chunk.sec === p.sec && p.idx <= x.chunk.end); const list = k >= 0 ? u.slice(0, k + 1) : u;
+        const need = list.filter(x => !isReady(x.key)).length;
+        const mins = Math.round(list.reduce((a, x) => a + x.chunk.len, 0) / cps() / 60 / (state.rate || 1));
+        sub += `: circa ${fmtMin(mins)} di ascolto, ${need} ${need === 1 ? 'richiesta' : 'richieste'} Google`;
+      }catch(e){}
+    }
+    g1.appendChild(gRow(SI.cloud, 'Prepara in anticipo', sub, () => {
       closeSheet(); state.prepareTo = until; requestWake();
       want(upcoming(lookahead()));
       setStatus('Preparazione avviata. Tieni l\'app aperta, anche in pausa: l\'avanzamento è sotto la barra del player.');
