@@ -852,7 +852,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 66;
+const APP_VERSION = 67;
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
   let hadController = !!navigator.serviceWorker.controller, reloading = false;
@@ -989,14 +989,15 @@ const acache = {
   },
   get(k){ return this.req('readonly', st => st.get(k)); },
   async put(k, blob, book){
-    const ok = await this.req('readwrite', st => st.put({ k, blob, size: blob.size, book, at: Date.now() }));
+    let ok = await this.req('readwrite', st => st.put({ k, blob, size: blob.size, book, at: Date.now() }));
+    if(ok === null){ await this.prune(0.6); ok = await this.req('readwrite', st => st.put({ k, blob, size: blob.size, book, at: Date.now() })); }
     if(ok === null) return false;
     const bytes = (store.get('audioBytes') || 0) + blob.size;
     store.set('audioBytes', bytes);
     if(bytes > AUDIO_CAP) await this.prune();
     return true;
   },
-  async prune(){
+  async prune(frac = 0.8){
     // libera spazio fino all'80% del limite: prima l'audio già ascoltato, poi quello di altre voci,
     // poi il più vecchio; per ultimo quello ancora da ascoltare del libro aperto
     const db = await lib.open().catch(() => null); if(!db) return;
@@ -1014,7 +1015,7 @@ const acache = {
     };
     items.forEach(x => x.r = rank(x));
     items.sort((a, b) => a.r - b.r || a.at - b.at);
-    let excess = total - AUDIO_CAP * 0.8;
+    let excess = total - AUDIO_CAP * frac;
     for(const x of items){ if(excess <= 0) break; st.delete(x.k); excess -= x.size; total -= x.size; }
     await new Promise(res => { t.oncomplete = res; t.onerror = res; t.onabort = res; });
     store.set('audioBytes', Math.max(0, total));
@@ -1243,13 +1244,14 @@ async function pump(){
   if(isGemId(vid)){
     // al massimo una richiesta ogni 21 secondi: il limite gratuito è di 3 al minuto
     const gap = Math.max(0, gemLastStart + 21000 - Date.now());
-    const t0 = performance.now() + gap;
+    const t0 = performance.now() + gap, redo = isDoneKey(next.key);
     new Promise(r => setTimeout(r, gap)).then(() => { gemLastStart = Date.now(); return geminiTTS(en.text, vid); })
       .then(async blob => {
         const chunky = /\|c\d+-\d+$/.test(next.key);
         const secs = await wavSeconds(blob);
         const cut = chunky && en.text.length > 1500 && secs && secs < en.text.length / 15 * 0.55;
         gemStatAudio(secs, cut, en.text.length, performance.now() - t0);
+        if(redo){ const st = gemStats(); st.redo = (st.redo || 0) + 1; st.redoSecs = (st.redoSecs || 0) + (secs || 0); store.set('gemStats', st); }
         if(cut){ shrinkGemChunks(en.text.length); throw new Error('tagliato'); }
         if(chunky){ rememberChunk(next.key); growGemChunks(en.text.length); }
         return blob;
@@ -1410,11 +1412,11 @@ function gemDay(){ try{ return new Date().toLocaleDateString('en-CA', { timeZone
 function gemStats(){
   const st = store.get('gemStats');
   if(st && st.day === gemDay()) return st;
-  const fresh = { day: gemDay(), req: {}, n: 0, secs: 0, cut: 0 };
+  const fresh = { day: gemDay(), req: {}, n: 0, secs: 0, cut: 0, heard: 0, redo: 0, redoSecs: 0 };
   if(st && st.day){
     // il giorno è cambiato: salvo quello di ieri nello storico (ultimi 14 giorni)
     const h = store.get('gemHist') || {};
-    h[st.day] = { req: st.req, n: st.n, secs: st.secs, cut: st.cut };
+    h[st.day] = { req: st.req, n: st.n, secs: st.secs, cut: st.cut, heard: st.heard || 0, redo: st.redo || 0, redoSecs: st.redoSecs || 0 };
     Object.keys(h).sort().slice(0, -14).forEach(k => delete h[k]);
     store.set('gemHist', h); store.set('gemStats', fresh);
   }
@@ -1424,6 +1426,15 @@ let gemLastModel = '', gemLastStart = 0;
 function gemStatReq(model){ gemLastModel = model; const st = gemStats(); st.req[model] = (st.req[model] || 0) + 1; store.set('gemStats', st); }
 function gemLogFail(model, status, chars, ms){
   const lg = store.get('gemLog') || []; lg.push({ t: Date.now(), m: model, c: chars || 0, s: 0, cut: false, ms: Math.round(ms || 0), err: String(status) }); store.set('gemLog', lg.slice(-40));
+}
+// audio Google ascoltato (a velocità normale), accumulato e salvato ogni tanto
+let gemHeardPending = 0;
+function gemHeardFlush(){ if(gemHeardPending < 1) return; const st = gemStats(); st.heard = (st.heard || 0) + gemHeardPending; gemHeardPending = 0; store.set('gemStats', st); }
+// un pezzo già scaricato in passato e richiesto di nuovo: lo segno come spreco
+function isDoneKey(key){
+  const m = /^(gem-[^|]+)\|([^|]+)\|(\d+)\|c(\d+)-(\d+)$/.exec(key); if(!m) return false;
+  const arr = ((store.get('gemDone:' + m[1] + '|' + m[2]) || {})[m[3]]) || [];
+  return arr.some(([a, b]) => a === +m[4] && b === +m[5]);
 }
 function gemStatAudio(secs, cut, chars, ms){
   // registro delle ultime richieste: quando, quale modello, quanto testo e quanto audio è tornato, quanto ci ha messo
@@ -1679,9 +1690,9 @@ function lookahead(){
 }
 function upcoming(n){
   if(isGem()){
-    // blocchi lunghi: preparo solo quello in corso e il successivo, per non consumare richieste inutili
+    // blocchi lunghi: preparo solo quello in corso e il successivo (sempre così in pausa), per non consumare richieste inutili
     let k = 2;
-    if(gemAheadOn() && gemModelsLeft()){
+    if(gemAheadOn() && gemModelsLeft() && state.playing){
       // preparazione automatica: circa mezz'ora di ascolto oltre il punto attuale, finché il limite di oggi lo consente
       const u = upcomingChunks(40); let sum = 0, i = 0;
       while(i < u.length && sum < GEM_AHEAD_CHARS){ sum += u[i].chunk.len; i++; }
@@ -1853,6 +1864,8 @@ function advance(){
 }
 function stop(){
   state.playing = false; state.gen++;
+  // in pausa con voce Google: tolgo dalla coda le parti oltre la successiva, per non consumare richieste
+  if(isGem() && state.total && state.prepareTo == null) try{ want(upcoming(lookahead()), audio.dataset.key); }catch(e){}
   if(audio.src === holdUrl){ audio.loop = false; audio.pause(); }
   if('speechSynthesis' in window) speechSynthesis.cancel();
   audio.pause();
@@ -3461,11 +3474,30 @@ function statsFlush(){
 // un tick ogni secondo: conta solo mentre la lettura è in corso; i buchi lunghi (schermo spento, app sospesa) non vengono contati
 setInterval(() => {
   const now = Date.now(), gap = statsLast ? now - statsLast : 0; statsLast = now;
-  if(state.playing && state.key && gap > 0 && gap < 5000){ statsAdd(state.key, state.meta && state.meta.title, gap / 1000); }
-  if(statsPending.length && (now % 15000) < 1000) statsFlush();
+  // voci di sistema: conto col tempo; le altre voci si contano dall'avanzamento dell'audio (vale anche a schermo bloccato)
+  if(state.playing && state.key && state.engine === 'sys' && gap > 0 && gap < 5000){ statsAdd(state.key, state.meta && state.meta.title, gap / 1000); }
+  if((now % 15000) < 1000){ if(statsPending.length) statsFlush(); gemHeardFlush(); }
 }, 1000);
-document.addEventListener('visibilitychange', () => { if(document.hidden) statsFlush(); });
-addEventListener('pagehide', statsFlush);
+document.addEventListener('visibilitychange', () => { if(document.hidden){ statsFlush(); gemHeardFlush(); } });
+addEventListener('pagehide', () => { statsFlush(); gemHeardFlush(); });
+let statsAT = null;
+audio.addEventListener('timeupdate', () => {
+  const k = audio.dataset.key || '';
+  if(!k || k === 'gem-setup' || k.includes('|anteprima|') || audio.src === silenceUrl || audio.src === holdUrl || audio.paused){ statsAT = null; return; }
+  const t = audio.currentTime;
+  // pezzo nuovo appena partito: conto anche i primi istanti
+  const prev = statsAT && statsAT.k === k ? statsAT.t : (t < 1.5 ? 0 : null);
+  if(prev != null){
+    const d = t - prev;
+    // avanzamento normale (anche con eventi radi a schermo bloccato); i salti in avanti non contano
+    if(d > 0 && d < 180){
+      if(state.key) statsAdd(state.key, state.meta && state.meta.title, d / (audio.playbackRate || 1));
+      if(isGemId(k.split('|')[0])) gemHeardPending += d;
+    }
+  }
+  statsAT = { k, t };
+});
+audio.addEventListener('seeking', () => { statsAT = null; });
 
 let statsVoice = store.get('statsVoice') || 'all';
 let statsBook = store.get('statsBook') || 'all';
@@ -3784,9 +3816,9 @@ function openSettings(focus, keepScroll){
       });
       ca.appendChild(how);
       // consumo di oggi e stima di quanto si può ancora ascoltare
-      const fc = gemForecast();
+      const fc = gemForecast(), stHeard = gemStats();
       const fmtM = m => m >= 1 ? (Math.round(m * 10) / 10).toString().replace('.', ',') : '<1';
-      ca.appendChild(famRow('Oggi', `${fc.used} richieste usate, ${fmtMin(fc.genMin)} di audio ricevuti.${fc.cut ? ` Google ha tagliato ${fc.cut} ${fc.cut === 1 ? 'parte' : 'parti'}, ora le faccio più corte.` : ''}`, null));
+      ca.appendChild(famRow('Oggi', `${fc.used} richieste usate, ${fmtMin(fc.genMin)} di audio ricevuti, ${fmtMin(Math.round(((stHeard.heard || 0) + gemHeardPending) / 60))} ascoltati.${stHeard.redo ? ` ${stHeard.redo} ${stHeard.redo === 1 ? 'parte scaricata' : 'parti scaricate'} di nuovo (${fmtMin(Math.round(stHeard.redoSecs / 60))}).` : ''}${fc.cut ? ` Google ha tagliato ${fc.cut} ${fc.cut === 1 ? 'parte' : 'parti'}, ora le faccio più corte.` : ''}`, null));
       ca.appendChild(famRow('Ancora disponibili', `Circa ${fc.left} richieste, cioè circa ${fmtMin(fc.leftMin)} di ascolto. Ogni richiesta vale ${fc.measured ? 'in media' : 'circa'} ${fmtM(fc.avgMin)} minuti${fc.measured ? '' : ' (stima, diventa precisa dopo le prime parti)'}.`, null));
       // monitoraggio: per modello, ultime richieste, ultimi giorni
       ca.appendChild(el('div', 'innerLabel', 'Richieste di oggi per modello'));
@@ -3820,7 +3852,7 @@ function openSettings(focus, keepScroll){
       const hist = store.get('gemHist') || {}, days = Object.keys(hist).sort().slice(-7).reverse();
       if(days.length){
         ca.appendChild(el('div', 'innerLabel', 'Ultimi giorni'));
-        days.forEach(d => { const h = hist[d], n = Object.values(h.req || {}).reduce((a, b) => a + b, 0); ca.appendChild(famRow(new Date(d + 'T12:00:00').toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric', month: 'short' }), `${n} richieste, ${fmtMin(Math.round(h.secs / 60))} di audio${h.cut ? `, ${h.cut} tagliate` : ''}.`, null)); });
+        days.forEach(d => { const h = hist[d], n = Object.values(h.req || {}).reduce((a, b) => a + b, 0); ca.appendChild(famRow(new Date(d + 'T12:00:00').toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric', month: 'short' }), `${n} richieste, ${fmtMin(Math.round(h.secs / 60))} di audio ricevuti${h.heard ? `, ${fmtMin(Math.round(h.heard / 60))} ascoltati` : ''}${h.redo ? `, ${h.redo} scaricate di nuovo` : ''}${h.cut ? `, ${h.cut} tagliate` : ''}.`, null)); });
       }
       const save = () => { store.set('prefs', prefs); openSettings(null, true); };
       const ahead = isGem() ? readyAheadMinutes() : 0;
