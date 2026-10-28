@@ -852,7 +852,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 71;
+const APP_VERSION = 72;
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
   let hadController = !!navigator.serviceWorker.controller, reloading = false;
@@ -1461,25 +1461,27 @@ function gemForecast(){
 }
 function isMinuteBlock(m){ const b = store.get('gemBlocked') || {}; return b[m] && b[m] - Date.now() < 5 * 60000; }
 // se tutti i modelli sono fermi solo per il limite al minuto, aspetto invece di dire che il limite è finito
-async function geminiTTS(text, voiceId, keyOverride, retry = 0){
+async function geminiTTS(text, voiceId, keyOverride, retry = 0, noRetry = false){
   if(!keyOverride){
     // il modello migliore ancora disponibile oggi è fermo solo per meno di un minuto e mezzo: lo aspetto
     const b = store.get('gemBlocked') || {}, now = Date.now();
     const best = GEM_MODELS.find(m => !(b[m] > now) || b[m] - now < 90000);
     if(best && b[best] > now){ gemWait = { phase: 'wait', until: b[best] + 500 }; await new Promise(r => setTimeout(r, b[best] - now + 500)); }
   }
-  try{ return await geminiTTSOnce(text, voiceId, keyOverride); }
+  try{ return await geminiTTSOnce(text, voiceId, keyOverride, noRetry); }
   catch(e){
+    // un solo nuovo tentativo sullo stesso modello dopo un rifiuto al minuto
+    if(e.temp && !noRetry) return geminiTTS(text, voiceId, keyOverride, retry, true);
     if(keyOverride || !/limite/.test(e.message || '') || retry >= 8) throw e;
     const b = store.get('gemBlocked') || {}, now = Date.now();
     const soon = Math.min(...GEM_MODELS.map(m => b[m] || 0).filter(t => t > now));
     if(!isFinite(soon) || soon - now > 400000) throw e;
     gemWait = { phase: 'wait', until: soon + 500 };
     await new Promise(r => setTimeout(r, soon - now + 500));
-    return geminiTTS(text, voiceId, keyOverride, retry + 1);
+    return geminiTTS(text, voiceId, keyOverride, retry + 1, true);
   }
 }
-async function geminiTTSOnce(text, voiceId, keyOverride){
+async function geminiTTSOnce(text, voiceId, keyOverride, noRetry){
   const key = keyOverride || store.get('gemKey');
   if(!key) throw new Error('chiave mancante');
   const style = (GEM_STYLES[prefs.gemStyle] || GEM_STYLES.narrativa).text;
@@ -1529,10 +1531,11 @@ async function geminiTTSOnce(text, voiceId, keyOverride){
       const perDay = /per ?day|PerDay|daily/i.test(t), perMin = /per ?minute|PerMinute/i.test(t);
       const wait = rd && +rd[1] < 600 ? Math.ceil(+rd[1]) * 1000 + 3000 : 65000;
       const temp = !(perDay && !perMin) && (perMin || rd);
-      blockModel(model, perDay && !perMin ? gemResetDate().getTime() : temp ? Date.now() + wait : Date.now() + 90000);
+      // secondo rifiuto al minuto per lo stesso pezzo: questo modello resta fermo 5 minuti, si passa al successivo
+      blockModel(model, perDay && !perMin ? gemResetDate().getTime() : temp ? Date.now() + (noRetry ? 5 * 60000 : wait) : Date.now() + 90000);
       lastErr = new Error('limite');
-      // rifiuto solo per questo minuto: invece di passare a un modello più lento, aspetto e riprovo questo
-      if(temp && !keyOverride) break;
+      // primo rifiuto al minuto: invece di passare a un modello più lento, aspetto e lo riprovo una sola volta
+      if(temp && !keyOverride && !noRetry){ lastErr.temp = true; break; }
       continue;
     }
     if(r.status === 401 || /API[_ ]?key not valid|API_KEY_INVALID|invalid api key/i.test(t)) throw new Error('chiave');
