@@ -852,7 +852,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 68;
+const APP_VERSION = 69;
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
   let hadController = !!navigator.serviceWorker.controller, reloading = false;
@@ -868,7 +868,7 @@ if('serviceWorker' in navigator){
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(reg => {
       // controllo aggiornamenti anche quando l'app torna in primo piano
-      document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') reg.update().catch(() => {}); });
+      document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible' && reg) reg.update().catch(() => {}); });
     }).catch(() => {});
   });
 }
@@ -1242,10 +1242,11 @@ async function pump(){
   const id = ++reqId; inflight.set(id, { key: next.key, t: performance.now() });
   const vid = next.key.split('|')[0];
   if(isGemId(vid)){
-    // al massimo una richiesta ogni 21 secondi: il limite gratuito è di 3 al minuto
-    const gap = Math.max(0, gemLastStart + 21000 - Date.now());
+    // al massimo 3 richieste in un minuto: è il limite gratuito di Google
+    const recent = gemStarts.filter(t => Date.now() - t < 60000);
+    const gap = recent.length >= 3 ? Math.max(0, recent[0] + 61000 - Date.now()) : 0;
     const t0 = performance.now() + gap, redo = isDoneKey(next.key);
-    (gap ? (gemWait = { phase: 'gap', until: Date.now() + gap }, new Promise(r => setTimeout(r, gap))) : Promise.resolve()).then(() => { gemLastStart = Date.now(); return geminiTTS(en.text, vid); })
+    (gap ? (gemWait = { phase: 'gap', until: Date.now() + gap }, new Promise(r => setTimeout(r, gap))) : Promise.resolve()).then(() => { gemLastStart = Date.now(); gemStarts = gemStarts.filter(t => Date.now() - t < 60000).concat(Date.now()); return geminiTTS(en.text, vid); })
       .then(async blob => {
         const chunky = /\|c\d+-\d+$/.test(next.key);
         const secs = await wavSeconds(blob);
@@ -1392,9 +1393,14 @@ async function gemCall(model, api, text, voice, style, key){
     ? { contents: [{ parts: [{ text }] }], generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } } } }
     : { model, input: [{ type: 'user_input', content: [{ type: 'text', text, annotations: [{ type: 'speech_metadata', style }] }] }], response_format: { type: 'audio' }, generation_config: { speech_config: [{ voice }] } };
   // nessun tempo massimo: una richiesta interrotta Google la conta lo stesso, quindi aspetto sempre la risposta
+  const ac = new AbortController(); gemAbort = ac;
   try{
-    return await fetch(url, { method: 'POST', headers: { 'x-goog-api-key': key, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  }catch(e){ throw new Error('rete'); }
+    return await fetch(url, { method: 'POST', headers: { 'x-goog-api-key': key, 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: ac.signal });
+  }catch(e){
+    // interrotta da me perché persa durante la sospensione: Google l'ha contata, provo con il modello successivo
+    if(ac.signal.aborted){ gemStatReq(model); return { ok: false, status: 408, text: async () => 'persa mentre iPhone teneva ferma l\'app' }; }
+    throw new Error('rete');
+  }finally{ if(gemAbort === ac) gemAbort = null; }
 }
 function audioFrom(j){
   const a = findAudio(j); if(!a) return null;
@@ -1424,7 +1430,7 @@ function gemStats(){
 }
 let gemLastModel = '', gemLastStart = 0;
 // cosa sta aspettando l'app in questo momento, per dirlo a chi ascolta: richiesta in corso, attesa chiesta da Google, distanza tra richieste
-let gemWait = null, gemSusp = 0;
+let gemWait = null, gemSusp = 0, gemStarts = [], gemAbort = null;
 function gemStatReq(model){ gemLastModel = model; const st = gemStats(); st.req[model] = (st.req[model] || 0) + 1; store.set('gemStats', st); }
 function gemLogFail(model, status, chars, ms){
   const lg = store.get('gemLog') || []; lg.push({ t: Date.now(), m: model, c: chars || 0, s: 0, cut: false, ms: Math.round(ms || 0), err: String(status) }); store.set('gemLog', lg.slice(-40));
@@ -1620,7 +1626,7 @@ function chunksFor(sec){
     let Tt = T;
     if(anchor >= 0){
       if(i < anchor) stopAt = Math.min(stopAt, anchor);
-      else Tt = Math.min(T, run ? Math.max(GEM_FIRST * 4, run * 4) : GEM_FIRST);
+      else Tt = Math.min(T, !run ? GEM_FIRST : run <= GEM_FIRST * 1.5 ? Math.round(GEM_FIRST * 2.5) : T);
     }
     let len = 0, j = i, lastPara = -1;
     while(j < stopAt){
@@ -3485,6 +3491,12 @@ document.addEventListener('visibilitychange', () => { if(document.hidden){ stats
 addEventListener('pagehide', () => { statsFlush(); gemHeardFlush(); });
 // mentre la voce Google non è ancora pronta, il messaggio dice cosa succede e da quanto
 let gemTickLast = Date.now();
+document.addEventListener('visibilitychange', () => {
+  if(document.visibilityState !== 'visible' || !gemWait || gemWait.phase !== 'req') return;
+  const since = gemWait.since;
+  // dopo una sospensione lunga la risposta di solito non arriva più: aspetto 20 secondi, poi la rimando
+  setTimeout(() => { if(gemWait && gemWait.phase === 'req' && gemWait.since === since && gemSusp > 30000 && gemAbort) gemAbort.abort(); }, 20000);
+});
 setInterval(() => {
   const now = Date.now(), gap = now - gemTickLast; gemTickLast = now;
   if(gemWait && gemWait.phase === 'req' && gap > 10000) gemSusp += gap; // l'app era ferma: iPhone l'ha sospesa
