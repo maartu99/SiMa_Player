@@ -852,7 +852,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 67;
+const APP_VERSION = 68;
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
   let hadController = !!navigator.serviceWorker.controller, reloading = false;
@@ -1245,19 +1245,19 @@ async function pump(){
     // al massimo una richiesta ogni 21 secondi: il limite gratuito è di 3 al minuto
     const gap = Math.max(0, gemLastStart + 21000 - Date.now());
     const t0 = performance.now() + gap, redo = isDoneKey(next.key);
-    new Promise(r => setTimeout(r, gap)).then(() => { gemLastStart = Date.now(); return geminiTTS(en.text, vid); })
+    (gap ? (gemWait = { phase: 'gap', until: Date.now() + gap }, new Promise(r => setTimeout(r, gap))) : Promise.resolve()).then(() => { gemLastStart = Date.now(); return geminiTTS(en.text, vid); })
       .then(async blob => {
         const chunky = /\|c\d+-\d+$/.test(next.key);
         const secs = await wavSeconds(blob);
         const cut = chunky && en.text.length > 1500 && secs && secs < en.text.length / 15 * 0.55;
-        gemStatAudio(secs, cut, en.text.length, performance.now() - t0);
+        gemStatAudio(secs, cut, en.text.length, performance.now() - t0, gemSusp); gemWait = null;
         if(redo){ const st = gemStats(); st.redo = (st.redo || 0) + 1; st.redoSecs = (st.redoSecs || 0) + (secs || 0); store.set('gemStats', st); }
         if(cut){ shrinkGemChunks(en.text.length); throw new Error('tagliato'); }
         if(chunky){ rememberChunk(next.key); growGemChunks(en.text.length); }
         return blob;
       })
       .then(blob => onWorkerMessage({ data: { type: 'result', id, blob } }))
-      .catch(err => onWorkerMessage({ data: { type: 'error', id, message: String(err && err.message || err) } }));
+      .catch(err => { gemWait = null; onWorkerMessage({ data: { type: 'error', id, message: String(err && err.message || err) } }); });
     return;
   }
   wk(vid).postMessage({ type: 'predict', id, voiceId: vid, text: en.text });
@@ -1423,6 +1423,8 @@ function gemStats(){
   return fresh;
 }
 let gemLastModel = '', gemLastStart = 0;
+// cosa sta aspettando l'app in questo momento, per dirlo a chi ascolta: richiesta in corso, attesa chiesta da Google, distanza tra richieste
+let gemWait = null, gemSusp = 0;
 function gemStatReq(model){ gemLastModel = model; const st = gemStats(); st.req[model] = (st.req[model] || 0) + 1; store.set('gemStats', st); }
 function gemLogFail(model, status, chars, ms){
   const lg = store.get('gemLog') || []; lg.push({ t: Date.now(), m: model, c: chars || 0, s: 0, cut: false, ms: Math.round(ms || 0), err: String(status) }); store.set('gemLog', lg.slice(-40));
@@ -1436,9 +1438,9 @@ function isDoneKey(key){
   const arr = ((store.get('gemDone:' + m[1] + '|' + m[2]) || {})[m[3]]) || [];
   return arr.some(([a, b]) => a === +m[4] && b === +m[5]);
 }
-function gemStatAudio(secs, cut, chars, ms){
+function gemStatAudio(secs, cut, chars, ms, susp){
   // registro delle ultime richieste: quando, quale modello, quanto testo e quanto audio è tornato, quanto ci ha messo
-  const lg = store.get('gemLog') || []; lg.push({ t: Date.now(), m: gemLastModel, c: chars || 0, s: Math.round(secs || 0), cut: !!cut, ms: ms || 0 }); store.set('gemLog', lg.slice(-40));
+  const lg = store.get('gemLog') || []; lg.push({ t: Date.now(), m: gemLastModel, c: chars || 0, s: Math.round(secs || 0), cut: !!cut, ms: ms || 0, sus: Math.round(susp || 0) }); store.set('gemLog', lg.slice(-40));
   const st = gemStats(); st.n++; st.secs += secs || 0; if(cut) st.cut++; store.set('gemStats', st);
   // media di minuti per richiesta, tenuta anche tra un giorno e l'altro
   if(secs && !cut){ const a = store.get('gemAvg'); store.set('gemAvg', a ? a * 0.8 + secs * 0.2 : secs); }
@@ -1459,6 +1461,7 @@ async function geminiTTS(text, voiceId, keyOverride, retry = 0){
     const b = store.get('gemBlocked') || {}, now = Date.now();
     const soon = Math.min(...GEM_MODELS.map(m => b[m] || 0).filter(t => t > now));
     if(!isFinite(soon) || soon - now > 400000) throw e;
+    gemWait = { phase: 'wait', until: soon + 500 };
     await new Promise(r => setTimeout(r, soon - now + 500));
     return geminiTTS(text, voiceId, keyOverride, retry + 1);
   }
@@ -1483,7 +1486,7 @@ async function geminiTTSOnce(text, voiceId, keyOverride){
     const order = apis[model] === 'generate' ? ['generate', 'interactions'] : ['interactions', 'generate'];
     let r = null, t = '', usedApi = null;
     for(const api of order){
-      const tq = performance.now();
+      const tq = performance.now(); gemWait = { phase: 'req', model, since: Date.now() }; gemSusp = 0;
       try{ r = await gemCall(model, api, text, voice, style, key); }
       catch(e){ gemStatReq(model); gemLogFail(model, 'rete', text.length, performance.now() - tq); throw e; }
       usedApi = api;
@@ -3480,6 +3483,29 @@ setInterval(() => {
 }, 1000);
 document.addEventListener('visibilitychange', () => { if(document.hidden){ statsFlush(); gemHeardFlush(); } });
 addEventListener('pagehide', () => { statsFlush(); gemHeardFlush(); });
+// mentre la voce Google non è ancora pronta, il messaggio dice cosa succede e da quanto
+let gemTickLast = Date.now();
+setInterval(() => {
+  const now = Date.now(), gap = now - gemTickLast; gemTickLast = now;
+  if(gemWait && gemWait.phase === 'req' && gap > 10000) gemSusp += gap; // l'app era ferma: iPhone l'ha sospesa
+  if(!state.playing || !isGem() || !gemWait) return;
+  const cur = wanted[0] && entries.get(wanted[0].key);
+  if(!cur || cur.st === 'ready' || cur.st === 'stored') return;
+  const mmss = ms => { const x = Math.max(0, Math.round(ms / 1000)); return x < 60 ? `${x} s` : `${Math.floor(x / 60)} min ${String(x % 60).padStart(2, '0')} s`; };
+  let t;
+  if(gemWait.phase === 'req'){
+    const el2 = now - gemWait.since;
+    t = `Google sta preparando la voce (${GEM_MODEL_NAMES[gemWait.model] || 'Google'}) da ${mmss(el2)}. Di solito servono 15-30 secondi.`;
+    if(gemSusp > 20000) t += ` iPhone ha tenuto l'app ferma per ${mmss(gemSusp)}: tienila aperta finché parte la voce.`;
+    else if(el2 > 60000) t += ' Oggi Google risponde più lentamente.';
+    t += ' Aspettare non consuma richieste; chiudere l\'app sì.';
+  } else if(gemWait.phase === 'wait'){
+    t = `Google ha chiesto di aspettare un momento: riprovo tra ${mmss(gemWait.until - now)}. Non consuma richieste.`;
+  } else {
+    t = `Riprovo tra ${mmss(gemWait.until - now)}: Google accetta al massimo 3 richieste al minuto.`;
+  }
+  setStatus(t, false, true);
+}, 1000);
 let statsAT = null;
 audio.addEventListener('timeupdate', () => {
   const k = audio.dataset.key || '';
@@ -3848,7 +3874,7 @@ function openSettings(focus, keepScroll){
       const lg = (store.get('gemLog') || []).slice(-8).reverse();
       ca.appendChild(el('div', 'innerLabel', 'Ultime richieste'));
       if(!lg.length) ca.appendChild(el('p', 'cardNote', 'Ancora nessuna richiesta registrata. Da qui in poi le vedi qui.'));
-      lg.forEach(r => ca.appendChild(famRow(`${new Date(r.t).toLocaleString('it-IT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} · ${GEM_MODEL_NAMES[r.m] || r.m || 'modello'}`, (r.err ? `${r.c} caratteri inviati, rifiutata da Google (${r.err === '408' ? 'nessuna risposta in tempo' : 'errore ' + r.err}).` : r.cut ? `${r.c} caratteri inviati, tornati solo ${fmtM(r.s / 60)} min di audio: Google ha tagliato.` : `${r.c} caratteri inviati, ${fmtM(r.s / 60)} min di audio.`) + (r.ms ? ` Risposta in ${r.ms < 90000 ? Math.round(r.ms / 1000) + ' s' : fmtM(r.ms / 60000) + ' min'}.` : ''), null)));
+      lg.forEach(r => ca.appendChild(famRow(`${new Date(r.t).toLocaleString('it-IT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} · ${GEM_MODEL_NAMES[r.m] || r.m || 'modello'}`, (r.err ? `${r.c} caratteri inviati, rifiutata da Google (${r.err === '408' ? 'nessuna risposta in tempo' : 'errore ' + r.err}).` : r.cut ? `${r.c} caratteri inviati, tornati solo ${fmtM(r.s / 60)} min di audio: Google ha tagliato.` : `${r.c} caratteri inviati, ${fmtM(r.s / 60)} min di audio.`) + (r.ms ? ` Risposta in ${r.ms < 90000 ? Math.round(r.ms / 1000) + ' s' : fmtM(r.ms / 60000) + ' min'}${r.sus > 20000 ? `, di cui ${fmtM(r.sus / 60000)} min con l'app sospesa da iPhone` : ''}.` : ''), null)));
       const hist = store.get('gemHist') || {}, days = Object.keys(hist).sort().slice(-7).reverse();
       if(days.length){
         ca.appendChild(el('div', 'innerLabel', 'Ultimi giorni'));
