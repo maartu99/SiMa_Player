@@ -852,7 +852,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 74;
+const APP_VERSION = 75;
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
   let hadController = !!navigator.serviceWorker.controller, reloading = false;
@@ -1510,7 +1510,8 @@ async function geminiTTSOnce(text, voiceId, keyOverride, noRetry){
     if(probe.length){ gemLastProbe = Date.now(); blocked = blocked.filter(m => !probe.includes(m)); }
   }
   const apis = store.get('gemApi') || {};
-  for(const model of GEM_MODELS){
+  // la verifica della chiave non deve spendere una richiesta dei modelli migliori: prova prima Flash Lite (veloce), poi gli altri
+  for(const model of (keyOverride ? [GEM_MODELS[2], GEM_MODELS[1], GEM_MODELS[0], GEM_MODELS[3]] : GEM_MODELS)){
     if(blocked.includes(model)) continue;
     tried++;
     const order = apis[model] === 'generate' ? ['generate', 'interactions'] : ['interactions', 'generate'];
@@ -1655,7 +1656,7 @@ function chunksFor(sec){
     let Tt = T;
     if(anchor >= 0){
       if(i < anchor) stopAt = Math.min(stopAt, anchor);
-      else Tt = Math.min(T, !run ? GEM_FIRST : run <= GEM_FIRST * 1.5 ? 8000 : T);
+      else Tt = T; // nessun primo pezzo corto: ogni richiesta ai modelli buoni legge un pezzo intero
     }
     let len = 0, j = i, lastPara = -1;
     while(j < stopAt){
