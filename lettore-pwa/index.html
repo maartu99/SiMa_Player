@@ -852,7 +852,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 69;
+const APP_VERSION = 70;
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
   let hadController = !!navigator.serviceWorker.controller, reloading = false;
@@ -1242,9 +1242,8 @@ async function pump(){
   const id = ++reqId; inflight.set(id, { key: next.key, t: performance.now() });
   const vid = next.key.split('|')[0];
   if(isGemId(vid)){
-    // al massimo 3 richieste in un minuto: è il limite gratuito di Google
-    const recent = gemStarts.filter(t => Date.now() - t < 60000);
-    const gap = recent.length >= 3 ? Math.max(0, recent[0] + 61000 - Date.now()) : 0;
+    // una richiesta alla volta, al massimo una ogni 21 secondi: resta sempre sotto il limite di Google (3 al minuto)
+    const gap = Math.max(0, gemLastStart + 21000 - Date.now());
     const t0 = performance.now() + gap, redo = isDoneKey(next.key);
     (gap ? (gemWait = { phase: 'gap', until: Date.now() + gap }, new Promise(r => setTimeout(r, gap))) : Promise.resolve()).then(() => { gemLastStart = Date.now(); gemStarts = gemStarts.filter(t => Date.now() - t < 60000).concat(Date.now()); return geminiTTS(en.text, vid); })
       .then(async blob => {
@@ -1562,7 +1561,7 @@ function gemErrorText(msg){
 const chunkCache = new Map();
 // lunghezza dei blocchi in caratteri: circa 7-8 minuti di ascolto; si accorcia da sola se Google taglia l'audio
 const gemTarget = () => store.get('gemChunk') || 6500;
-const GEM_FIRST = 1800; // primo blocco dopo una partenza: circa 2 minuti di audio, pronto in 15-20 secondi
+const GEM_FIRST = 2500; // primo blocco dopo una partenza: circa 3 minuti di audio, pronto in 15-25 secondi
 // tetto: la lunghezza più grande che Google regge (scende quando taglia, dopo una settimana si riprova)
 const GEM_CEIL = 15000;
 function gemCeil(){ const c = store.get('gemCeil'); return c && c.until > Date.now() ? c.v : GEM_CEIL; }
@@ -1626,7 +1625,7 @@ function chunksFor(sec){
     let Tt = T;
     if(anchor >= 0){
       if(i < anchor) stopAt = Math.min(stopAt, anchor);
-      else Tt = Math.min(T, !run ? GEM_FIRST : run <= GEM_FIRST * 1.5 ? Math.round(GEM_FIRST * 2.5) : T);
+      else Tt = Math.min(T, !run ? GEM_FIRST : run <= GEM_FIRST * 1.5 ? 8000 : T);
     }
     let len = 0, j = i, lastPara = -1;
     while(j < stopAt){
@@ -1653,6 +1652,18 @@ const GEM_TINY = 400;
 function secChars(sec){ const s = state.sections[sec]; return s ? s.sentences.reduce((a, x) => a + x.t.length + 1, 0) : 0; }
 // prossima sezione da leggere con la voce Google: salto quelle di poche parole
 function nextGemSec(sec){ let n = sec + 1; while(n < state.sections.length - 1 && secChars(n) < GEM_TINY) n++; return n < state.sections.length ? n : -1; }
+// partenza "a freddo": il punto non è dentro né subito dopo audio già scaricato o in preparazione (meno di 3 minuti di testo)
+function gemColdAt(sec, idx){
+  const ss = state.sections[sec]; if(!ss) return true;
+  const pre = state.piperVoice + '|' + state.key + '|' + sec + '|c';
+  const live = [...entries.entries()].filter(([k, en]) => en.st === 'working' && k.startsWith(pre)).map(([k]) => k.slice(pre.length).split('-').map(Number));
+  const near = doneChunks(sec).concat(live).filter(([a, b]) => a <= idx);
+  if(!near.length) return true;
+  const end = Math.max(...near.map(([, b]) => b));
+  if(end >= idx) return false;
+  let gap = 0; for(let i = end + 1; i < idx && gap < 3000; i++) gap += ss.sentences[i].t.length + 1;
+  return gap >= 3000;
+}
 function chunkAt(sec, idx){ return chunksFor(sec).find(c => idx >= c.start && idx <= c.end); }
 function chunkKey(c){ return `${state.piperVoice}|${state.key}|${c.sec}|c${c.start}-${c.end}`; }
 function chunkText(c){ return state.sections[c.sec].sentences.slice(c.start, c.end + 1).map(x => x.t).join(' '); }
@@ -1722,7 +1733,7 @@ function upcoming(n){
 async function piperSpeakCurrent(fromAdvance){
   const g = ++state.gen;
   // partenza o salto: riparto con la rampa dal punto attuale (i blocchi già fatti o in corso restano)
-  if(!fromAdvance && isGem()) chunkCache.clear();
+  if(!fromAdvance && isGem() && gemColdAt(state.sec, state.idx)) chunkCache.clear();
   const list = upcoming(lookahead());
   if(!list.length){ stop(); return; }
   const key = list[0].key;
