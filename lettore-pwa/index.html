@@ -678,17 +678,17 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 
 /* v45: scheda Statistiche */
 #statsView{padding:16px 16px calc(env(safe-area-inset-bottom) + 190px)}
-.sPeriod{position:static;grid-template-columns:repeat(4,1fr);margin:16px 0 0;box-shadow:none}
-.sPeriod .tab{font-size:14px;height:36px}
-.sNav{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:12px 0 0}
-.sArrow{width:40px;height:40px;flex:none;display:flex;align-items:center;justify-content:center;border:0;border-radius:20px;background:none;color:var(--ink)}
+.sTools{display:flex;gap:4px;margin-right:-10px}
+.sTool{position:relative;width:44px;height:44px;border:0;border-radius:22px;background:none;color:var(--ink);display:flex;align-items:center;justify-content:center}
+.sTool.on{color:var(--accent)}
+.sDot{display:none;position:absolute;top:9px;right:9px;width:8px;height:8px;border-radius:4px;background:var(--accent)}
+.sTool.on .sDot{display:block}
+.sNav{display:flex;align-items:center;justify-content:center;gap:2px;margin-top:2px}
+.sArrow{width:36px;height:36px;flex:none;display:flex;align-items:center;justify-content:center;border:0;border-radius:18px;background:none;color:var(--ink2)}
 .sArrow:disabled{opacity:.25}
-.sDate{flex:1;min-width:0;height:40px;border:0;background:none;color:var(--ink);font:inherit;font-size:16px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.sFilters{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0 0}
-.sPill{display:flex;align-items:center;justify-content:center;gap:6px;min-width:0;height:36px;padding:0 12px;border-radius:18px;border:1px solid var(--line);background:var(--surface);color:var(--ink2);font:inherit;font-size:13px;font-weight:500}
-.sPill.on{border-color:var(--ink);color:var(--ink);font-weight:600}
-.sPillText{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.sPill svg{flex:none;opacity:.7}
+.sDate{min-width:0;max-width:70%;height:36px;padding:0 4px;border:0;background:none;color:var(--ink);font:inherit;font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sPresets{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:0 0 20px}
+.sPresets .chip{width:100%;height:36px;padding:0 2px;font-size:12px;letter-spacing:-.1px;text-overflow:clip}
 .sChart.dense{gap:2px}
 .sCal{padding:0 0 8px}
 .sCalHead{display:flex;align-items:center;justify-content:space-between;margin:0 0 8px}
@@ -703,9 +703,9 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 .sCalDay.has::after{content:'';position:absolute;left:50%;bottom:4px;width:4px;height:4px;margin-left:-2px;border-radius:2px;background:var(--accent)}
 .sCalDay.a.has::after,.sCalDay.b.has::after{background:var(--accent-ink)}
 .sCalNote{font-size:13px;color:var(--muted);text-align:center;margin:12px 0}
-.sCal .wideBtn.soft{justify-content:center}
+.sClear{justify-content:center!important;margin:0 0 6px}
 #sBooks > .cardNote{margin:0;padding:16px 0}
-.sTotal{text-align:center;margin-top:22px}
+.sTotal{text-align:center;margin-top:18px}
 .sBig{font-family:var(--serif);font-size:38px;font-weight:600;letter-spacing:-.5px;color:var(--ink);font-variant-numeric:tabular-nums}
 .sSub{font-size:13px;color:var(--muted);margin-top:4px}
 .sChart{display:flex;align-items:flex-end;gap:3px;height:160px;margin:22px 0 4px;padding:0 2px;border-bottom:1px solid var(--line)}
@@ -764,15 +764,10 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 
 <!-- BARRA IN BASSO -->
 <main id="statsView" class="hidden">
-  <div class="libHead"><div class="libHeadRow"><h1>Statistiche</h1></div></div>
-  <div class="tabs sPeriod" id="sPeriod" role="tablist" aria-label="Periodo"></div>
-  <div class="sNav">
-    <button class="sArrow" id="sPrev" aria-label="Periodo precedente"></button>
-    <button class="sDate" id="sDate" aria-label="Scegli le date"><span id="sDateText"></span></button>
-    <button class="sArrow" id="sNext" aria-label="Periodo successivo"></button>
-  </div>
-  <div class="sFilters"><button class="sPill" id="sVoiceBtn" aria-label="Filtra per voce"></button><button class="sPill" id="sBookBtn" aria-label="Filtra per libro"></button></div>
-  <div class="sTotal"><div class="sBig" id="sBig"></div><div class="sSub" id="sSub"></div></div>
+  <div class="libHead"><div class="libHeadRow"><h1>Statistiche</h1><div class="sTools"><button class="sTool" id="sCalBtn" aria-label="Scegli il periodo"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></button><button class="sTool" id="sFilterBtn" aria-label="Filtri"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg><span class="sDot"></span></button></div></div></div>
+  <div class="sTotal"><div class="sBig" id="sBig"></div>
+    <div class="sNav"><button class="sArrow" id="sPrev" aria-label="Periodo precedente"></button><button class="sDate" id="sDate" aria-label="Scegli il periodo"><span id="sDateText"></span></button><button class="sArrow" id="sNext" aria-label="Periodo successivo"></button></div>
+    <div class="sSub" id="sSub"></div></div>
   <div class="sChart" id="sChart" aria-hidden="true"></div>
   <h3 class="cardTitle">Libri ascoltati</h3>
   <div class="setSection"><div class="card" id="sBooks"></div></div>
@@ -857,7 +852,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 65;
+const APP_VERSION = 66;
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
   let hadController = !!navigator.serviceWorker.controller, reloading = false;
@@ -3536,6 +3531,11 @@ function statsSpanLabel(sp){
   }
   if(statsMode === 'month') return cap(IT_MONTHS[sp.from.getMonth()]) + (sp.from.getFullYear() !== yr ? ' ' + sp.from.getFullYear() : '');
   if(statsMode === 'year') return String(sp.from.getFullYear());
+  if(sameDay(sp.to, today)){
+    const n = Math.round((sp.to - sp.from) / 864e5) + 1;
+    if(n === 2) return 'Ieri e oggi';
+    if(n === 7 || n === 30) return `Ultimi ${n} giorni`;
+  }
   if(sameDay(sp.from, sp.to)) return fmtShort(sp.from, sp.from.getFullYear() !== yr);
   const yrs = sp.from.getFullYear() !== sp.to.getFullYear() || sp.to.getFullYear() !== yr;
   if(!yrs && sp.from.getMonth() === sp.to.getMonth()) return `${sp.from.getDate()} - ${fmtShort(sp.to)}`;
@@ -3560,39 +3560,12 @@ function renderStats(){
   const cats = [['gem', 'Voci Google', 'Tutte le voci Google'], ['piper', 'Voci sul telefono', 'Tutte le voci sul telefono'], ['sys', 'Voci di sistema', 'Tutte le voci di sistema']].filter(([c]) => [...used].some(v => statsVoiceCat(v) === c));
   if(statsVoice !== 'all' && !(statsVoice.startsWith('cat:') ? cats.some(([c]) => 'cat:' + c === statsVoice) : used.has(statsVoice.slice(2)))) statsVoice = 'all';
   if(statsBook !== 'all' && !usedBooks.has(statsBook)) statsBook = 'all';
-  // periodo
-  const pb = $('sPeriod'); pb.textContent = '';
-  [['day', 'Giorno'], ['week', 'Settimana'], ['month', 'Mese'], ['year', 'Anno']].forEach(([k, label]) => {
-    const t = el('button', 'tab', label); t.setAttribute('role', 'tab'); t.setAttribute('aria-selected', statsMode === k ? 'true' : 'false');
-    t.onclick = () => { if(statsMode === 'custom') statsRef = statsTo || new Date(); statsMode = k; store.set('statsMode', k); renderStats(); };
-    pb.appendChild(t);
-  });
   const sp = statsSpan(), today = dOnly(new Date());
   $('sDateText').textContent = statsSpanLabel(sp);
   $('sNext').disabled = sp.to >= today;
-  // filtri
-  const voiceLabel = statsVoice === 'all' ? 'Tutte le voci' : statsVoice.startsWith('cat:') ? (cats.find(([c]) => 'cat:' + c === statsVoice) || [, , 'Voci'])[2] : statsVoice === 'v:legacy' ? 'Voce non registrata' : (voices[statsVoice.slice(2)] || 'Voce');
-  $('sVoiceBtn').innerHTML = ''; $('sVoiceBtn').append(el('span', 'sPillText', voiceLabel)); $('sVoiceBtn').insertAdjacentHTML('beforeend', CHEV_D);
-  $('sVoiceBtn').classList.toggle('on', statsVoice !== 'all');
-  $('sBookBtn').innerHTML = ''; $('sBookBtn').append(el('span', 'sPillText', statsBook === 'all' ? 'Tutti i libri' : (titles[statsBook] || 'Libro'))); $('sBookBtn').insertAdjacentHTML('beforeend', CHEV_D);
-  $('sBookBtn').classList.toggle('on', statsBook !== 'all');
-  $('sVoiceBtn').onclick = () => {
-    const body = openSheet('statsVoice', 'Voce', true);
-    const pick = v => () => { statsVoice = v; store.set('statsVoice', v); closeSheet(); renderStats(); };
-    body.appendChild(option('Tutte le voci', null, statsVoice === 'all', pick('all')));
-    cats.forEach(([c, label, all]) => {
-      body.appendChild(el('div', 'innerLabel', label));
-      body.appendChild(option(all, null, statsVoice === 'cat:' + c, pick('cat:' + c)));
-      [...used].filter(v => statsVoiceCat(v) === c).sort((a, b) => (voices[a] || '').localeCompare(voices[b] || '', 'it')).forEach(v => body.appendChild(option(voices[v] || 'Voce', null, statsVoice === 'v:' + v, pick('v:' + v))));
-    });
-    if(used.has('legacy')) body.appendChild(option('Voce non registrata', 'Ascolti di prima che l\'app salvasse la voce', statsVoice === 'v:legacy', pick('v:legacy')));
-  };
-  $('sBookBtn').onclick = () => {
-    const body = openSheet('statsBook', 'Libro', true);
-    const pick = k => () => { statsBook = k; store.set('statsBook', k); closeSheet(); renderStats(); };
-    body.appendChild(option('Tutti i libri', null, statsBook === 'all', pick('all')));
-    [...usedBooks].sort((a, b) => (titles[a] || '').localeCompare(titles[b] || '', 'it')).forEach(k => body.appendChild(option(titles[k] || 'Libro', null, statsBook === k, pick(k))));
-  };
+  $('sCalBtn').classList.toggle('on', !(statsMode === 'day' && sameDay(sp.from, today)));
+  $('sFilterBtn').classList.toggle('on', statsVoice !== 'all' || statsBook !== 'all');
+  $('sFilterBtn').onclick = () => openStatsFilters(cats, used, usedBooks, voices, titles);
   // dati del periodo
   const chart = $('sChart'); chart.textContent = '';
   const bars = [], days = [];
@@ -3644,13 +3617,50 @@ function renderStats(){
   });
 }
 
-// calendario: un tocco sceglie un giorno, un secondo tocco la fine del periodo
+// filtri: voce e libro nello stesso pannello, la scelta si applica subito
+function openStatsFilters(cats, used, usedBooks, voices, titles){
+  const draw = () => {
+    const body = sheetKind === 'statsFilter' ? $('sheetBody') : openSheet('statsFilter', 'Filtri', true);
+    body.textContent = '';
+    if(statsVoice !== 'all' || statsBook !== 'all'){
+      const clr = el('button', 'wideBtn soft sClear', 'Togli tutti i filtri');
+      clr.onclick = () => { statsVoice = 'all'; statsBook = 'all'; store.set('statsVoice', 'all'); store.set('statsBook', 'all'); renderStats(); draw(); };
+      body.appendChild(clr);
+    }
+    const pickV = v => () => { statsVoice = v; store.set('statsVoice', v); renderStats(); draw(); };
+    const pickB = k => () => { statsBook = k; store.set('statsBook', k); renderStats(); draw(); };
+    body.appendChild(el('div', 'innerLabel', 'Libro'));
+    body.appendChild(option('Tutti i libri', null, statsBook === 'all', pickB('all')));
+    [...usedBooks].sort((a, b) => (titles[a] || '').localeCompare(titles[b] || '', 'it')).forEach(k => body.appendChild(option(titles[k] || 'Libro', null, statsBook === k, pickB(k))));
+    body.appendChild(el('div', 'innerLabel', 'Voce'));
+    body.appendChild(option('Tutte le voci', null, statsVoice === 'all', pickV('all')));
+    cats.forEach(([c, label, all]) => {
+      body.appendChild(option(all, null, statsVoice === 'cat:' + c, pickV('cat:' + c)));
+      [...used].filter(v => statsVoiceCat(v) === c).sort((a, b) => (voices[a] || '').localeCompare(voices[b] || '', 'it')).forEach(v => body.appendChild(option(voices[v] || 'Voce', label, statsVoice === 'v:' + v, pickV('v:' + v))));
+    });
+    if(used.has('legacy')) body.appendChild(option('Voce non registrata', 'Ascolti di prima che l\'app salvasse la voce', statsVoice === 'v:legacy', pickV('v:legacy')));
+  };
+  draw();
+}
+
+// periodo: scorciatoie a un tocco, oppure inizio e fine toccati sul calendario
 function openStatsCalendar(){
   const st = statsCollect(), sp = statsSpan(), today = dOnly(new Date());
   let a = sp.from, b = sp.to > today ? today : sp.to, view = new Date(b.getFullYear(), b.getMonth(), 1), picking = false;
-  const body = openSheet('statsCal', 'Scegli le date', true);
+  const body = openSheet('statsCal', 'Periodo', true);
+  const go = (mode, ref, from, to) => { statsMode = mode; if(ref) statsRef = ref; statsFrom = from || null; statsTo = to || null; if(mode !== 'custom') store.set('statsMode', mode); closeSheet(); renderStats(); };
+  const firstDay = () => { const ks = Object.keys(st).filter(k => Object.values(st[k].v || {}).some(h => h.some(x => x > 0))).sort(); return ks.length ? dOnly(new Date(ks[0] + 'T12:00:00')) : today; };
+  const presets = [
+    ['Oggi', () => go('day', today)], ['Ieri', () => go('day', addDays(today, -1))], ['Ieri e oggi', () => go('custom', null, addDays(today, -1), today)],
+    ['Questa settimana', () => go('week', today)], ['Settimana scorsa', () => go('week', addDays(today, -7))], ['Ultimi 7 giorni', () => go('custom', null, addDays(today, -6), today)],
+    ['Questo mese', () => go('month', today)], ['Mese scorso', () => go('month', new Date(today.getFullYear(), today.getMonth() - 1, 1))], ['Ultimi 30 giorni', () => go('custom', null, addDays(today, -29), today)],
+    ['Quest\'anno', () => go('year', today)], ['Anno scorso', () => go('year', new Date(today.getFullYear() - 1, 0, 1))], ['Tutto', () => go('custom', null, firstDay(), today)]
+  ];
   const draw = () => {
     body.textContent = '';
+    const pr = el('div', 'sPresets');
+    presets.forEach(([label, fn]) => { const c = el('button', 'chip', label); c.onclick = fn; pr.appendChild(c); });
+    body.appendChild(pr);
     const wrap = el('div', 'sCal');
     const head = el('div', 'sCalHead');
     const pv = el('button', 'sArrow'); pv.innerHTML = CHEV_L; pv.setAttribute('aria-label', 'Mese precedente'); pv.onclick = () => { view = new Date(view.getFullYear(), view.getMonth() - 1, 1); draw(); };
@@ -3674,7 +3684,7 @@ function openStatsCalendar(){
     }
     wrap.appendChild(grid);
     const n = Math.round((b - a) / 864e5) + 1;
-    wrap.appendChild(el('p', 'sCalNote', picking ? 'Tocca un altro giorno per scegliere un periodo, oppure Mostra per vedere solo questo giorno.' : (n === 1 ? 'Un giorno' : `${n} giorni`) + ' selezionati'));
+    wrap.appendChild(el('p', 'sCalNote', picking ? 'Ora tocca il giorno di fine, oppure Mostra per vedere solo questo giorno.' : 'Tocca il giorno di inizio, poi quello di fine. ' + (n === 1 ? '1 giorno scelto.' : `${n} giorni scelti.`)));
     const show = el('button', 'wideBtn', 'Mostra');
     show.onclick = () => {
       if(sameDay(a, b)){ statsMode = 'day'; statsRef = a; store.set('statsMode', 'day'); }
@@ -3682,13 +3692,6 @@ function openStatsCalendar(){
       closeSheet(); renderStats();
     };
     wrap.appendChild(show);
-    const all = el('button', 'wideBtn soft', 'Tutto lo storico');
-    all.onclick = () => {
-      const ks = Object.keys(st).filter(k => Object.values(st[k].v || {}).some(h => h.some(x => x > 0))).sort();
-      const f = ks.length ? new Date(ks[0] + 'T12:00:00') : today;
-      statsMode = 'custom'; statsFrom = dOnly(f); statsTo = today; closeSheet(); renderStats();
-    };
-    wrap.appendChild(all);
     body.appendChild(wrap);
   };
   draw();
@@ -3942,7 +3945,7 @@ function openMore(){
 $('addBtn').onclick = () => $('file').click();
 $('sPrev').innerHTML = CHEV_L; $('sNext').innerHTML = CHEV_R;
 $('sPrev').onclick = () => statsShift(-1); $('sNext').onclick = () => statsShift(1);
-$('sDate').onclick = () => openStatsCalendar();
+$('sDate').onclick = () => openStatsCalendar(); $('sCalBtn').onclick = () => openStatsCalendar();
 $('bkFile').onchange = e => { const f = e.target.files[0]; if(f) restoreBackup(f); e.target.value = ''; };
 $('file').onchange = e => { const f = e.target.files[0]; if(f) addFile(f); e.target.value = ''; };
 document.querySelectorAll('.chip').forEach(c => c.onclick = () => { filter = c.dataset.f; renderChips(); renderLibrary(); });
