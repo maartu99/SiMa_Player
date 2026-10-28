@@ -852,7 +852,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 76;
+const APP_VERSION = 77;
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
   let hadController = !!navigator.serviceWorker.controller, reloading = false;
@@ -1368,7 +1368,7 @@ function blockModel(m, until){ const b = store.get('gemBlocked') || {}; b[m] = u
 function gemUnavailable(m){ const b = store.get('gemBlocked') || {}, e = (store.get('gemErr') || {})[m]; return !!(b[m] && b[m] > Date.now() && e && !/^429/.test(e.s) && !/^200/.test(e.s)) || !!(e && /limit:\s*0\b/i.test(e.t) && b[m] > Date.now()); }
 function gemModelsFree(){ return GEM_MODELS.filter(m => !gemUnavailable(m)); }
 // rifiuto giornaliero confermato da Google oggi: solo questo vale come "finito". Gli altri blocchi salvati si possono riprovare.
-function gemConfirmedDaily(m){ const e = (store.get('gemErr') || {})[m]; return !!(e && e.d && e.at > gemResetDate().getTime() - 864e5); }
+function gemConfirmedDaily(m){ const e = (store.get('gemErr') || {})[m], bl = store.get('gemBlocked') || {}; return !!(e && e.d && bl[m] > Date.now()); }
 let gemLastProbe = 0;
 function gemModelsLeft(){ const bl = gemBlocked(); return GEM_MODELS.filter(m => !bl.includes(m)).length; }
 function findAudio(o){
@@ -1548,7 +1548,8 @@ async function geminiTTSOnce(text, voiceId, keyOverride, noRetry){
       const wait = rd && +rd[1] < 600 ? Math.ceil(+rd[1]) * 1000 + 3000 : 65000;
       const temp = !(perDay && !perMin) && (perMin || rd);
       // secondo rifiuto al minuto per lo stesso pezzo: questo modello resta fermo 5 minuti, si passa al successivo
-      blockModel(model, perDay && !perMin ? gemResetDate().getTime() : temp ? Date.now() + (noRetry ? 5 * 60000 : wait) : Date.now() + 90000);
+      // anche un rifiuto "al giorno" ferma il modello solo 20 minuti: il 3.8 rifiutato alle 09:09 ha risposto di nuovo alle 20:18, quindi il blocco fino al mattino faceva usare per ore solo i modelli peggiori
+      blockModel(model, perDay && !perMin ? Date.now() + 20 * 60000 : temp ? Date.now() + (noRetry ? 5 * 60000 : wait) : Date.now() + 90000);
       lastErr = new Error('limite');
       // primo rifiuto al minuto: invece di passare a un modello più lento, aspetto e lo riprovo una sola volta
       if(temp && !keyOverride && !noRetry){ lastErr.temp = true; break; }
@@ -1568,6 +1569,10 @@ async function geminiTTSOnce(text, voiceId, keyOverride, noRetry){
 }
 // nessun modello resta fermo oltre il prossimo azzeramento: i blocchi di una settimana delle versioni precedenti erano sbagliati
 (() => {
+  // blocchi "al giorno" salvati dalle versioni precedenti (fino alle 08:01): al massimo 20 minuti, tranne i modelli non inclusi nel piano gratuito (limit: 0)
+  { const b0 = store.get('gemBlocked') || {}, e0 = store.get('gemErr') || {}; let ch0 = false;
+    Object.keys(b0).forEach(m => { if(b0[m] - Date.now() > 25 * 60000 && !(e0[m] && /limit:\s*0\b/i.test(e0[m].t || ''))){ b0[m] = Date.now() + 20 * 60000; ch0 = true; } });
+    if(ch0) store.set('gemBlocked', b0); }
   const b = store.get('gemBlocked') || {}, lim = gemResetDate().getTime() + 36e5;
   let ch = false; Object.keys(b).forEach(m => { if(b[m] > lim){ delete b[m]; ch = true; } });
   if(ch) store.set('gemBlocked', b);
