@@ -1527,6 +1527,8 @@ async function geminiTTSOnce(text, voiceId, keyOverride, noRetry){
       gemLogFail(model, r.status, text.length, performance.now() - tq, t);
       // con l'altro metodo ha senso riprovare solo se questo non è supportato per il modello
       if(!(r.status === 404 || (r.status === 400 && isUnsupported(t)))) break;
+      // me lo ricordo subito: senza questo, finché l'altro metodo non riesce, ogni pezzo spenderebbe una richiesta inutile su questo
+      { const other = order[order.indexOf(api) + 1]; if(other && apis[model] !== other){ apis[model] = other; store.set('gemApi', apis); } }
     }
     if(r.ok){
       const blob = audioFrom(await r.json().catch(() => null));
@@ -1597,10 +1599,10 @@ function gemErrorText(msg){
 const chunkCache = new Map();
 // lunghezza dei blocchi in caratteri: circa 7-8 minuti di ascolto; si accorcia da sola se Google taglia l'audio
 // pezzi mai oltre circa 8 minuti: più lunghi, la voce di Google accelera, si abbassa e salta parole all'inizio e alla fine
-const gemTarget = () => Math.min(store.get('gemChunk') || 6500, 7000);
+const gemTarget = () => Math.min(store.get('gemChunk') || 6500, 8500);
 const GEM_FIRST = 2500; // primo blocco dopo una partenza: circa 3 minuti di audio, pronto in 15-25 secondi
 // tetto: la lunghezza più grande che Google regge (scende quando taglia, dopo una settimana si riprova)
-const GEM_CEIL = 7000;
+const GEM_CEIL = 8500;
 function gemCeil(){ const c = store.get('gemCeil'); return c && c.until > Date.now() ? c.v : GEM_CEIL; }
 function shrinkGemChunks(failedLen){
   // metà della lunghezza che Google non ha accettato; se più blocchi falliscono insieme, non accorcio due volte
