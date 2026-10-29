@@ -852,7 +852,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 77;
+const APP_VERSION = 78;
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
   let hadController = !!navigator.serviceWorker.controller, reloading = false;
@@ -1285,8 +1285,8 @@ function readyAhead(){
 function gemWaitShort(part, of){
   if(!gemWait) return '';
   const now = Date.now(), mmss = ms => { const x = Math.max(0, Math.round(ms / 1000)); return x < 60 ? `${x} s` : `${Math.floor(x / 60)} min ${String(x % 60).padStart(2, '0')} s`; };
-  if(gemWait.phase === 'req') return ` · ${part ? `parte ${part} di ${of} ` : ''}con ${(GEM_MODEL_NAMES[gemWait.model] || 'Google').replace(', il principale', '').replace(', anteprima', '')} da ${mmss(now - gemWait.since)}`;
-  return gemWait.phase === 'gap' ? ` · prossima parte tra ${mmss(gemWait.until - now)}` : ` · riprovo tra ${mmss(gemWait.until - now)}`;
+  if(gemWait.phase === 'req') return ` · ${part ? `parte ${part} di ${of}, ` : ''}${(GEM_MODEL_NAMES[gemWait.model] || 'Google').replace(', il principale', '').replace(', anteprima', '')} da ${mmss(now - gemWait.since)}`;
+  return gemWait.phase === 'gap' ? ` · prossima tra ${mmss(gemWait.until - now)}` : ` · riprovo tra ${mmss(gemWait.until - now)}`;
 }
 let bufTimer = null;
 function updateBuf(){
@@ -1312,7 +1312,7 @@ function updateBuf(){
     } else {
       if(isGem()){
         const min = readyAheadMinutes();
-        b.textContent = min >= 1 ? `Pronti circa ${fmtMin(min)} di ascolto${busy ? ', ne preparo altri' + gemWaitShort() : ''}` : (busy ? 'Google sta preparando la prossima parte' + gemWaitShort() : '');
+        b.textContent = min >= 1 ? `Pronti ${fmtMin(min)}${busy ? (gemWait ? gemWaitShort() : ' · preparo altri') : ''}` : (busy ? 'Preparo la prossima parte' + gemWaitShort() : '');
       }
       else b.textContent = n ? `${n} ${n === 1 ? 'frase pronta' : 'frasi pronte'} in anticipo` : (busy ? 'Preparo le prossime frasi...' : '');
     }
@@ -1448,8 +1448,8 @@ let gemLastModel = '', gemLastStart = 0;
 // cosa sta aspettando l'app in questo momento, per dirlo a chi ascolta: richiesta in corso, attesa chiesta da Google, distanza tra richieste
 let gemWait = null, gemSusp = 0, gemSent = [], gemAbort = null;
 function gemStatReq(model){ gemLastModel = model; const st = gemStats(); st.req[model] = (st.req[model] || 0) + 1; store.set('gemStats', st); }
-function gemLogFail(model, status, chars, ms){
-  const lg = store.get('gemLog') || []; lg.push({ t: Date.now(), m: model, c: chars || 0, s: 0, cut: false, ms: Math.round(ms || 0), err: String(status) }); store.set('gemLog', lg.slice(-40));
+function gemLogFail(model, status, chars, ms, msg){
+  const lg = store.get('gemLog') || []; lg.push({ t: Date.now(), m: model, c: chars || 0, s: 0, cut: false, ms: Math.round(ms || 0), err: String(status), x: String(msg || '').replace(/\s+/g, ' ').slice(0, 300) }); store.set('gemLog', lg.slice(-40));
 }
 // audio Google ascoltato (a velocità normale), accumulato e salvato ogni tanto
 let gemHeardPending = 0;
@@ -1524,7 +1524,7 @@ async function geminiTTSOnce(text, voiceId, keyOverride, noRetry){
       if(r.ok) break;
       t = await r.text().catch(() => '');
       noteGemErr(model, r.status + ' ' + api, t);
-      gemLogFail(model, r.status, text.length, performance.now() - tq);
+      gemLogFail(model, r.status, text.length, performance.now() - tq, t);
       // con l'altro metodo ha senso riprovare solo se questo non è supportato per il modello
       if(!(r.status === 404 || (r.status === 400 && isUnsupported(t)))) break;
     }
@@ -3954,7 +3954,7 @@ function openSettings(focus, keepScroll){
       const lg = (store.get('gemLog') || []).slice(-8).reverse();
       ca.appendChild(el('div', 'innerLabel', 'Ultime richieste'));
       if(!lg.length) ca.appendChild(el('p', 'cardNote', 'Ancora nessuna richiesta registrata. Da qui in poi le vedi qui.'));
-      lg.forEach(r => ca.appendChild(famRow(`${new Date(r.t).toLocaleString('it-IT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} · ${GEM_MODEL_NAMES[r.m] || r.m || 'modello'}`, (r.err ? `${r.c} caratteri inviati, rifiutata da Google (${r.err === '408' ? 'nessuna risposta in tempo' : 'errore ' + r.err}).` : r.cut ? `${r.c} caratteri inviati, tornati solo ${fmtM(r.s / 60)} min di audio: Google ha tagliato.` : `${r.c} caratteri inviati, ${fmtM(r.s / 60)} min di audio.`) + (r.ms ? ` Risposta in ${r.ms < 90000 ? Math.round(r.ms / 1000) + ' s' : fmtM(r.ms / 60000) + ' min'}${r.sus > 20000 ? `, di cui ${fmtM(r.sus / 60000)} min con l'app sospesa da iPhone` : ''}.` : ''), null)));
+      lg.forEach(r => ca.appendChild(famRow(`${new Date(r.t).toLocaleString('it-IT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} · ${GEM_MODEL_NAMES[r.m] || r.m || 'modello'}`, (r.err ? `${r.c} caratteri inviati, rifiutata da Google (${r.err === '408' ? 'nessuna risposta in tempo' : 'errore ' + r.err}).${r.x ? ' Messaggio di Google: ' + r.x : ''}` : r.cut ? `${r.c} caratteri inviati, tornati solo ${fmtM(r.s / 60)} min di audio: Google ha tagliato.` : `${r.c} caratteri inviati, ${fmtM(r.s / 60)} min di audio.`) + (r.ms ? ` Risposta in ${r.ms < 90000 ? Math.round(r.ms / 1000) + ' s' : fmtM(r.ms / 60000) + ' min'}${r.sus > 20000 ? `, di cui ${fmtM(r.sus / 60000)} min con l'app sospesa da iPhone` : ''}.` : ''), null)));
       const hist = store.get('gemHist') || {}, days = Object.keys(hist).sort().slice(-7).reverse();
       if(days.length){
         ca.appendChild(el('div', 'innerLabel', 'Ultimi giorni'));
