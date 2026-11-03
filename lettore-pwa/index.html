@@ -1186,6 +1186,10 @@ function onWorkerMessage(e){
         else { en.st = 'ready'; en.url = URL.createObjectURL(m.blob); en.res.forEach(r => r.resolve(en.url)); en.res = []; }
       } else {
         en.st = 'error'; en.err = m.message;
+        if(/^bloccato/.test(m.message || '')){
+          const mm = /^gem-[^|]+\|([^|]+)\|(\d+)\|c(\d+)-(\d+)$/.exec(key || '');
+          if(mm){ markBlocked(mm[1], +mm[2], +mm[3], +mm[4]); chunkCache.clear(); entries.delete(key); gemReplan = true; }
+        }
         en.res.forEach(r => r.reject(new Error(m.message))); en.res = [];
       }
     }
@@ -1558,6 +1562,7 @@ async function geminiTTSOnce(text, voiceId, keyOverride, noRetry){
       continue;
     }
     if(r.status === 401 || /API[_ ]?key not valid|API_KEY_INVALID|invalid api key/i.test(t)) throw new Error('chiave');
+    if(r.status === 400 && /content_blocked|blocked for an unspecified policy/i.test(t)) throw new Error('bloccato');
     if(r.status === 400 && isTooLong(t) && !isUnsupported(t)) throw new Error('richiesta: ' + t.slice(0, 160));
     if(r.status === 404 || r.status === 403 || (r.status === 400 && isUnsupported(t))){
       // modello non disponibile per questo account con nessuno dei due metodi: lo riprovo domani
@@ -1589,10 +1594,17 @@ function gemResetDate(){
   }catch(e){ return new Date(Date.now() + 12 * 36e5); }
 }
 function gemResetTime(){ return gemResetDate().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }); }
+// tempo tipico di risposta, misurato sulle ultime richieste riuscite (non un valore fisso)
+function gemTypicalText(){
+  const ok = (store.get('gemLog') || []).filter(x => x.s > 0 && x.ms > 0 && !x.sus).slice(-10).map(x => x.ms).sort((a, b) => a - b);
+  if(ok.length < 3) return 'Un pezzo lungo può richiedere anche un paio di minuti.';
+  const m = ok[Math.floor(ok.length / 2)] / 1000;
+  return m < 90 ? `Di solito servono circa ${Math.max(10, Math.round(m / 5) * 5)} secondi.` : `Di solito servono circa ${Math.round(m / 60 * 10) / 10} minuti.`;
+}
 function gemErrorText(msg){
   if(/limite/.test(msg)) return `Hai finito il limite gratuito di oggi delle voci Google: si azzera verso le ${gemResetTime()}. Intanto puoi riascoltare le parti già preparate, oppure usare una voce dell'iPhone.`;
   if(/chiave/.test(msg)) return 'La chiave Gemini non funziona. Controllala in Voce > Google Gemini.';
-  if(/rete/.test(msg)) return 'Gemini non risponde: serve la connessione a internet.';
+  if(/rete/.test(msg)) return 'La connessione con Google si è interrotta: la richiesta era già partita e potrebbe essere stata contata. Controlla internet e, se c\'è, riprova: se il problema è del modello, Google a volte non risponde per molti minuti.';
   return 'Gemini non è riuscito a generare la voce (' + msg + ').';
 }
 // Gemini legge a blocchi di più frasi: meno richieste, intonazione più naturale
@@ -1623,6 +1635,20 @@ function growGemChunks(okLen){
 // dopo un allungamento, le parti in coda non ancora iniziate vengono ripianificate con la nuova lunghezza
 let gemReplan = false;
 // i blocchi già generati restano validi anche se cambia la lunghezza: ne ricordo i confini
+// passaggi che Google non ha voluto leggere (blocco "content_blocked"): messi da parte, mai persi. Salvati con il libro, senza scadenza
+const blkKey = () => 'gemBlk:' + state.key;
+function blkRanges(sec){ return (((store.get(blkKey()) || {})[sec]) || []).map(([a, b]) => [a, b]); }
+function isBlockedChunk(c){ return !!c && blkRanges(c.sec).some(([a, b]) => a === c.start && b === c.end); }
+function markBlocked(book, sec, a, b){
+  const k = 'gemBlk:' + book, d = store.get(k) || {}, arr = d[sec] = d[sec] || [];
+  if(!arr.some(x => x[0] === a && x[1] === b)){ arr.push([a, b, Date.now()]); arr.sort((x, y) => x[0] - y[0]); store.set(k, d); }
+}
+function unblockRange(sec, a, b){
+  const k = blkKey(), d = store.get(k) || {};
+  d[sec] = (d[sec] || []).filter(x => !(x[0] === a && x[1] === b)); if(!d[sec].length) delete d[sec];
+  store.set(k, d); chunkCache.clear();
+}
+function allBlocked(){ const d = store.get(blkKey()) || {}; const out = []; Object.keys(d).forEach(sec => d[sec].forEach(([a, b, at]) => out.push({ sec: +sec, a, b, at }))); return out.sort((x, y) => x.sec - y.sec || x.a - y.a); }
 function doneChunks(sec){ return ((store.get('gemDone:' + state.piperVoice + '|' + state.key) || {})[sec]) || []; }
 async function recallChunks(book){
   try{
@@ -1645,7 +1671,7 @@ function chunksFor(sec){
   // contano come già fatti anche i blocchi che Google sta generando in questo momento
   const pre = state.piperVoice + '|' + state.key + '|' + sec + '|c';
   const live = [...entries.entries()].filter(([k, en]) => en.st === 'working' && k.startsWith(pre)).map(([k]) => k.slice(pre.length).split('-').map(Number));
-  const done = doneChunks(sec).concat(live.filter(([a]) => !doneChunks(sec).some(([x]) => x === a))).filter(([a, b]) => b < ss.length).sort((x, y) => x[0] - y[0]);
+  const done = doneChunks(sec).concat(blkRanges(sec).filter(([a]) => !doneChunks(sec).some(([x]) => x === a))).concat(live.filter(([a]) => !doneChunks(sec).some(([x]) => x === a) && !blkRanges(sec).some(([x]) => x === a))).filter(([a, b]) => b < ss.length).sort((x, y) => x[0] - y[0]);
   const make = (a, b) => { const c = { sec, start: a, end: b, cum: [], len: 0 }; for(let i = a; i <= b; i++){ c.cum.push(c.len); c.len += ss[i].t.length + 1; } return c; };
   // partenza a rampa: dal punto in cui si ascolta, il primo blocco è corto (circa 1 minuto), poi 3 volte più lungo
   // del precedente, fino alla lunghezza normale. Il numero totale di richieste resta quasi lo stesso.
@@ -1709,7 +1735,7 @@ function chunkText(c){ return state.sections[c.sec].sentences.slice(c.start, c.e
 function upcomingChunks(n){
   const list = []; let c = chunkAt(state.sec, state.idx);
   while(c && list.length < n){
-    list.push({ key: chunkKey(c), text: chunkText(c), chunk: c });
+    if(!isBlockedChunk(c)) list.push({ key: chunkKey(c), text: chunkText(c), chunk: c });
     const arr = chunksFor(c.sec), i = arr.indexOf(c);
     if(i < arr.length - 1) c = arr[i + 1]; else { const ns = nextGemSec(c.sec); c = ns >= 0 ? chunksFor(ns)[0] : null; }
   }
@@ -1775,6 +1801,13 @@ async function piperSpeakCurrent(fromAdvance){
   if(!fromAdvance && isGem() && gemColdAt(state.sec, state.idx)) chunkCache.clear();
   const list = upcoming(lookahead());
   if(!list.length){ stop(); return; }
+  if(isGem() && list[0].chunk){
+    const c0 = list[0].chunk;
+    if(c0.sec !== state.sec || state.idx < c0.start){
+      const inBlk = blkRanges(state.sec).some(([a, b]) => state.idx >= a && state.idx <= b) || c0.sec !== state.sec;
+      if(inBlk){ state.sec = c0.sec; state.idx = c0.start; if(!audio.dataset.key || !state.playing) setStatus('Questo passaggio non è stato letto da Google: parto dal pezzo dopo.'); }
+    }
+  }
   const key = list[0].key;
   want(list);
   if(isGem()){
@@ -1821,6 +1854,10 @@ async function piperSpeakCurrent(fromAdvance){
     await audio.play();
   }catch(err){
     if(g !== state.gen || err.message === 'skip') return;
+    if(isGem() && /^bloccato/.test(err.message || '')){
+      setStatus('Google non ha letto un passaggio del testo: l\'ho messo da parte e continuo. Lo trovi in Opzioni > Passaggi non letti, da leggere o da riprovare.', false, true);
+      state.playing = true; updatePlay(); return piperSpeakCurrent(true);
+    }
     if(err.name === 'NotAllowedError'){ stop(); setStatus('Tocca play per continuare.'); return; }
     stop();
     if(isGem() && (/tagliato/.test(err.message || '') || (/richiesta/.test(err.message || '') && gemTarget() > 1500))){
@@ -2813,6 +2850,27 @@ async function openNotesList(key){
     body.appendChild(c);
   });
 }
+function openBlockedList(){
+  const body = openSheet('blk', 'Passaggi non letti', true);
+  bookCardEl().then(c => body.insertBefore(c, body.firstChild));
+  const list = allBlocked();
+  if(!list.length){ body.appendChild(el('p', 'hint', 'Nessun passaggio da riprovare in questo libro.')); return; }
+  body.appendChild(el('p', 'hint', 'Google non ha voluto leggere questi passaggi, senza dire perché. Non sono persi: puoi leggerli qui senza spendere richieste, oppure riprovarli (una richiesta per ogni tentativo).'));
+  list.forEach(n => {
+    const ss = state.sections[n.sec] && state.sections[n.sec].sentences; if(!ss) return;
+    const txt = ss.slice(n.a, n.b + 1).map(x => x.t).join(' ');
+    const c = el('div', 'nCard');
+    const h = el('div', 'nHead'); const hl = el('span'); hl.append(el('b', null, secLabel(n.sec)), document.createTextNode(' · ' + new Date(n.at).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })));
+    h.append(hl, el('span', 'pillTag', `Frasi ${n.a + 1}-${n.b + 1}`));
+    c.append(h, el('blockquote', null, `«${txt.slice(0, 160)}${txt.length > 160 ? '...' : ''}»`));
+    const f = el('div', 'nFoot');
+    const rd = el('button', 'softPill'); rd.innerHTML = SI.notes + '<span>Leggi il testo</span>';
+    rd.onclick = () => { closeSheet(); reader.restore = { sec: state.sec, idx: state.idx }; state.sec = n.sec; state.idx = n.a; openPlayer(); openReader(); reader.readOnly = true; setStatus('Sola lettura: toccare il testo non avvia l\'audio e non spende richieste.'); };
+    const re = el('button', 'softPill'); re.innerHTML = SI.playC + `<span>Riprova (1 richiesta)</span>`;
+    re.onclick = () => { unblockRange(n.sec, n.a, n.b); closeSheet(); jumpTo(n.sec, n.a, true); openPlayer(); };
+    f.append(rd, re); c.appendChild(f); body.appendChild(c);
+  });
+}
 // va a una frase e la fa ascoltare; se il testo è aperto, lo mostra lì
 function jumpTo(sec, idx, listen){
   goTo(sec, idx);
@@ -2821,7 +2879,7 @@ function jumpTo(sec, idx, listen){
 }
 
 /* ---------- testo a tutta pagina ---------- */
-const reader = { open: false, first: -1, last: -1, follow: true, onEl: null };
+const reader = { open: false, first: -1, last: -1, follow: true, onEl: null, readOnly: false };
 function chapterEl(sec){
   const s = state.sections[sec];
   const wrap = el('div', 'rdChap'); wrap.dataset.sec = sec;
@@ -2886,7 +2944,7 @@ function openReader(){
   const seen = store.get('rdHint') || 0;
   if(seen < 3){ store.set('rdHint', seen + 1); $('rdHint').classList.remove('hidden'); setTimeout(() => $('rdHint').classList.add('hidden'), 9000); }
 }
-function closeReader(){ reader.open = false; $('reader').classList.add('hidden'); $('rdBody').textContent = ''; reader.onEl = null; }
+function closeReader(){ if(reader.readOnly && reader.restore){ state.sec = reader.restore.sec; state.idx = reader.restore.idx; refreshPosition(true); } reader.restore = null; reader.open = false; reader.readOnly = false; $('reader').classList.add('hidden'); $('rdBody').textContent = ''; reader.onEl = null; }
 (function readerEvents(){
   const b = $('rdBody');
   b.addEventListener('scroll', () => {
@@ -2917,7 +2975,16 @@ function closeReader(){ reader.open = false; $('reader').classList.add('hidden')
     if(!press) return;
     const { sp, long } = press; cancel();
     if(long) return;
-    jumpTo(+sp.dataset.s, +sp.dataset.i, true);
+    const ts = +sp.dataset.s, ti = +sp.dataset.i;
+    // sola lettura: il tocco non avvia l'audio, quindi non può spendere richieste
+    if(reader.readOnly){ setStatus('Sei in sola lettura: toccare il testo non avvia l\'audio e non spende richieste.'); return; }
+    // con una voce Google, un punto non ancora scaricato costa una richiesta: chiedo prima
+    if(isGem() && state.engine === 'piper' && !gemHasAudio(ts, ti)){
+      const inBlk = (((store.get(blkKey()) || {})[ts]) || []).some(([a, b]) => ti >= a && ti <= b);
+      if(!confirm(inBlk ? 'Google non ha letto questo passaggio. Riprovare costa una richiesta. Vuoi riprovare?' : 'Questo punto non è ancora scaricato: ascoltare da qui manda una richiesta a Google. Vuoi farlo?')) return;
+      if(inBlk) unblockRange(ts, ...(((store.get(blkKey()) || {})[ts]) || []).filter(([a, b]) => ti >= a && ti <= b)[0].slice(0, 2));
+    }
+    jumpTo(ts, ti, true);
   });
   b.addEventListener('contextmenu', e => e.preventDefault());
 })();
@@ -3577,7 +3644,7 @@ setInterval(() => {
   let t;
   if(gemWait.phase === 'req'){
     const el2 = now - gemWait.since;
-    t = `Google sta preparando la voce (${GEM_MODEL_NAMES[gemWait.model] || 'Google'}) da ${mmss(el2)}. Di solito servono 15-30 secondi.`;
+    t = `Google sta preparando la voce (${GEM_MODEL_NAMES[gemWait.model] || 'Google'}) da ${mmss(el2)}. ${gemTypicalText()}`;
     if(gemSusp > 20000) t += ` iPhone ha tenuto l'app ferma per ${mmss(gemSusp)}: tienila aperta finché parte la voce.`;
     else if(el2 > 60000) t += ' Oggi Google risponde più lentamente.';
     t += ' Aspettare non consuma richieste; chiudere l\'app sì.';
@@ -4080,6 +4147,8 @@ function openMore(){
   }
   const nn = notes().length;
   g1.appendChild(gRow(SI.notes, 'Clip e note', null, () => openNotesList(), { pill: nn ? `${nn} ${nn === 1 ? 'nota' : 'note'}` : null }));
+  const nb = isGem() ? allBlocked().length : 0;
+  if(nb) g1.appendChild(gRow(SI.cloud, 'Passaggi non letti', 'Google non ha voluto leggerli. Il testo resta nel libro', () => openBlockedList(), { pill: String(nb) }));
   g1.appendChild(gRow(SI.gear, 'Impostazioni', null, () => openSettings()));
   const g2 = el('div', 'group');
   g2.appendChild(gRow(SI.restart, 'Ricomincia dall\'inizio', null, () => { closeSheet(); goTo(0, 0); }, { end: SI.restart }));
