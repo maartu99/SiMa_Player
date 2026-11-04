@@ -1195,6 +1195,7 @@ function onWorkerMessage(e){
     }
     if(m.type === 'error' && !key){ downloading.clear(); refreshVoiceUI(); setStatus('Non riesco a scaricare la voce. Controlla la connessione e riprova.', true); }
     updateBuf();
+    { const w = gemWeakOnly() ? gemWeakChars() : 0; if(w !== gemWeakPrev){ gemWeakPrev = w; chunkCache.clear(); gemReplan = true; } }
     if(gemReplan){ gemReplan = false; if(isGem() && state.total){ want(upcoming(lookahead()), audio.dataset.key); return; } }
     pump();
   }
@@ -1414,14 +1415,22 @@ async function gemCall(model, api, text, voice, style, key){
     : { model, input: [{ type: 'user_input', content: [{ type: 'text', text, annotations: [{ type: 'speech_metadata', style }] }] }], response_format: { type: 'audio' }, generation_config: { speech_config: [{ voice }] } };
   // nessun tempo massimo: una richiesta interrotta Google la conta lo stesso, quindi aspetto sempre la risposta
   const ac = new AbortController(); gemAbort = ac;
+  // oltre 6 minuti senza risposta il modello è fermo: smetto di aspettarlo (Google l'ha già contata) e passo al successivo
+  let slow = false, tm = null; const t0 = Date.now();
+  const arm = ms => { tm = setTimeout(() => { if(document.hidden || gemSusp > 0 || Date.now() - t0 < gemWaitMs - 10000){ arm(15000); return; } slow = true; ac.abort(); }, ms); };
+  arm(gemWaitMs);
   try{
     return await fetch(url, { method: 'POST', headers: { 'x-goog-api-key': key, 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: ac.signal });
   }catch(e){
     // interrotta da me perché persa durante la sospensione: Google l'ha contata, provo con il modello successivo
-    if(ac.signal.aborted){ gemStatReq(model); return { ok: false, status: 408, text: async () => 'persa mentre iPhone teneva ferma l\'app' }; }
+    if(ac.signal.aborted){ gemStatReq(model); if(slow) gemMarkSlow(model); return { ok: false, status: 408, text: async () => slow ? 'nessuna risposta dopo 6 minuti' : 'persa mentre iPhone teneva ferma l\'app' }; }
     throw new Error('rete');
-  }finally{ if(gemAbort === ac) gemAbort = null; }
+  }finally{ clearTimeout(tm); if(gemAbort === ac) gemAbort = null; }
 }
+let gemWaitMs = 360000;
+// modello lento oggi: lo uso per ultimo fino all'azzeramento. Non è un blocco: se gli altri finiscono, torna a essere provato
+function gemMarkSlow(model){ const d = store.get('gemSlow') || {}; d[model] = gemResetDate().getTime(); store.set('gemSlow', d); }
+function gemModelOrder(){ const d = store.get('gemSlow') || {}; const slow = m => d[m] && d[m] > Date.now(); return GEM_MODELS.filter(m => !slow(m)).concat(GEM_MODELS.filter(slow)); }
 function audioFrom(j){
   const a = findAudio(j); if(!a) return null;
   const bin = atob(a.data); const bytes = new Uint8Array(bin.length);
@@ -1515,7 +1524,7 @@ async function geminiTTSOnce(text, voiceId, keyOverride, noRetry){
   }
   const apis = store.get('gemApi') || {};
   // la verifica della chiave non deve spendere una richiesta dei modelli migliori: prova prima Flash Lite (veloce), poi gli altri
-  for(const model of (keyOverride ? [GEM_MODELS[2], GEM_MODELS[1], GEM_MODELS[0], GEM_MODELS[3]] : GEM_MODELS)){
+  for(const model of (keyOverride ? [GEM_MODELS[2], GEM_MODELS[1], GEM_MODELS[0], GEM_MODELS[3]] : gemModelOrder())){
     if(blocked.includes(model)) continue;
     tried++;
     const order = apis[model] === 'generate' ? ['generate', 'interactions'] : ['interactions', 'generate'];
@@ -1523,7 +1532,12 @@ async function geminiTTSOnce(text, voiceId, keyOverride, noRetry){
     for(const api of order){
       const tq = performance.now(); gemWait = { phase: 'req', model, since: Date.now() }; gemSusp = 0;
       try{ r = await gemCall(model, api, text, voice, style, key); }
-      catch(e){ gemStatReq(model); gemLogFail(model, 'rete', text.length, performance.now() - tq); throw e; }
+      catch(e){
+        gemStatReq(model); gemLogFail(model, 'rete', text.length, performance.now() - tq);
+        // dopo più di un minuto di attesa non è internet che manca: il modello ha lasciato cadere la richiesta
+        if(!keyOverride && performance.now() - tq > 60000){ gemMarkSlow(model); lastErr = e; r = null; break; }
+        throw e;
+      }
       usedApi = api;
       if(r.ok) break;
       t = await r.text().catch(() => '');
@@ -1534,6 +1548,7 @@ async function geminiTTSOnce(text, voiceId, keyOverride, noRetry){
       // me lo ricordo subito: senza questo, finché l'altro metodo non riesce, ogni pezzo spenderebbe una richiesta inutile su questo
       { const other = order[order.indexOf(api) + 1]; if(other && apis[model] !== other){ apis[model] = other; store.set('gemApi', apis); } }
     }
+    if(!r) continue;
     if(r.ok){
       const blob = audioFrom(await r.json().catch(() => null));
       if(!blob){ noteGemErr(model, '200 ' + usedApi, 'nessun audio nella risposta'); lastErr = new Error('nessun audio nella risposta'); continue; }
@@ -1555,7 +1570,12 @@ async function geminiTTSOnce(text, voiceId, keyOverride, noRetry){
       const temp = !(perDay && !perMin) && (perMin || rd);
       // secondo rifiuto al minuto per lo stesso pezzo: questo modello resta fermo 5 minuti, si passa al successivo
       // anche un rifiuto "al giorno" ferma il modello solo 20 minuti: il 3.8 rifiutato alle 09:09 ha risposto di nuovo alle 20:18, quindi il blocco fino al mattino faceva usare per ore solo i modelli peggiori
-      blockModel(model, perDay && !perMin ? Date.now() + 20 * 60000 : temp ? Date.now() + (noRetry ? 5 * 60000 : wait) : Date.now() + 90000);
+      // rifiuto "al giorno": Google dice quando riprovare ("retry in 19h13m30s"). Ogni riprova prima di quell'ora è una richiesta che Google conta lo stesso
+      let dayMs = 0; const hm = /retry in\s*(?:(\d+)h)?\s*(?:(\d+)m)?\s*(?:(\d+(?:\.\d+)?)s)?/i.exec(t);
+      if(hm && (hm[1] || hm[2] || hm[3])) dayMs = ((+hm[1] || 0) * 3600 + (+hm[2] || 0) * 60 + (+hm[3] || 0)) * 1000;
+      else if(rd && +rd[1] >= 600) dayMs = +rd[1] * 1000;
+      const dayCap = gemResetDate().getTime() + 36e5 - Date.now();
+      blockModel(model, perDay && !perMin ? Date.now() + (dayMs ? Math.min(dayMs + 30000, dayCap) : gemResetDate().getTime() - Date.now()) : temp ? Date.now() + (noRetry ? 5 * 60000 : wait) : Date.now() + 90000);
       lastErr = new Error('limite');
       // primo rifiuto al minuto: invece di passare a un modello più lento, aspetto e lo riprovo una sola volta
       if(temp && !keyOverride && !noRetry){ lastErr.temp = true; break; }
@@ -1577,9 +1597,6 @@ async function geminiTTSOnce(text, voiceId, keyOverride, noRetry){
 // nessun modello resta fermo oltre il prossimo azzeramento: i blocchi di una settimana delle versioni precedenti erano sbagliati
 (() => {
   // blocchi "al giorno" salvati dalle versioni precedenti (fino alle 08:01): al massimo 20 minuti, tranne i modelli non inclusi nel piano gratuito (limit: 0)
-  { const b0 = store.get('gemBlocked') || {}, e0 = store.get('gemErr') || {}; let ch0 = false;
-    Object.keys(b0).forEach(m => { if(b0[m] - Date.now() > 25 * 60000 && !(e0[m] && /limit:\s*0\b/i.test(e0[m].t || ''))){ b0[m] = Date.now() + 20 * 60000; ch0 = true; } });
-    if(ch0) store.set('gemBlocked', b0); }
   const b = store.get('gemBlocked') || {}, lim = gemResetDate().getTime() + 36e5;
   let ch = false; Object.keys(b).forEach(m => { if(b[m] > lim){ delete b[m]; ch = true; } });
   if(ch) store.set('gemBlocked', b);
@@ -1611,7 +1628,11 @@ function gemErrorText(msg){
 const chunkCache = new Map();
 // lunghezza dei blocchi in caratteri: circa 7-8 minuti di ascolto; si accorcia da sola se Google taglia l'audio
 // pezzi mai oltre circa 8 minuti: più lunghi, la voce di Google accelera, si abbassa e salta parole all'inizio e alla fine
-const gemTarget = () => Math.min(store.get('gemChunk') || 6500, 8500);
+// con 3.8 e 3.1 finiti per oggi leggono Lite e 2.5: la loro voce cala a metà di un pezzo lungo, quindi pezzi più corti (prova da verificare all'ascolto)
+const GEM_WEAK_CHARS = 6000, GEM_WEAK25_CHARS = 7000; // sempre circa 6 minuti di audio: Lite legge circa 1000 caratteri al minuto, il 2.5 circa 1150-1200 (più veloce)
+function gemWeakOnly(){ return gemConfirmedDaily(GEM_MODELS[0]) && gemConfirmedDaily(GEM_MODELS[1]) && !(gemConfirmedDaily(GEM_MODELS[2]) && gemConfirmedDaily(GEM_MODELS[3])); }
+const gemWeakChars = () => gemConfirmedDaily(GEM_MODELS[2]) ? GEM_WEAK25_CHARS : GEM_WEAK_CHARS;
+const gemTarget = () => { const t = Math.min(store.get('gemChunk') || 6500, 8500); return gemWeakOnly() ? Math.min(t, gemWeakChars()) : t; };
 const GEM_FIRST = 2500; // primo blocco dopo una partenza: circa 3 minuti di audio, pronto in 15-25 secondi
 // tetto: la lunghezza più grande che Google regge (scende quando taglia, dopo una settimana si riprova)
 const GEM_CEIL = 8500;
@@ -1627,13 +1648,14 @@ function shrinkGemChunks(failedLen){
 }
 // ogni blocco lungo andato a buon fine allunga i successivi del 25%, fino al tetto: meno richieste per ora di ascolto
 function growGemChunks(okLen){
+  if(gemWeakOnly()) return; // i pezzi corti dei modelli deboli non cambiano la lunghezza normale
   const T = gemTarget();
   if(okLen < T * 0.85) return;
   const t = Math.min(gemCeil(), Math.round(T * 1.25));
   if(t > T){ store.set('gemChunk', t); chunkCache.clear(); gemReplan = true; }
 }
 // dopo un allungamento, le parti in coda non ancora iniziate vengono ripianificate con la nuova lunghezza
-let gemReplan = false;
+let gemReplan = false, gemWeakPrev = 0;
 // i blocchi già generati restano validi anche se cambia la lunghezza: ne ricordo i confini
 // passaggi che Google non ha voluto leggere (blocco "content_blocked"): messi da parte, mai persi. Salvati con il libro, senza scadenza
 const blkKey = () => 'gemBlk:' + state.key;
@@ -1705,7 +1727,7 @@ function chunksFor(sec){
       let mine = 0, rest = 0;
       for(let x = i; x <= endIdx; x++) mine += ss[x].t.length + 1;
       for(let x = endIdx + 1; x < stopAt; x++) rest += ss[x].t.length + 1;
-      if(rest < Tt * 0.35 && mine + rest <= gemCeil()) endIdx = stopAt - 1;
+      if(rest < Tt * 0.35 && mine + rest <= (gemWeakOnly() ? Math.round(Tt * 1.1) : gemCeil())) endIdx = stopAt - 1;
     }
     const nc = make(i, endIdx); out.push(nc); i = endIdx + 1;
     if(anchor >= 0 && nc.start >= anchor) run += nc.len;
