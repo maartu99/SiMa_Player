@@ -606,6 +606,7 @@ body.noMini #toast{bottom:calc(env(safe-area-inset-bottom) + 76px)}
 .smallBtn{border-radius:10px}
 .wideBtn{border-radius:12px}
 .softPill{border-radius:10px}
+.gSkip{padding:14px 16px;border-bottom:1px solid var(--line)}.gSkip b{display:block;font-size:15px;color:var(--ink)}.gSkip small{display:block;color:var(--muted);font-size:13px;line-height:1.4;margin-top:2px}.gSkipBtns{display:flex;gap:8px;margin-top:12px}.gSkipPill{flex:1;height:52px;padding:0 6px;flex-direction:column;justify-content:center;gap:2px}.gSkipPill span{font-size:15px;font-weight:700}.gSkipPill small{font-size:11px;font-weight:500;margin:0;color:inherit;opacity:.8}
 #sheetClose{border-radius:10px}
 .presets button{border-radius:10px}
 .recCta{border-radius:12px}
@@ -720,7 +721,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 
 <!-- LIBRERIA -->
 <header class="appBar">
-  <div class="brand"><span class="brandMark"><img src="icon-192.png" alt="" width="32" height="32"></span><span>SiMa</span><span class="brandVer" id="brandVer">(85)</span></div>
+  <div class="brand"><span class="brandMark"><img src="icon-192.png" alt="" width="32" height="32"></span><span>SiMa</span><span class="brandVer" id="brandVer">(86)</span></div>
 </header>
 <main id="libView">
   <div class="actRow hidden">
@@ -853,7 +854,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 85;
+const APP_VERSION = 86;
 { const bv = document.getElementById('brandVer'); if(bv) bv.textContent = '(' + APP_VERSION + ')'; }
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
@@ -1841,12 +1842,8 @@ async function piperSpeakCurrent(fromAdvance){
       if(blockedHere){
         // Google non vuole leggere questo passaggio: non salto mai da solo. Mi fermo e decidi tu
         stop();
-        if(!confirm('Google non vuole leggere questo passaggio del libro, e dopo ci sarebbe un buco nella storia.\n\nOK = lo salto e continuo dal pezzo dopo.\nAnnulla = resto fermo qui (puoi riprovarlo da Opzioni > Passaggi non letti, costa 1 richiesta).')){
-          setStatus(GEM_HOLD_MSG, true, true); return;
-        }
-        gemHold = false; gemBlkRun = 0;
-        state.playing = true; updatePlay(); requestWake();
-        state.sec = c0.sec; state.idx = c0.start;
+        showGemProblem('bloccato', chunkAt(state.sec, state.idx), 'bloccato');
+        return;
       } else if(c0.sec !== state.sec){ state.sec = c0.sec; state.idx = c0.start; }
     }
   }
@@ -1878,7 +1875,7 @@ async function piperSpeakCurrent(fromAdvance){
     }
   }
   try{
-    if(isGem() && gemHold){ const e0 = entries.get(key); if(e0 && e0.st === 'queued'){ stop(); setStatus(GEM_HOLD_MSG, true, true); return; } }
+    if(isGem() && gemHold){ const e0 = entries.get(key); if(e0 && e0.st === 'queued'){ stop(); showGemProblem('bloccato', state.curChunk || chunkAt(state.sec, state.idx), 'bloccato'); return; } }
     const url = await waitFor(key);
     // dopo un'interruzione riparto solo con qualche frase già pronta, così non si ferma a ogni frase
     if(stalled && fromAdvance && list.length > 1){
@@ -1900,7 +1897,7 @@ async function piperSpeakCurrent(fromAdvance){
     if(isGem() && /^bloccato/.test(err.message || '')){
       gemHold = true; stop();
       const bc = state.curChunk; if(bc){ state.sec = bc.sec; state.idx = bc.start; savePos(); }
-      setStatus(GEM_HOLD_MSG, true, true);
+      showGemProblem('bloccato', bc, 'bloccato');
       return;
     }
     if(err.name === 'NotAllowedError'){ stop(); setStatus('Tocca play per continuare.'); return; }
@@ -1911,7 +1908,8 @@ async function piperSpeakCurrent(fromAdvance){
       state.playing = true; updatePlay(); return piperSpeakCurrent(fromAdvance);
     }
     if(isGem() && /limite/.test(err.message || '') && prefs.gemFallback && enterFallback()) return;
-    if(isGem()) setStatus(gemErrorText(err.message || ''), true);
+    if(isGem() && !/chiave/.test(err.message || '')) showGemProblem(gemProblemKind(err.message), state.curChunk, err.message || '');
+    else if(isGem()) setStatus(gemErrorText(err.message || ''), true);
     else setStatus('Non riesco a generare la voce. Controlla la connessione per il primo download, oppure scegli una voce dell\'iPhone.', true);
   }
 }
@@ -2894,6 +2892,62 @@ async function openNotesList(key){
     f.append(go, ed); c.appendChild(f);
     body.appendChild(c);
   });
+}
+
+/* ---------- quando Google non legge un pezzo: pannello nel player, con le scelte e il loro costo ---------- */
+function gemProblemKind(msg){ msg = msg || ''; if(/^bloccato/.test(msg)) return 'bloccato'; if(/limite/.test(msg)) return 'limite'; if(/rete|408|nessuna risposta/.test(msg)) return 'rete'; return 'altro'; }
+const chunkMins = c => Math.max(1, Math.round(c.len / cps() / 60));
+function chunkIdx(arr, c){ return arr.findIndex(x => x.start === c.start && x.end === c.end); }
+function chunkNext(c){ const arr = chunksFor(c.sec), i = chunkIdx(arr, c); if(i >= 0 && i < arr.length - 1) return arr[i + 1]; const ns = nextGemSec(c.sec); return ns >= 0 ? (chunksFor(ns)[0] || null) : null; }
+function chunkPrev(c){ const arr = chunksFor(c.sec), i = chunkIdx(arr, c); if(i > 0) return arr[i - 1]; let q = c.sec - 1; while(q >= 0 && secChars(q) < GEM_TINY) q--; if(q < 0) return null; const a2 = chunksFor(q); return a2[a2.length - 1] || null; }
+function gemProblemGo(c, listen){
+  closeSheet(); gemHold = false; gemBlkRun = 0;
+  { const k0 = chunkKey(c), e0 = entries.get(k0); if(e0 && e0.st === 'error') entries.delete(k0); }
+  chunkCache.clear(); state.sec = c.sec; state.idx = c.start;
+  if(listen){ state.playing = false; refreshPosition(true); savePos(); unlockAudio(); play(); }
+  else { refreshPosition(true); savePos(); }
+}
+function showGemProblem(kind, c, msg){
+  if(!c) c = chunkAt(state.sec, state.idx);
+  if(!c || (sheetKind && sheetKind !== 'prob')){ setStatus(kind === 'bloccato' ? GEM_HOLD_MSG : gemErrorText(msg || ''), true, true); return; }
+  const titles = { bloccato: 'Google non ha letto questo pezzo', limite: 'Le richieste di oggi sono finite', rete: 'Google non ha risposto', altro: 'Google non è riuscito a leggere questo pezzo' };
+  const body = openSheet('prob', titles[kind] || titles.altro, true);
+  const mins = chunkMins(c);
+  const where = `${secLabel(c.sec)}, circa ${mins} ${mins === 1 ? 'minuto' : 'minuti'} di libro`;
+  let why;
+  if(kind === 'bloccato') why = `Google ha rifiutato questo pezzo (${where}) senza dire il motivo. Non vuol dire che il testo sia vietato: altre persone segnalano blocchi a caso anche su libri normali, e a volte lo stesso pezzo passa al secondo tentativo. Il testo resta nel libro.`;
+  else if(kind === 'limite') why = `Le voci Google gratuite hanno finito le richieste di oggi. Si azzerano verso le ${gemResetTime()}. Finché non si azzerano, ogni tentativo viene rifiutato.`;
+  else if(kind === 'rete') why = `Google non ha risposto a questo pezzo (${where}), oppure la connessione si è interrotta. La richiesta era già partita e Google potrebbe averla contata.`;
+  else why = `Google non è riuscito a preparare questo pezzo (${where}). ${gemErrorText(msg || '')}`;
+  body.appendChild(el('p', 'hint', why));
+  const g = el('div', 'group');
+  if(kind !== 'limite'){
+    g.appendChild(gRow(SI.restart, 'Riprova questo pezzo', kind === 'bloccato' ? 'Costa 1 richiesta. Non sappiamo perché Google lo ha rifiutato: potrebbe rifiutarlo ancora.' : 'Costa 1 richiesta. Quella di prima potrebbe già essere stata contata.', () => { if(kind === 'bloccato') unblockRange(c.sec, c.start, c.end); gemProblemGo(c, true); }));
+  }
+  const pv = chunkPrev(c);
+  if(pv){
+    const saved = isDoneKey(chunkKey(pv)), pm = chunkMins(pv);
+    g.appendChild(gRow(SI.replay, 'Torna al pezzo prima', saved ? `Lo hai già ascoltato (circa ${pm} min): è salvato sul telefono e non costa richieste.` : `Non è salvato sul telefono: costa 1 richiesta.`, () => gemProblemGo(pv, true)));
+  }
+  if(kind !== 'limite'){
+    const box = el('div', 'gSkip');
+    box.append(el('b', null, 'Vai avanti'), el('small', null, 'Salti questo pezzo e quelli che scegli (sotto ogni numero, i minuti di libro che salti): non li ascolti, e nella storia resta un buco. Il pezzo dove arrivi costa 1 richiesta.'));
+    const row = el('div', 'gSkipBtns');
+    let acc = mins, t = c;
+    for(let n = 1; n <= 4; n++){
+      let nx = chunkNext(t); if(!nx) break;
+      while(nx && isBlockedChunk(nx)){ acc += chunkMins(nx); const n2 = chunkNext(nx); if(!n2){ nx = null; break; } nx = n2; }
+      if(!nx) break;
+      const target = nx, lost = acc;
+      const b = el('button', 'softPill gSkipPill'); b.append(el('span', null, `+${n}`), el('small', null, `~${lost} min`));
+      b.onclick = () => gemProblemGo(target, true);
+      row.appendChild(b);
+      acc += chunkMins(nx); t = nx;
+    }
+    if(row.children.length){ box.appendChild(row); g.appendChild(box); }
+  }
+  g.appendChild(gRow(SI.done, 'Chiudi, non fare niente', 'Resti fermo qui. Non parte nessuna richiesta.', () => closeSheet()));
+  body.appendChild(g);
 }
 function openBlockedList(){
   const body = openSheet('blk', 'Passaggi non letti', true);
