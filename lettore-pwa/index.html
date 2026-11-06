@@ -337,6 +337,7 @@ body{background:var(--bg)}
 /* barra in alto della libreria */
 .appBar{position:sticky;top:0;z-index:15;display:flex;align-items:center;justify-content:space-between;padding:calc(env(safe-area-inset-top) + 10px) 16px 12px;background:var(--bar);-webkit-backdrop-filter:blur(20px) saturate(180%);backdrop-filter:blur(20px) saturate(180%);border-bottom:1px solid var(--line);max-width:560px;margin:0 auto}
 .brand{display:flex;align-items:center;gap:10px;font-family:var(--serif);font-size:21px;font-weight:600;letter-spacing:-.3px}
+.brandVer{font-family:var(--sans);font-size:13px;font-weight:600;letter-spacing:0;color:var(--muted);align-self:center;margin-left:-4px}
 .brandMark{width:32px;height:32px;border-radius:8px;background:var(--accent-soft);border:1px solid var(--accent-line);color:var(--accent);display:flex;align-items:center;justify-content:center}
 #libView{padding:16px 16px calc(env(safe-area-inset-bottom) + 190px)}
 .actRow{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:20px}
@@ -719,7 +720,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 
 <!-- LIBRERIA -->
 <header class="appBar">
-  <div class="brand"><span class="brandMark"><img src="icon-192.png" alt="" width="32" height="32"></span><span>SiMa</span></div>
+  <div class="brand"><span class="brandMark"><img src="icon-192.png" alt="" width="32" height="32"></span><span>SiMa</span><span class="brandVer" id="brandVer">(84)</span></div>
 </header>
 <main id="libView">
   <div class="actRow hidden">
@@ -852,7 +853,8 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 78;
+const APP_VERSION = 84;
+{ const bv = document.getElementById('brandVer'); if(bv) bv.textContent = '(' + APP_VERSION + ')'; }
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
   let hadController = !!navigator.serviceWorker.controller, reloading = false;
