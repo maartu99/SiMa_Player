@@ -1189,7 +1189,7 @@ function onWorkerMessage(e){
         en.st = 'error'; en.err = m.message;
         if(/^bloccato/.test(m.message || '')){
           const mm = /^gem-[^|]+\|([^|]+)\|(\d+)\|c(\d+)-(\d+)$/.exec(key || '');
-          if(mm){ markBlocked(mm[1], +mm[2], +mm[3], +mm[4]); chunkCache.clear(); entries.delete(key); gemReplan = true; gemBlkRun++; if(gemBlkRun >= 2) gemHold = true; }
+          if(mm){ markBlocked(mm[1], +mm[2], +mm[3], +mm[4]); chunkCache.clear(); entries.delete(key); gemReplan = true; gemBlkRun++; gemHold = true; }
         }
         en.res.forEach(r => r.reject(new Error(m.message))); en.res = [];
       }
@@ -1658,7 +1658,7 @@ function growGemChunks(okLen){
 }
 // dopo un allungamento, le parti in coda non ancora iniziate vengono ripianificate con la nuova lunghezza
 let gemReplan = false, gemWeakPrev = 0;
-const GEM_HOLD_MSG = 'Google ha rifiutato due pezzi di fila di questo tratto del libro. Mi fermo per non consumare altre richieste. Tocca play per riprovare dal pezzo dopo (al massimo 2 richieste).';
+const GEM_HOLD_MSG = 'Google non vuole leggere questo passaggio del libro. Mi fermo qui e non salto niente. Tocca play: ti chiedo se vuoi saltarlo. Oppure riprovalo da Opzioni > Passaggi non letti (1 richiesta).';
 let gemBlkRun = 0, gemHold = false; // rifiuti 'content_blocked' di fila: dopo 2 mi fermo e non mando altro finché non tocchi play
 // i blocchi già generati restano validi anche se cambia la lunghezza: ne ricordo i confini
 // passaggi che Google non ha voluto leggere (blocco "content_blocked"): messi da parte, mai persi. Salvati con il libro, senza scadenza
@@ -1672,7 +1672,7 @@ function markBlocked(book, sec, a, b){
 function unblockRange(sec, a, b){
   const k = blkKey(), d = store.get(k) || {};
   d[sec] = (d[sec] || []).filter(x => !(x[0] === a && x[1] === b)); if(!d[sec].length) delete d[sec];
-  store.set(k, d); chunkCache.clear();
+  store.set(k, d); chunkCache.clear(); gemHold = false; gemBlkRun = 0;
 }
 function allBlocked(){ const d = store.get(blkKey()) || {}; const out = []; Object.keys(d).forEach(sec => d[sec].forEach(([a, b, at]) => out.push({ sec: +sec, a, b, at }))); return out.sort((x, y) => x.sec - y.sec || x.a - y.a); }
 function doneChunks(sec){ return ((store.get('gemDone:' + state.piperVoice + '|' + state.key) || {})[sec]) || []; }
@@ -1830,8 +1830,17 @@ async function piperSpeakCurrent(fromAdvance){
   if(isGem() && list[0].chunk){
     const c0 = list[0].chunk;
     if(c0.sec !== state.sec || state.idx < c0.start){
-      const inBlk = blkRanges(state.sec).some(([a, b]) => state.idx >= a && state.idx <= b) || c0.sec !== state.sec;
-      if(inBlk){ state.sec = c0.sec; state.idx = c0.start; if(!audio.dataset.key || !state.playing) setStatus('Questo passaggio non è stato letto da Google: parto dal pezzo dopo.'); }
+      const blockedHere = blkRanges(state.sec).some(([a, b]) => state.idx >= a && state.idx <= b);
+      if(blockedHere){
+        // Google non vuole leggere questo passaggio: non salto mai da solo. Mi fermo e decidi tu
+        stop();
+        if(!confirm('Google non vuole leggere questo passaggio del libro, e dopo ci sarebbe un buco nella storia.\n\nOK = lo salto e continuo dal pezzo dopo.\nAnnulla = resto fermo qui (puoi riprovarlo da Opzioni > Passaggi non letti, costa 1 richiesta).')){
+          setStatus(GEM_HOLD_MSG, true, true); return;
+        }
+        gemHold = false; gemBlkRun = 0;
+        state.playing = true; updatePlay(); requestWake();
+        state.sec = c0.sec; state.idx = c0.start;
+      } else if(c0.sec !== state.sec){ state.sec = c0.sec; state.idx = c0.start; }
     }
   }
   const key = list[0].key;
@@ -1881,13 +1890,11 @@ async function piperSpeakCurrent(fromAdvance){
     await audio.play();
   }catch(err){
     if(g !== state.gen || err.message === 'skip') return;
-    if(isGem() && /^bloccato/.test(err.message || '') && gemHold){
-      stop(); setStatus(GEM_HOLD_MSG, true, true);
-      return;
-    }
     if(isGem() && /^bloccato/.test(err.message || '')){
-      setStatus('Google non ha letto un passaggio del testo: l\'ho messo da parte e continuo. Lo trovi in Opzioni > Passaggi non letti, da leggere o da riprovare.', false, true);
-      state.playing = true; updatePlay(); return piperSpeakCurrent(true);
+      gemHold = true; stop();
+      const bc = state.curChunk; if(bc){ state.sec = bc.sec; state.idx = bc.start; savePos(); }
+      setStatus(GEM_HOLD_MSG, true, true);
+      return;
     }
     if(err.name === 'NotAllowedError'){ stop(); setStatus('Tocca play per continuare.'); return; }
     stop();
@@ -2000,7 +2007,6 @@ function stop(){
 }
 function play(){
   if(!state.total) return;
-  if(gemHold){ gemHold = false; gemBlkRun = 0; }
   if(previewBtn) stopPreview();
   state.playing = true; updatePlay(); requestWake();
   const ch = isGem() ? chunkAt(state.sec, state.idx) : null;
