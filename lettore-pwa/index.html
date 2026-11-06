@@ -721,7 +721,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 
 <!-- LIBRERIA -->
 <header class="appBar">
-  <div class="brand"><span class="brandMark"><img src="icon-192.png" alt="" width="32" height="32"></span><span>SiMa</span><span class="brandVer" id="brandVer">(87)</span></div>
+  <div class="brand"><span class="brandMark"><img src="icon-192.png" alt="" width="32" height="32"></span><span>SiMa</span><span class="brandVer" id="brandVer">(88)</span></div>
 </header>
 <main id="libView">
   <div class="actRow hidden">
@@ -854,7 +854,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 87;
+const APP_VERSION = 88;
 { const bv = document.getElementById('brandVer'); if(bv) bv.textContent = '(' + APP_VERSION + ')'; }
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
@@ -2934,7 +2934,7 @@ function showGemProblem(kind, c, msg){
   const mins = chunkMins(c);
   const where = `${secLabel(c.sec)}, circa ${mins} ${mins === 1 ? 'minuto' : 'minuti'} di libro`;
   let why;
-  if(kind === 'bloccato') why = `Google ha rifiutato questo pezzo (${where}) senza dire il motivo. Non vuol dire che il testo sia vietato: altre persone segnalano blocchi a caso anche su libri normali, e a volte lo stesso pezzo passa al secondo tentativo. Il testo resta nel libro.`;
+  if(kind === 'bloccato') why = `Purtroppo Google su questo è una merda: ci ha bloccato questo pezzo (${where}) per un "motivo non specificato", parole sue. Non è detto che c'entri il contenuto: altre persone segnalano blocchi a caso anche su libri normali, e a volte lo stesso pezzo al secondo tentativo passa. Il testo resta nel libro, qui non si perde niente.`;
   else if(kind === 'limite') why = gemLimitText();
   else if(kind === 'rete') why = `Google non ha risposto a questo pezzo (${where}), oppure la connessione si è interrotta. La richiesta era già partita e Google potrebbe averla contata.`;
   else why = `Google non è riuscito a preparare questo pezzo (${where}). ${gemErrorText(msg || '')}`;
