@@ -721,7 +721,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 
 <!-- LIBRERIA -->
 <header class="appBar">
-  <div class="brand"><span class="brandMark"><img src="icon-192.png" alt="" width="32" height="32"></span><span>SiMa</span><span class="brandVer" id="brandVer">(86)</span></div>
+  <div class="brand"><span class="brandMark"><img src="icon-192.png" alt="" width="32" height="32"></span><span>SiMa</span><span class="brandVer" id="brandVer">(87)</span></div>
 </header>
 <main id="libView">
   <div class="actRow hidden">
@@ -854,7 +854,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 86;
+const APP_VERSION = 87;
 { const bv = document.getElementById('brandVer'); if(bv) bv.textContent = '(' + APP_VERSION + ')'; }
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
@@ -1379,6 +1379,25 @@ function gemUnavailable(m){ const b = store.get('gemBlocked') || {}, e = (store.
 function gemModelsFree(){ return GEM_MODELS.filter(m => !gemUnavailable(m)); }
 // rifiuto giornaliero confermato da Google oggi: solo questo vale come "finito". Gli altri blocchi salvati si possono riprovare.
 function gemConfirmedDaily(m){ const e = (store.get('gemErr') || {})[m], bl = store.get('gemBlocked') || {}; return !!(e && e.d && bl[m] > Date.now()); }
+// stato di ogni modello, un'unica fonte per le impostazioni e per i messaggi: 'day' finito per oggi, 'wait' fermo per un po', 'slow' non risponde, 'free' non risulta fermo
+function gemModelStates(){
+  const bl = store.get('gemBlocked') || {}, sl = store.get('gemSlow') || {}, now = Date.now();
+  return GEM_MODELS.map(m => {
+    const until = bl[m] || 0;
+    if(gemConfirmedDaily(m)) return { m, kind: 'day', until };
+    if(until > now) return { m, kind: 'wait', until };
+    if((sl[m] || 0) > now) return { m, kind: 'slow', until: sl[m] };
+    return { m, kind: 'free', until: 0 };
+  });
+}
+const hhmmOf = t => new Date(t).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+// spiegazione del "limite": dice la stessa cosa che vedi nelle impostazioni
+function gemLimitText(){
+  const st = gemModelStates(), free = st.filter(x => x.kind === 'free' || x.kind === 'slow');
+  if(!free.length && st.every(x => x.kind === 'day')) return `Tutte le voci Google gratuite hanno finito le richieste di oggi. Si azzerano verso le ${gemResetTime()}.`;
+  if(!free.length){ const first = Math.min(...st.map(x => x.until)); return `Google ha rifiutato le richieste su tutti i modelli: alcuni sono finiti per oggi, altri sono fermi per un po'. Il primo riprova alle ${hhmmOf(first)}.`; }
+  return `Google ha rifiutato l'ultima richiesta, ma ${free.length === 1 ? 'un modello non risulta fermo' : free.length + ' modelli non risultano fermi'} (${free.map(x => (GEM_MODEL_NAMES[x.m] || x.m).replace(', il principale', '').replace(', anteprima', '')).join(', ')}): puoi riprovare.`;
+}
 let gemLastProbe = 0;
 function gemModelsLeft(){ const bl = gemBlocked(); return GEM_MODELS.filter(m => !bl.includes(m)).length; }
 function findAudio(o){
@@ -1629,7 +1648,7 @@ function gemTypicalText(){
   return m < 90 ? `Di solito servono circa ${Math.max(10, Math.round(m / 5) * 5)} secondi.` : `Di solito servono circa ${Math.round(m / 60 * 10) / 10} minuti.`;
 }
 function gemErrorText(msg){
-  if(/limite/.test(msg)) return `Hai finito il limite gratuito di oggi delle voci Google: si azzera verso le ${gemResetTime()}. Intanto puoi riascoltare le parti già preparate, oppure usare una voce dell'iPhone.`;
+  if(/limite/.test(msg)) return gemLimitText() + ' Intanto puoi riascoltare le parti già preparate.';
   if(/chiave/.test(msg)) return 'La chiave Gemini non funziona. Controllala in Voce > Google Gemini.';
   if(/rete/.test(msg)) return 'La connessione con Google si è interrotta: la richiesta era già partita e potrebbe essere stata contata. Controlla internet e, se c\'è, riprova: se il problema è del modello, Google a volte non risponde per molti minuti.';
   return 'Gemini non è riuscito a generare la voce (' + msg + ').';
@@ -2916,12 +2935,13 @@ function showGemProblem(kind, c, msg){
   const where = `${secLabel(c.sec)}, circa ${mins} ${mins === 1 ? 'minuto' : 'minuti'} di libro`;
   let why;
   if(kind === 'bloccato') why = `Google ha rifiutato questo pezzo (${where}) senza dire il motivo. Non vuol dire che il testo sia vietato: altre persone segnalano blocchi a caso anche su libri normali, e a volte lo stesso pezzo passa al secondo tentativo. Il testo resta nel libro.`;
-  else if(kind === 'limite') why = `Le voci Google gratuite hanno finito le richieste di oggi. Si azzerano verso le ${gemResetTime()}. Finché non si azzerano, ogni tentativo viene rifiutato.`;
+  else if(kind === 'limite') why = gemLimitText();
   else if(kind === 'rete') why = `Google non ha risposto a questo pezzo (${where}), oppure la connessione si è interrotta. La richiesta era già partita e Google potrebbe averla contata.`;
   else why = `Google non è riuscito a preparare questo pezzo (${where}). ${gemErrorText(msg || '')}`;
   body.appendChild(el('p', 'hint', why));
   const g = el('div', 'group');
-  if(kind !== 'limite'){
+  const canTry = kind !== 'limite' || gemModelStates().some(x => x.kind === 'free' || x.kind === 'slow');
+  if(canTry){
     g.appendChild(gRow(SI.restart, 'Riprova questo pezzo', kind === 'bloccato' ? 'Costa 1 richiesta. Non sappiamo perché Google lo ha rifiutato: potrebbe rifiutarlo ancora.' : 'Costa 1 richiesta. Quella di prima potrebbe già essere stata contata.', () => { if(kind === 'bloccato') unblockRange(c.sec, c.start, c.end); gemProblemGo(c, true); }));
   }
   const pv = chunkPrev(c);
@@ -2929,7 +2949,7 @@ function showGemProblem(kind, c, msg){
     const saved = isDoneKey(chunkKey(pv)), pm = chunkMins(pv);
     g.appendChild(gRow(SI.replay, 'Torna al pezzo prima', saved ? `Lo hai già ascoltato (circa ${pm} min): è salvato sul telefono e non costa richieste.` : `Non è salvato sul telefono: costa 1 richiesta.`, () => gemProblemGo(pv, true)));
   }
-  if(kind !== 'limite'){
+  if(canTry){
     const box = el('div', 'gSkip');
     box.append(el('b', null, 'Vai avanti'), el('small', null, 'Salti questo pezzo e quelli che scegli (sotto ogni numero, i minuti di libro che salti): non li ascolti, e nella storia resta un buco. Il pezzo dove arrivi costa 1 richiesta.'));
     const row = el('div', 'gSkipBtns');
@@ -4105,10 +4125,14 @@ function openSettings(focus, keepScroll){
         const what = /token/i.test(t) ? 'token' : 'richieste';
         return `${what}, ${kind}${lim ? `, limite ${lim}` : ''}${id ? ` (${id})` : ''}`;
       };
+      ca.appendChild(el('p', 'cardNote', 'Il numero "X di 10" è una stima dell\'app: Google conta anche le richieste rifiutate o perse, e l\'app non sempre le vede. Quando Google dice basta, qui vedi "Finito per oggi". Il conteggio vero è nel pannello di Google AI Studio.'));
       GEM_MODELS.forEach(m => {
         const used = stNow.req[m] || 0, until = blNow[m] || 0, lf = until - tNow;
-        const state = lf <= 0 ? (used >= GEM_RPD ? 'Limite raggiunto' : 'Disponibile') : gemUnavailable(m) ? 'Non disponibile sul tuo account' : lf > 5 * 60000 ? `Bloccato fino alle ${gemResetTime()}` : 'In pausa un minuto';
-        ca.appendChild(famRow(GEM_MODEL_NAMES[m] || m, `${used} di ${GEM_RPD} richieste usate. ${state}.`, null));
+        const hhmm = hhmmOf;
+        const dayOut = gemConfirmedDaily(m), slowUntil = (store.get('gemSlow') || {})[m] > tNow ? (store.get('gemSlow') || {})[m] : 0;
+        // finito per oggi: lo ha detto Google, quindi per lui sono tutte e 10; non conta il numero che l'app ha tenuto da sola
+        const state = dayOut ? `Finito per oggi: Google ha detto basta, torna verso le ${hhmm(until)}` : lf <= 0 ? (used >= GEM_RPD ? 'Limite raggiunto' : 'Disponibile') : gemUnavailable(m) ? 'Non disponibile sul tuo account' : lf > 5 * 60000 ? `Fermo fino alle ${hhmm(until)}` : 'In pausa un minuto';
+        ca.appendChild(famRow(GEM_MODEL_NAMES[m] || m, dayOut ? `${GEM_RPD} di ${GEM_RPD} richieste (secondo Google). ${state}.` : `${used} di ${GEM_RPD} richieste contate dall'app. ${state}.${slowUntil ? ` Non risponde: in fondo alla lista fino alle ${hhmm(slowUntil)}.` : ''}`, null));
         const er = (store.get('gemErr') || {})[m];
         if(lf > 0 && !(er && /^429/.test(er.s) && tNow - er.at < 2 * 864e5)) ca.appendChild(el('div', 'modelErr', 'Motivo del blocco non registrato: il blocco è stato salvato da una versione precedente. Usa "Sblocca e riprova" qui sotto: se Google rifiuta ancora, vedrai il motivo esatto.'));
         if(er && /^429/.test(er.s) && tNow - er.at < 2 * 864e5) ca.appendChild(el('div', 'modelErr', `Ultimo rifiuto di Google, ${new Date(er.at).toLocaleString('it-IT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}: ${quotaWhy(er.t)}. Testo: ${er.t.slice(0, 260)}`));
