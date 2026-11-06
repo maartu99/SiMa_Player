@@ -720,7 +720,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 
 <!-- LIBRERIA -->
 <header class="appBar">
-  <div class="brand"><span class="brandMark"><img src="icon-192.png" alt="" width="32" height="32"></span><span>SiMa</span><span class="brandVer" id="brandVer">(84)</span></div>
+  <div class="brand"><span class="brandMark"><img src="icon-192.png" alt="" width="32" height="32"></span><span>SiMa</span><span class="brandVer" id="brandVer">(85)</span></div>
 </header>
 <main id="libView">
   <div class="actRow hidden">
@@ -853,7 +853,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 84;
+const APP_VERSION = 85;
 { const bv = document.getElementById('brandVer'); if(bv) bv.textContent = '(' + APP_VERSION + ')'; }
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
@@ -1433,6 +1433,7 @@ async function gemCall(model, api, text, voice, style, key){
 }
 let gemWaitMs = 360000;
 // modello lento oggi: lo uso per ultimo fino all'azzeramento. Non è un blocco: se gli altri finiscono, torna a essere provato
+const gemReteRun = {}; // errori di rete di fila per modello: due di fila e il modello resta fermo 30 minuti
 function gemMarkSlow(model){ const d = store.get('gemSlow') || {}; d[model] = gemResetDate().getTime(); store.set('gemSlow', d); }
 function gemModelOrder(){ const d = store.get('gemSlow') || {}; const slow = m => d[m] && d[m] > Date.now(); return GEM_MODELS.filter(m => !slow(m)).concat(GEM_MODELS.filter(slow)); }
 function audioFrom(j){
@@ -1540,8 +1541,10 @@ async function geminiTTSOnce(text, voiceId, keyOverride, noRetry){
         gemStatReq(model); gemLogFail(model, 'rete', text.length, performance.now() - tq);
         // dopo più di un minuto di attesa non è internet che manca: il modello ha lasciato cadere la richiesta
         if(!keyOverride && performance.now() - tq > 60000){ gemMarkSlow(model); lastErr = e; r = null; break; }
+        if(!keyOverride){ gemReteRun[model] = (gemReteRun[model] || 0) + 1; if(gemReteRun[model] >= 2){ gemReteRun[model] = 0; blockModel(model, Date.now() + 30 * 60000); } }
         throw e;
       }
+      gemReteRun[model] = 0;
       usedApi = api;
       if(r.ok) break;
       t = await r.text().catch(() => '');
@@ -1569,7 +1572,9 @@ async function geminiTTSOnce(text, voiceId, keyOverride, noRetry){
       // limite al minuto: fermo un minuto; altrimenti fino all'azzeramento giornaliero
       // Google indica quanto aspettare ("retryDelay"): se sono secondi è il limite al minuto
       const rd = /retry(?:Delay)?"?\s*[:in]+\s*"?(\d+(?:\.\d+)?)\s*s/i.exec(t);
-      const perDay = /per ?day|PerDay|daily/i.test(t), perMin = /per ?minute|PerMinute/i.test(t);
+      const perMin = /per ?minute|PerMinute/i.test(t);
+      // il 3.1 risponde solo "You exceeded your current quota" (senza dire se al giorno o al minuto): senza un tempo breve indicato da Google lo tratto come limite del giorno, perche ogni riprova e una richiesta contata lo stesso
+      const perDay = /per ?day|PerDay|daily/i.test(t) || (!perMin && !/retry(?:Delay)?"?\s*[:in]+\s*"?\d+(?:\.\d+)?\s*s/i.test(t) && /exceeded your current quota|free_tier_requests|requests_per_model/i.test(t));
       const wait = rd && +rd[1] < 600 ? Math.ceil(+rd[1]) * 1000 + 3000 : 65000;
       const temp = !(perDay && !perMin) && (perMin || rd);
       // secondo rifiuto al minuto per lo stesso pezzo: questo modello resta fermo 5 minuti, si passa al successivo
@@ -1579,7 +1584,7 @@ async function geminiTTSOnce(text, voiceId, keyOverride, noRetry){
       if(hm && (hm[1] || hm[2] || hm[3])) dayMs = ((+hm[1] || 0) * 3600 + (+hm[2] || 0) * 60 + (+hm[3] || 0)) * 1000;
       else if(rd && +rd[1] >= 600) dayMs = +rd[1] * 1000;
       const dayCap = gemResetDate().getTime() + 36e5 - Date.now();
-      blockModel(model, perDay && !perMin ? Date.now() + (dayMs ? Math.min(dayMs + 30000, dayCap) : gemResetDate().getTime() - Date.now()) : temp ? Date.now() + (noRetry ? 5 * 60000 : wait) : Date.now() + 90000);
+      blockModel(model, perDay && !perMin ? Date.now() + (dayMs ? Math.min(dayMs + 30000, dayCap) : gemResetDate().getTime() - Date.now()) : temp ? Date.now() + (noRetry ? 5 * 60000 : wait) : Date.now() + 30 * 60000);
       lastErr = new Error('limite');
       // primo rifiuto al minuto: invece di passare a un modello più lento, aspetto e lo riprovo una sola volta
       if(temp && !keyOverride && !noRetry){ lastErr.temp = true; break; }
