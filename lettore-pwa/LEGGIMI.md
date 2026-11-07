@@ -1,11 +1,10 @@
 # Lettore - web app installabile
 
-App per ascoltare PDF ed EPUB in italiano con voci naturali Piper (Paola e Riccardo), che girano direttamente sul telefono, gratis e anche offline dopo il primo download. Restano disponibili anche le voci dell'iPhone.
+App per ascoltare PDF ed EPUB in italiano. Voci: Google Gemini e Fish Audio (online, con chiave personale gratuita, senza carta) e le voci di sistema del telefono. Le voci scaricabili sul telefono (Kokoro, Piper, Supertonic) sono state tolte dalla versione 90.
 
 ## File del progetto
 
 - **index.html** - l'app
-- **tts-worker.js** - il motore vocale Piper (gira in background)
 - **sw.js** - rende l'app installabile e utilizzabile offline
 - **manifest.webmanifest** - nome e icona dell'app
 - **icon-192.png, icon-512.png, apple-touch-icon.png** - icone
@@ -23,14 +22,13 @@ App per ascoltare PDF ed EPUB in italiano con voci naturali Piper (Paola e Ricca
 
 1. Apri il link in **Safari**.
 2. Tocca **Condividi > Aggiungi alla schermata Home**.
-3. Apri l'app dall'icona, scegli la voce **Paola** e tocca **Prova**: la voce viene scaricata una sola volta (circa 60 MB, meglio con Wi-Fi). Riccardo pesa meno (circa 20 MB) ma suona meno naturale.
+3. Apri l'app dall'icona e scegli una voce in Impostazioni > Voci.
 
 ## Note
 
 - I libri non vengono caricati da nessuna parte: restano sul telefono.
 - Il repository è pubblico: chi ha il link vede l'app, non i tuoi file.
-- Con le voci Piper la velocità cambia al volo senza interrompere, e la pausa riprende a metà frase.
-- La generazione della voce avviene sul telefono: la prima frase può richiedere qualche secondo, poi l'app prepara in anticipo le frasi successive.
+- Le voci online leggono a blocchi di alcuni minuti: la prima parte può richiedere qualche secondo, poi l'app prepara solo la successiva.
 - A schermo bloccato la lettura può proseguire, ma dipende da come iOS gestisce le web app: se si ferma, tienila in primo piano.
 - PDF scansionati e libri Kindle non sono supportati.
 

@@ -721,7 +721,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 
 <!-- LIBRERIA -->
 <header class="appBar">
-  <div class="brand"><span class="brandMark"><img src="icon-192.png" alt="" width="32" height="32"></span><span>SiMa</span><span class="brandVer" id="brandVer">(89)</span></div>
+  <div class="brand"><span class="brandMark"><img src="icon-192.png" alt="" width="32" height="32"></span><span>SiMa</span><span class="brandVer" id="brandVer">(90)</span></div>
 </header>
 <main id="libView">
   <div class="actRow hidden">
@@ -854,7 +854,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 89;
+const APP_VERSION = 90;
 { const bv = document.getElementById('brandVer'); if(bv) bv.textContent = '(' + APP_VERSION + ')'; }
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
@@ -886,16 +886,7 @@ const ICON = {
 };
 const big = s => s.replace('width="20" height="20"', 'width="34" height="34"');
 
-const PIPER_VOICES = [
-  { id: 'kokoro-if_sara', name: 'Sara', engine: 'Kokoro', size: 'circa 130 MB' },
-  { id: 'kokoro-im_nicola', name: 'Nicola', engine: 'Kokoro', size: 'circa 130 MB' },
-  { id: 'it_IT-paola-medium', name: 'Paola', engine: 'Piper', size: 'circa 60 MB' },
-  { id: 'it_IT-riccardo-x_low', name: 'Riccardo', engine: 'Piper', size: 'circa 20 MB' },
-  { id: 'st-F1', name: 'Donna 1', engine: 'Supertonic, sperimentale', size: 'circa 400 MB' },
-  { id: 'st-F2', name: 'Donna 2', engine: 'Supertonic, sperimentale', size: 'circa 400 MB' },
-  { id: 'st-M1', name: 'Uomo 1', engine: 'Supertonic, sperimentale', size: 'circa 400 MB' },
-  { id: 'st-M2', name: 'Uomo 2', engine: 'Supertonic, sperimentale', size: 'circa 400 MB' }
-];
+const PIPER_VOICES = []; // le voci scaricabili sul telefono sono state tolte: restano Google, Fish Audio e le voci di sistema
 // voci Google Gemini (online, chiave gratuita personale)
 const GEM_VOICES = [
   { id: 'gem-Sulafat', name: 'Sulafat', desc: 'calda' },
@@ -909,6 +900,8 @@ const GEM_VOICES = [
   { id: 'gem-Iapetus', name: 'Iapetus', desc: 'chiara' },
   { id: 'gem-Puck', name: 'Puck', desc: 'vivace' }
 ];
+// voce Fish Audio (online, chiave gratuita personale, senza carta)
+const FISH_VOICES = [{ id: 'fish-main', name: 'Fish Audio', desc: 'italiano' }];
 const GEM_STYLES = {
   narrativa: { label: 'Narrativa', text: 'Lettura di un audiolibro in italiano: tono naturale e coinvolgente, ritmo pacato, intonazione che segue il senso del testo, le domande e i dialoghi.' },
   calma: { label: 'Calma', text: 'Lettura calma e rilassata di un audiolibro in italiano, voce morbida, ritmo lento e pause naturali.' },
@@ -920,10 +913,13 @@ const IS_ANDROID = /Android/.test(navigator.userAgent || '');
 const SYS_NAME = IS_IOS ? 'iPhone' : IS_ANDROID ? 'Android' : 'telefono';
 const isGemId = id => !!id && id.startsWith('gem-');
 const isGem = () => state.engine === 'piper' && isGemId(state.piperVoice);
+const isFishId = id => !!id && id.startsWith('fish-');
+const isFish = () => state.engine === 'piper' && isFishId(state.piperVoice);
+const isChunked = () => isGem() || isFish(); // voci che leggono a blocchi lunghi (Google e Fish Audio)
 const state = {
   key: null, meta: null, sections: [], offsets: [], total: 0, isPdf: false,
   sec: 0, idx: 0, playing: false, gen: 0,
-  rate: 1, engine: 'piper', piperVoice: PIPER_VOICES[0].id, sysVoice: null,
+  rate: 1, engine: 'piper', piperVoice: GEM_VOICES[0].id, sysVoice: null,
   charPos: 0, boundarySeen: false, prepareTo: null
 };
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -1116,21 +1112,7 @@ audio.preload = 'auto';
 audio.setAttribute('playsinline', '');
 audio.preservesPitch = true; audio.webkitPreservesPitch = true;
 
-const workers = {};
-const isKokoro = id => id.startsWith('kokoro-');
-const familyOf = id => isKokoro(id) ? 'kokoro' : id.startsWith('st-') ? 'supertonic' : isGemId(id) ? 'gemini' : 'piper';
-function wk(voiceId){
-  const k = familyOf(voiceId);
-  if(!workers[k]){
-    const w = k === 'kokoro' ? new Worker('kokoro-worker.js', { type: 'module' })
-      : k === 'supertonic' ? new Worker('supertonic-worker.js')
-      : new Worker('tts-worker.js');
-    w.onmessage = onWorkerMessage;
-    w.onerror = () => { busy = false; setStatus('Il motore vocale si è fermato. Riapri l\'app o scegli un\'altra voce.', true); };
-    workers[k] = w;
-  }
-  return workers[k];
-}
+const familyOf = id => isGemId(id) ? 'gemini' : isFishId(id) ? 'fish' : 'piper';
 const entries = new Map();   // chiave -> { st: queued|working|ready|stored|error, text, url, res }
 const inflight = new Map();  // id richiesta -> { key, t }
 let wanted = [];
@@ -1139,12 +1121,12 @@ let reqId = 0;
 let readyVoices = new Set(store.get('readyVoices') || []);
 function voiceReady(id){
   if(isGemId(id)) return !!store.get('gemKey');
-  const f = familyOf(id);
-  return readyVoices.has(id) || ((f === 'kokoro' || f === 'supertonic') && [...readyVoices].some(v => familyOf(v) === f));
+  if(isFishId(id)) return !!store.get('fishKey');
+  return false;
 }
 const MEM_AHEAD = 40;        // frasi tenute pronte in memoria
 // le parti Google sono lunghe (fino a 15 minuti): in memoria solo le prime, le altre restano sul telefono
-const memAhead = () => isGem() ? 2 : MEM_AHEAD;
+const memAhead = () => isChunked() ? 2 : MEM_AHEAD;
 // velocità di generazione misurata su questo telefono: secondi per generare 1 secondo di audio
 function rtfOf(v){ return store.get('rtf:' + v); }
 function noteRtf(v, genMs, blob){
@@ -1159,19 +1141,6 @@ function noteRtf(v, genMs, blob){
 
 function onWorkerMessage(e){
   const m = e.data;
-  if(m.type === 'progress'){
-    const v = PIPER_VOICES.find(x => x.id === (m.voiceId || state.piperVoice));
-    setStatus(`Scarico la voce ${v ? v.name : ''}: ${Math.round(m.loaded * 100 / m.total)}%. Serve solo la prima volta.`, false, true);
-    return;
-  }
-  if(m.type === 'ready'){
-    readyVoices.add(m.voiceId); store.set('readyVoices', [...readyVoices]);
-    downloading.delete(familyKey(m.voiceId)); dlForget();
-    hasVoiceFiles(m.voiceId).then(ok => { if(!ok) setStatus('La voce funziona, ma l\'iPhone non ha lasciato spazio per salvarla: alla prossima apertura andrà scaricata di nuovo.', true); });
-    refreshVoiceUI();
-    if(!state.playing) setStatus('Voce pronta.');
-    return;
-  }
   if(m.type === 'result' || m.type === 'error'){
     busy = false;
     const inf = inflight.get(m.id); inflight.delete(m.id);
@@ -1179,8 +1148,7 @@ function onWorkerMessage(e){
     const en = key && entries.get(key);
     if(m.type === 'result' && key){
       const [vid, book] = key.split('|');
-      noteRtf(vid, performance.now() - inf.t, m.blob);
-      if(!readyVoices.has(vid)){ readyVoices.add(vid); store.set('readyVoices', [...readyVoices]); refreshVoiceUI(); }
+      if(isGemId(vid)) noteRtf(vid, performance.now() - inf.t, m.blob);
       if(book !== 'anteprima') en ? (en.saving = acache.put(key, m.blob, book)) : acache.put(key, m.blob, book);
     }
     if(en){
@@ -1191,6 +1159,7 @@ function onWorkerMessage(e){
         else { en.st = 'ready'; en.url = URL.createObjectURL(m.blob); en.res.forEach(r => r.resolve(en.url)); en.res = []; }
       } else {
         en.st = 'error'; en.err = m.message;
+        if(isFishId((key || '').split('|')[0])){ fishHold = true; fishLastErr = m.message || ''; } // un errore ferma ogni altra richiesta a Fish Audio finché non tocchi play
         if(/^bloccato/.test(m.message || '')){
           const mm = /^gem-[^|]+\|([^|]+)\|(\d+)\|c(\d+)-(\d+)$/.exec(key || '');
           if(mm){ markBlocked(mm[1], +mm[2], +mm[3], +mm[4]); chunkCache.clear(); entries.delete(key); gemReplan = true; gemBlkRun++; gemHold = true; }
@@ -1198,7 +1167,6 @@ function onWorkerMessage(e){
         en.res.forEach(r => r.reject(new Error(m.message))); en.res = [];
       }
     }
-    if(m.type === 'error' && !key){ downloading.clear(); refreshVoiceUI(); setStatus('Non riesco a scaricare la voce. Controlla la connessione e riprova.', true); }
     updateBuf();
     { const w = gemWeakOnly() ? gemWeakChars() : 0; if(w !== gemWeakPrev){ gemWeakPrev = w; chunkCache.clear(); gemReplan = true; } }
     if(gemReplan){ gemReplan = false; if(isGem() && state.total){ want(upcoming(lookahead()), audio.dataset.key); return; } }
@@ -1250,6 +1218,7 @@ async function pump(){
     busy = false; updateBuf(); return pump();
   }
   if(gemHold && isGemId(next.key.split('|')[0])){ en.st = 'queued'; busy = false; return; } // fermo: nessuna richiesta a Google finché non tocchi play
+  if(fishHold && isFishId(next.key.split('|')[0])){ en.st = 'queued'; busy = false; return; } // fermo: nessuna richiesta a Fish Audio finché non tocchi play
   const id = ++reqId; inflight.set(id, { key: next.key, t: performance.now() });
   const vid = next.key.split('|')[0];
   if(isGemId(vid)){
@@ -1273,7 +1242,23 @@ async function pump(){
       .catch(err => { gemWait = null; onWorkerMessage({ data: { type: 'error', id, message: String(err && err.message || err) } }); });
     return;
   }
-  wk(vid).postMessage({ type: 'predict', id, voiceId: vid, text: en.text });
+  if(isFishId(vid)){
+    // Fish Audio: una richiesta alla volta, mai ripetuta da sola, almeno 3 secondi tra una e l'altra
+    const gap = Math.max(0, fishLastStart + 3000 - Date.now());
+    (gap ? new Promise(r => setTimeout(r, gap)) : Promise.resolve())
+      .then(() => {
+        if(entries.get(next.key) !== en){ const e = new Error('skip'); e.skip = true; throw e; } // nel frattempo non serve più: non la mando
+        fishLastStart = Date.now();
+        return fishTTS(en.text);
+      })
+      .then(blob => { if(/\|c\d+-\d+$/.test(next.key)) rememberChunk(next.key); onWorkerMessage({ data: { type: 'result', id, blob } }); })
+      .catch(err => {
+        if(err && err.skip){ inflight.delete(id); busy = false; return pump(); }
+        onWorkerMessage({ data: { type: 'error', id, message: String(err && err.message || err) } });
+      });
+    return;
+  }
+  onWorkerMessage({ data: { type: 'error', id, message: 'voce non disponibile' } });
 }
 function waitFor(key){
   const en = entries.get(key);
@@ -1321,7 +1306,7 @@ function updateBuf(){
       } else b.textContent = done >= wanted.length ? 'Preparazione completata: le prossime frasi sono pronte.' : `Preparo in anticipo: ${done} di ${Math.min(wanted.length, tot + 1)} frasi pronte`;
       if(done >= wanted.length) state.prepareTo = null;
     } else {
-      if(isGem()){
+      if(isChunked()){
         const min = readyAheadMinutes();
         b.textContent = min >= 1 ? `Pronti ${fmtMin(min)}${busy ? (gemWait ? gemWaitShort() : ' · preparo altri') : ''}` : (busy ? 'Preparo la prossima parte' + gemWaitShort() : '');
       }
@@ -1648,6 +1633,54 @@ function gemTypicalText(){
   const m = ok[Math.floor(ok.length / 2)] / 1000;
   return m < 90 ? `Di solito servono circa ${Math.max(10, Math.round(m / 5) * 5)} secondi.` : `Di solito servono circa ${Math.round(m / 60 * 10) / 10} minuti.`;
 }
+/* ---------- Fish Audio: voce gratuita, senza carta ---------- */
+const FISH_URL = 'https://api.fish.audio/v1/tts';
+const FISH_CHUNK = 3500; // circa 3 minuti e mezzo di ascolto per richiesta
+let fishHold = false, fishLastErr = '', fishLastStart = 0;
+function fishNote(c, ms, err){
+  const m = localDay().slice(0, 7), d = store.get('fishUse') || {};
+  if(d.m !== m){ d.m = m; d.req = 0; d.chars = 0; }
+  d.req++; d.chars += c; store.set('fishUse', d);
+  const l = store.get('fishLog') || []; l.push({ t: Date.now(), c, ms, err: err || '' }); store.set('fishLog', l.slice(-10));
+}
+// una sola richiesta: se fallisce non la ripeto da solo
+async function fishTTS(text, keyOverride, refOverride){
+  const key = keyOverride || store.get('fishKey');
+  if(!key) throw new Error('chiave');
+  const ref = (refOverride != null ? refOverride : (store.get('fishRef') || '')).trim();
+  const body = { text, format: 'mp3', mp3_bitrate: 64, latency: 'normal', language: 'it' };
+  if(ref) body.reference_id = ref;
+  const t0 = performance.now(), ctl = new AbortController(), to = setTimeout(() => ctl.abort(), 150000);
+  let r;
+  try{
+    r = await fetch(FISH_URL, { method: 'POST', headers: { 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json', 'model': 's2.1-pro-free' }, body: JSON.stringify(body), signal: ctl.signal });
+  }catch(e){
+    clearTimeout(to);
+    const err = e && e.name === 'AbortError' ? 'scaduto' : 'rete';
+    fishNote(text.length, Math.round(performance.now() - t0), err);
+    throw new Error(err);
+  }
+  clearTimeout(to);
+  if(!r.ok){
+    let t = ''; try{ t = (await r.text()).slice(0, 200); }catch(e){}
+    fishNote(text.length, Math.round(performance.now() - t0), String(r.status));
+    throw new Error(r.status === 401 || r.status === 403 ? 'chiave' : r.status === 402 ? 'credito' : r.status === 429 ? 'limite' : 'http ' + r.status + (t ? ': ' + t : ''));
+  }
+  let blob;
+  try{ blob = await r.blob(); }catch(e){ fishNote(text.length, Math.round(performance.now() - t0), 'rete'); throw new Error('rete'); }
+  if(!blob || blob.size < 2000){ fishNote(text.length, Math.round(performance.now() - t0), 'vuoto'); throw new Error('vuoto'); }
+  fishNote(text.length, Math.round(performance.now() - t0), '');
+  return new Blob([blob], { type: 'audio/mpeg' });
+}
+function fishErrorText(msg){
+  if(/chiave/.test(msg)) return 'Fish Audio non accetta la chiave. Controllala in Impostazioni > Voci. Non ho riprovato.';
+  if(/credito/.test(msg)) return 'Fish Audio dice che il piano gratuito non basta più (errore 402). Non ho riprovato.';
+  if(/limite/.test(msg)) return 'Fish Audio chiede di rallentare (troppe richieste). Non ho riprovato: aspetta qualche minuto, poi tocca play (1 richiesta).';
+  if(/rete/.test(msg)) return 'Non arriva la risposta di Fish Audio: o manca la connessione, o il sito non accetta chiamate dall\'app. Non ho riprovato. Tocca play per riprovare (1 richiesta).';
+  if(/scaduto/.test(msg)) return 'Fish Audio non ha risposto in 2 minuti e mi sono fermato. Tocca play per riprovare (1 richiesta).';
+  if(/vuoto/.test(msg)) return 'Fish Audio ha risposto senza audio. Non ho riprovato. Tocca play per riprovare (1 richiesta).';
+  return 'Fish Audio ha risposto con un errore (' + msg + '). Non ho riprovato. Tocca play per riprovare (1 richiesta).';
+}
 function gemErrorText(msg){
   if(/limite/.test(msg)) return gemLimitText() + ' Intanto puoi riascoltare le parti già preparate.';
   if(/chiave/.test(msg)) return 'La chiave Gemini non funziona. Controllala in Voce > Google Gemini.';
@@ -1708,11 +1741,11 @@ async function recallChunks(book){
   try{
     const db = await lib.open();
     const keys = await new Promise(res => { const r = db.transaction('audio').objectStore('audio').getAllKeys(); r.onsuccess = () => res(r.result || []); r.onerror = () => res([]); });
-    keys.filter(k => String(k).startsWith('gem-') && String(k).includes('|' + book + '|')).forEach(k => rememberChunk(String(k)));
+    keys.filter(k => /^(gem|fish)-/.test(String(k)) && String(k).includes('|' + book + '|')).forEach(k => rememberChunk(String(k)));
   }catch(e){}
 }
 function rememberChunk(key){
-  const m = /^(gem-[^|]+)\|([^|]+)\|(\d+)\|c(\d+)-(\d+)$/.exec(key); if(!m) return;
+  const m = /^((?:gem|fish)-[^|]+)\|([^|]+)\|(\d+)\|c(\d+)-(\d+)$/.exec(key); if(!m) return;
   const sk = 'gemDone:' + m[1] + '|' + m[2], d = store.get(sk) || {};
   const arr = d[m[3]] = d[m[3]] || [];
   if(!arr.some(([a, b]) => a === +m[4] && b === +m[5])){ arr.push([+m[4], +m[5]]); arr.sort((x, y) => x[0] - y[0]); store.set(sk, d); }
@@ -1721,7 +1754,7 @@ function rememberChunk(key){
 function chunksFor(sec){
   const ck = state.piperVoice + '|' + state.key + '|' + sec;
   if(chunkCache.has(ck)) return chunkCache.get(ck);
-  const ss = state.sections[sec].sentences, out = [], T = gemTarget();
+  const ss = state.sections[sec].sentences, out = [], T = isFish() ? FISH_CHUNK : gemTarget();
   // contano come già fatti anche i blocchi che Google sta generando in questo momento
   const pre = state.piperVoice + '|' + state.key + '|' + sec + '|c';
   const live = [...entries.entries()].filter(([k, en]) => en.st === 'working' && k.startsWith(pre)).map(([k]) => k.slice(pre.length).split('-').map(Number));
@@ -1759,7 +1792,7 @@ function chunksFor(sec){
       let mine = 0, rest = 0;
       for(let x = i; x <= endIdx; x++) mine += ss[x].t.length + 1;
       for(let x = endIdx + 1; x < stopAt; x++) rest += ss[x].t.length + 1;
-      if(rest < Tt * 0.35 && mine + rest <= (gemWeakOnly() ? Math.round(Tt * 1.1) : gemCeil())) endIdx = stopAt - 1;
+      if(rest < Tt * 0.35 && mine + rest <= (isFish() || gemWeakOnly() ? Math.round(Tt * 1.1) : gemCeil())) endIdx = stopAt - 1;
     }
     const nc = make(i, endIdx); out.push(nc); i = endIdx + 1;
     if(anchor >= 0 && nc.start >= anchor) run += nc.len;
@@ -1803,7 +1836,7 @@ function seekInChunk(c){
 // durante l'ascolto segue l'audio ed evidenzia la frase giusta
 audio.addEventListener('timeupdate', () => {
   const c = state.curChunk;
-  if(!isGem() || !c || audio.dataset.key !== chunkKey(c) || !audio.duration) return;
+  if(!isChunked() || !c || audio.dataset.key !== chunkKey(c) || !audio.duration) return;
   const pos = audio.currentTime / audio.duration * c.len;
   let j = 0; while(j + 1 < c.cum.length && c.cum[j + 1] <= pos) j++;
   if(c.start + j !== state.idx && c.sec === state.sec){ state.idx = c.start + j; refreshPosition(false); savePos(); }
@@ -1813,7 +1846,7 @@ const GEM_AHEAD_CHARS = 27000; // circa 30 minuti a velocità normale: abbastanz
 const gemAheadOn = () => prefs.gemAhead !== false;
 // minuti di ascolto già pronti dopo il punto attuale (per le voci Google)
 function readyAheadMinutes(){
-  if(!isGem() || !state.total) return 0;
+  if(!isChunked() || !state.total) return 0;
   let chars = 0;
   for(let i = 1; i < wanted.length; i++){ const w = wanted[i]; if(!w.chunk || !isReady(w.key)) break; chars += w.chunk.len; }
   // più la parte in corso, dal punto attuale
@@ -1828,10 +1861,10 @@ function lookahead(){
   return MEM_AHEAD;
 }
 function upcoming(n){
-  if(isGem()){
+  if(isChunked()){
     // blocchi lunghi: preparo solo quello in corso e il successivo (sempre così in pausa), per non consumare richieste inutili
-    let k = 2;
-    if(gemAheadOn() && gemModelsLeft() && state.playing){
+    let k = isFish() && !state.playing ? 1 : 2; // Fish in pausa: solo la parte in corso
+    if(isGem() && gemAheadOn() && gemModelsLeft() && state.playing){
       // preparazione automatica: circa mezz'ora di ascolto oltre il punto attuale, finché il limite di oggi lo consente
       const u = upcomingChunks(40); let sum = 0, i = 0;
       while(i < u.length && sum < GEM_AHEAD_CHARS){ sum += u[i].chunk.len; i++; }
@@ -1852,13 +1885,13 @@ function upcoming(n){
 async function piperSpeakCurrent(fromAdvance){
   const g = ++state.gen;
   // partenza o salto: riparto con la rampa dal punto attuale (i blocchi già fatti o in corso restano)
-  if(!fromAdvance && isGem() && gemColdAt(state.sec, state.idx)) chunkCache.clear();
+  if(!fromAdvance && isChunked() && gemColdAt(state.sec, state.idx)) chunkCache.clear();
   const list = upcoming(lookahead());
   if(!list.length){ stop(); return; }
-  if(isGem() && list[0].chunk){
+  if(isChunked() && list[0].chunk){
     const c0 = list[0].chunk;
     if(c0.sec !== state.sec || state.idx < c0.start){
-      const blockedHere = blkRanges(state.sec).some(([a, b]) => state.idx >= a && state.idx <= b);
+      const blockedHere = isGem() && blkRanges(state.sec).some(([a, b]) => state.idx >= a && state.idx <= b);
       if(blockedHere){
         // Google non vuole leggere questo passaggio: non salto mai da solo. Mi fermo e decidi tu
         stop();
@@ -1869,7 +1902,7 @@ async function piperSpeakCurrent(fromAdvance){
   }
   const key = list[0].key;
   want(list);
-  if(isGem()){
+  if(isChunked()){
     state.curChunk = list[0].chunk;
     // stessa parte già caricata: mi sposto solo al punto giusto
     if(audio.dataset.key === key && audio.duration){
@@ -1887,19 +1920,20 @@ async function piperSpeakCurrent(fromAdvance){
   if(stalled){
     if(fromAdvance){
       const r = rtfOf(state.piperVoice);
-      if(isGem()) setStatus('Google sta preparando la prossima parte, qualche secondo...', false, true); else setStatus(r && r > 1
+      if(isFish()) setStatus('Fish Audio sta preparando la prossima parte, qualche secondo...', false, true); else if(isGem()) setStatus('Google sta preparando la prossima parte, qualche secondo...', false, true); else setStatus(r && r > 1
         ? `${voiceName()} su questo telefono è più lenta della lettura: aspetto di avere qualche frase pronta. Per ascoltare senza pause usa Prepara in anticipo dai tre puntini, oppure una voce più leggera.`
         : 'Preparo le prossime frasi...', false, true);
     } else {
-      setStatus(isGem() ? 'Google sta preparando la lettura, qualche secondo...' : voiceReady(state.piperVoice) ? 'Preparo la voce...' : 'Preparo la voce. La prima volta va scaricata, può richiedere qualche minuto.', false, true);
+      setStatus(isFish() ? 'Fish Audio sta preparando la lettura, qualche secondo...' : isGem() ? 'Google sta preparando la lettura, qualche secondo...' : voiceReady(state.piperVoice) ? 'Preparo la voce...' : 'Preparo la voce. La prima volta va scaricata, può richiedere qualche minuto.', false, true);
     }
   }
   try{
     if(isGem() && gemHold){ const e0 = entries.get(key); if(e0 && e0.st === 'queued'){ stop(); showGemProblem('bloccato', state.curChunk || chunkAt(state.sec, state.idx), 'bloccato'); return; } }
+    if(isFish() && fishHold){ const e0 = entries.get(key); if(e0 && e0.st !== 'ready' && e0.st !== 'stored'){ stop(); setStatus(fishErrorText(fishLastErr), true); return; } } // fermo dopo un errore: questa parte non arriverà, non resto in attesa
     const url = await waitFor(key);
     // dopo un'interruzione riparto solo con qualche frase già pronta, così non si ferma a ogni frase
     if(stalled && fromAdvance && list.length > 1){
-      if(!isGem()) try{ await waitFor(list[Math.min(3, list.length - 1)].key); }catch(e){}
+      if(!isChunked()) try{ await waitFor(list[Math.min(3, list.length - 1)].key); }catch(e){}
     }
     if(g !== state.gen || !state.playing) return;
     setStatus('');
@@ -1907,7 +1941,7 @@ async function piperSpeakCurrent(fromAdvance){
     audio.src = url; audio.dataset.key = key;
     audio.playbackRate = state.rate;
     audio.preservesPitch = true; audio.webkitPreservesPitch = true;
-    if(isGem() && state.idx > state.curChunk.start){
+    if(isChunked() && state.idx > state.curChunk.start){
       await new Promise(res => { if(audio.readyState >= 1) res(); else { audio.addEventListener('loadedmetadata', res, { once: true }); setTimeout(res, 3000); } });
       seekInChunk(state.curChunk);
     }
@@ -1922,6 +1956,7 @@ async function piperSpeakCurrent(fromAdvance){
     }
     if(err.name === 'NotAllowedError'){ stop(); setStatus('Tocca play per continuare.'); return; }
     stop();
+    if(isFish()){ setStatus(fishErrorText(err.message || ''), true); return; }
     if(isGem() && (/tagliato/.test(err.message || '') || (/richiesta/.test(err.message || '') && gemTarget() > 1500))){
       if(/richiesta/.test(err.message || '')) shrinkGemChunks();
       setStatus('Il blocco era troppo lungo per Google: riprovo con blocchi più corti...', false, true);
@@ -1936,7 +1971,7 @@ async function piperSpeakCurrent(fromAdvance){
 audio.onended = () => {
   if(audio.src === silenceUrl || audio.src === holdUrl) return;
   if(!state.playing || state.engine !== 'piper') return;
-  if(isGem() && state.curChunk){ state.sec = state.curChunk.sec; state.idx = state.curChunk.end; }
+  if(isChunked() && state.curChunk){ state.sec = state.curChunk.sec; state.idx = state.curChunk.end; }
   advance();
 };
 
@@ -2018,13 +2053,13 @@ function speakCurrent(fromAdvance){ maybeLeaveFallback(); if(state.engine === 'p
 function advance(){
   const s = state.sections[state.sec];
   if(state.idx < s.sentences.length - 1){ state.idx++; speakCurrent(true); }
-  else if(state.sec < state.sections.length - 1){ state.sec = isGem() ? nextGemSec(state.sec) : state.sec + 1; state.idx = 0; speakCurrent(true); }
+  else if(state.sec < state.sections.length - 1){ state.sec = isChunked() ? nextGemSec(state.sec) : state.sec + 1; state.idx = 0; speakCurrent(true); }
   else { stop(); savePos(true); renderLibrary(); setStatus('Hai finito il libro.'); }
 }
 function stop(){
   state.playing = false; state.gen++;
   // in pausa con voce Google: tolgo dalla coda le parti oltre la successiva, per non consumare richieste
-  if(isGem() && state.total && state.prepareTo == null) try{ want(upcoming(lookahead()), audio.dataset.key); }catch(e){}
+  if(isChunked() && state.total && state.prepareTo == null) try{ want(upcoming(lookahead()), audio.dataset.key); }catch(e){}
   if(audio.src === holdUrl){ audio.loop = false; audio.pause(); }
   if('speechSynthesis' in window) speechSynthesis.cancel();
   audio.pause();
@@ -2033,8 +2068,9 @@ function stop(){
 function play(){
   if(!state.total) return;
   if(previewBtn) stopPreview();
+  fishHold = false; // il tocco su play è la tua scelta di riprovare dopo un errore di Fish Audio
   state.playing = true; updatePlay(); requestWake();
-  const ch = isGem() ? chunkAt(state.sec, state.idx) : null;
+  const ch = isChunked() ? chunkAt(state.sec, state.idx) : null;
   const key = ch ? chunkKey(ch) : `${state.piperVoice}|${state.key}|${state.sec}|${state.idx}`;
   if(state.engine === 'piper' && audio.dataset.key === key && audio.currentTime > 0 && !audio.ended){
     if(ch) state.curChunk = ch;
@@ -2077,7 +2113,7 @@ audio.addEventListener('loadedmetadata', () => {
   const k = audio.dataset.key || '';
   if(!audio.duration || !isFinite(audio.duration) || !state.total || state.engine !== 'piper' || k.includes('anteprima') || k === 'gem-setup') return;
   let chars = 0;
-  if(isGem() && state.curChunk && k === chunkKey(state.curChunk)) chars = state.curChunk.len;
+  if(isChunked() && state.curChunk && k === chunkKey(state.curChunk)) chars = state.curChunk.len;
   else { const it = state.sections[state.sec] && state.sections[state.sec].sentences[state.idx]; if(it && k.endsWith(`|${state.sec}|${state.idx}`)) chars = it.t.length; }
   if(chars < 20) return;
   const v = chars / audio.duration;
@@ -2087,7 +2123,7 @@ const estDur = g => { const p = fromG(g); const it = state.sections[p.sec].sente
 // salto di qualche secondo: dentro l'audio già pronto quando possibile, altrimenti stimando la durata delle frasi
 function skipSeconds(d){
   if(!state.total) return;
-  const ch = isGem() ? (state.curChunk || chunkAt(state.sec, state.idx)) : null;
+  const ch = isChunked() ? (state.curChunk || chunkAt(state.sec, state.idx)) : null;
   const curKey = ch ? chunkKey(ch) : `${state.piperVoice}|${state.key}|${state.sec}|${state.idx}`;
   const audioOn = state.engine === 'piper' && audio.dataset.key === curKey && audio.duration && isFinite(audio.duration);
   if(audioOn){
@@ -2234,7 +2270,7 @@ function updatePlay(){
   updateRowButtons();
 }
 function voiceName(){
-  if(state.engine === 'piper'){ const v = PIPER_VOICES.find(x => x.id === state.piperVoice) || GEM_VOICES.find(x => x.id === state.piperVoice); return v ? v.name : ''; }
+  if(state.engine === 'piper'){ const v = GEM_VOICES.find(x => x.id === state.piperVoice) || FISH_VOICES.find(x => x.id === state.piperVoice); return v ? v.name : ''; }
   return state.sysVoice ? state.sysVoice.name.replace(/\s*\(.*\)\s*/, '') : 'iPhone';
 }
 // tempo stimato, senza costi: caratteri diviso la velocità di lettura misurata della voce e la velocità scelta
@@ -3233,6 +3269,8 @@ async function previewVoice(kind, id, btn){
   // secondo tocco sulla stessa voce: ferma l'anteprima
   if(previewId === kind + ':' + id && previewLabel !== 'Prova'){ stopPreview(); return; }
   if(isGemId(id) && !store.get('gemKey')){ gemFrom = view === 'set' && sheetKind !== 'voice' ? 'settings' : 'voice'; openGemSetup(id, 1); return; }
+  if(isFishId(id) && !store.get('fishKey')){ fishFrom = view === 'set' && sheetKind !== 'voice' ? 'settings' : 'voice'; openFishSetup(); return; }
+  if(isFishId(id)) fishHold = false; // la prova è una tua scelta: una richiesta
   if(state.playing) stop();
   stopPreview();
   const g = ++previewGen;
@@ -3272,7 +3310,7 @@ async function previewVoice(kind, id, btn){
     if(g !== previewGen || e.message === 'skip') return;
     previewState(btn, 'Prova'); previewBtn = null;
     if(e.name === 'NotAllowedError') setStatus('L\'iPhone ha bloccato l\'audio: tocca di nuovo Prova.', true);
-    else setStatus(isGemId(id) ? gemErrorText(e.message || '') : 'Anteprima non riuscita. Controlla la connessione per il primo download.', true);
+    else setStatus(isGemId(id) ? gemErrorText(e.message || '') : isFishId(id) ? fishErrorText(e.message || '') : 'Anteprima non riuscita.', true);
   }finally{
     // rimetto in coda le frasi del libro da preparare
     if(state.engine === 'piper' && state.total) setTimeout(() => want(upcoming(lookahead())), 0);
@@ -3284,14 +3322,10 @@ function selectVoice(kind, id){
   state.prepareTo = null;
   state.fallbackFrom = null; state.fallbackUntil = 0;
   if(kind === 'piper' && isGemId(id) && !store.get('gemKey')){ if(wasPlaying){ unlockAudio(); play(); } gemFrom = view === 'set' && sheetKind !== 'voice' ? 'settings' : 'voice'; openGemSetup(id, 1); return; }
+  if(kind === 'piper' && isFishId(id) && !store.get('fishKey')){ if(wasPlaying){ unlockAudio(); play(); } fishFrom = view === 'set' && sheetKind !== 'voice' ? 'settings' : 'voice'; openFishSetup(); return; }
   if(kind === 'piper'){
     state.engine = 'piper'; state.piperVoice = id;
     audio.removeAttribute('data-key');
-    if(!isGemId(id) && !voiceReady(id)){
-      const v = PIPER_VOICES.find(x => x.id === id);
-      setStatus(`La voce ${v.name} va scaricata una volta (${v.size}). Il download parte ora.`, false, true);
-      wk(id).postMessage({ type: 'prepare', voiceId: id });
-    }
   } else {
     state.engine = 'sys';
     state.sysVoice = speechSynthesis.getVoices().find(x => x.voiceURI === id) || null;
@@ -3343,12 +3377,11 @@ function openVoiceSheet(){
       body.appendChild(voiceRow(v.name, 'Voce ' + v.desc + ' · serve internet', sel, () => selectVoice('piper', v.id), b => previewVoice('piper', v.id, b), 'piper:' + v.id));
     });
   }
-  const phone = PIPER_VOICES.filter(v => voiceReady(v.id));
-  if(phone.length){
-    body.appendChild(el('div', 'groupLabel', 'Voci sul telefono'));
-    phone.forEach(v => {
+  if(store.get('fishKey')){
+    body.appendChild(el('div', 'groupLabel', 'Voce Fish Audio'));
+    FISH_VOICES.forEach(v => {
       const sel = state.engine === 'piper' && state.piperVoice === v.id;
-      body.appendChild(voiceRow(v.name, v.engine + speedNote(v.id), sel, () => selectVoice('piper', v.id), b => previewVoice('piper', v.id, b), 'piper:' + v.id));
+      body.appendChild(voiceRow(v.name, 'Voce ' + v.desc + ' · serve internet · in prova', sel, () => selectVoice('piper', v.id), b => previewVoice('piper', v.id, b), 'piper:' + v.id));
     });
   }
   const it = systemVoices();
@@ -3360,13 +3393,9 @@ function openVoiceSheet(){
     });
   }
   // la voce in uso non ancora pronta (es. download in corso) resta visibile
-  if(state.engine === 'piper' && !voiceReady(state.piperVoice)){
-    const v = PIPER_VOICES.find(x => x.id === state.piperVoice) || GEM_VOICES.find(x => x.id === state.piperVoice);
-    if(v){ body.appendChild(el('div', 'groupLabel', 'In preparazione')); body.appendChild(voiceRow(v.name, 'In download, la uso appena è pronta', true, () => {}, b => previewVoice('piper', v.id, b), 'piper:' + v.id)); }
-  }
   const more = el('button', 'moreVoices');
   more.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
-  const mt = el('span', 'ot', 'Scopri altre voci'); mt.appendChild(el('span', null, 'Voci Google, voci da scaricare sul telefono e altre, nelle Impostazioni'));
+  const mt = el('span', 'ot', 'Scopri altre voci'); mt.appendChild(el('span', null, 'Voci Google e Fish Audio, nelle Impostazioni'));
   more.appendChild(mt);
   more.onclick = () => openSettings('voices');
   body.appendChild(more);
@@ -3374,91 +3403,13 @@ function openVoiceSheet(){
 }
 
 /* ---------- gestione delle voci (Impostazioni) ---------- */
-const downloading = new Set();
-const familyKey = id => familyOf(id) === 'piper' ? id : familyOf(id);
-const PHONE_GROUPS = [
-  { key: 'kokoro', title: 'Sara e Nicola', size: '130 MB · le migliori', ids: ['kokoro-if_sara', 'kokoro-im_nicola'] },
-  { key: 'it_IT-paola-medium', title: 'Paola', size: '60 MB · leggera', ids: ['it_IT-paola-medium'] },
-  { key: 'it_IT-riccardo-x_low', title: 'Riccardo', size: '20 MB · la più leggera', ids: ['it_IT-riccardo-x_low'] },
-  { key: 'supertonic', title: 'Supertonic', size: '400 MB · sperimentale, in Wi-Fi', ids: ['st-F1', 'st-F2', 'st-M1', 'st-M2'] }
-];
-async function hasVoiceFiles(id){
-  const fam = familyOf(id);
-  try{
-    if(fam === 'kokoro'){ const c = await caches.open('transformers-cache'); return (await c.keys()).some(r => /kokoro/i.test(r.url) && /\.onnx/.test(r.url)); }
-    if(fam === 'supertonic'){ const c = await caches.open('supertonic-3'); return !!(await c.match('https://huggingface.co/supertone-oss-archive/supertonic-3/resolve/main/onnx/vector_estimator.onnx')); }
-    if(fam === 'piper'){ const root = await navigator.storage.getDirectory(); const dir = await root.getDirectoryHandle('piper'); await dir.getFileHandle(id + '.onnx'); return true; }
-  }catch(e){ return false; }
-  return true;
-}
-// all'avvio: le voci segnate come pronte devono avere i file sul telefono, altrimenti non sono pronte
-async function verifyVoices(){
-  const lost = [];
-  for(const id of [...readyVoices]){
-    if(isGemId(id)) continue;
-    if(!(await hasVoiceFiles(id))){ readyVoices.delete(id); lost.push(id); }
-  }
-  if(lost.length) store.set('readyVoices', [...readyVoices]);
-  return lost;
-}
-// i download in corso si ricordano: se iPhone li interrompe quando esci dall'app, ripartono da soli al ritorno
-function dlPending(){ return store.get('dlPending') || []; }
-function dlRemember(g){ const l = dlPending().filter(x => x.key !== g.key); l.push({ key: g.key, ids: g.ids, title: g.title, n: g.n || 0 }); store.set('dlPending', l); }
-function dlForget(){ const l = dlPending().filter(x => !readyVoices.has(x.ids[0])); store.set('dlPending', l); }
-function downloadGroup(g){
-  if(downloading.has(g.key)) return;
-  downloading.add(g.key); dlRemember(g);
-  setStatus(`Scarico ${g.title}. Non cambiare app e tieni lo schermo acceso: se iPhone interrompe il download, riprende da solo quando torni qui.`, false, true);
-  wk(g.ids[0]).postMessage({ type: 'prepare', voiceId: g.ids[0] });
-  refreshVoiceUI();
-}
-// riparte dal punto in cui si era fermato: i file già scaricati restano nella cache del telefono
-function dlResume(){
-  // non tocco il motore mentre legge o genera: sarebbe proprio la voce che stai ascoltando
-  if(state.playing || busy) return;
-  const list = dlPending().filter(g => !readyVoices.has(g.ids[0]));
-  if(!list.length) return;
-  const g = list[0], fam = familyOf(g.ids[0]);
-  // dopo tanti tentativi a vuoto smetto, così non riprova a ogni apertura
-  g.n = (g.n || 0) + 1; store.set('dlPending', dlPending().map(x => x.key === g.key ? { ...x, n: g.n } : x));
-  if(g.n > 6){ store.set('dlPending', dlPending().filter(x => x.key !== g.key)); setStatus(`Non riesco a finire il download di ${g.title}. Riprova più tardi con Scarica.`, true); return; }
-  if(workers[fam]){ workers[fam].terminate(); delete workers[fam]; }
-  busy = false; downloading.delete(g.key);
-  setStatus(`Riprendo il download di ${g.title}...`, false, true);
-  downloadGroup(g);
-}
-document.addEventListener('visibilitychange', () => { if(!document.hidden) setTimeout(dlResume, 800); });
-setTimeout(dlResume, 2000);
-async function removeGroup(g){
-  if(!confirm(`Rimuovere ${g.title} dal telefono? Potrai scaricarla di nuovo quando vuoi.`)) return;
-  const fam = familyOf(g.ids[0]);
-  if(workers[fam]){ workers[fam].terminate(); delete workers[fam]; busy = false; }
-  try{
-    if(fam === 'kokoro'){
-      await caches.delete('kokoro-voices');
-      const c = await caches.open('transformers-cache');
-      for(const r of await c.keys()) if(/kokoro/i.test(r.url)) await c.delete(r);
-    } else if(fam === 'supertonic'){
-      await caches.delete('supertonic-3');
-    } else {
-      const root = await navigator.storage.getDirectory();
-      const dir = await root.getDirectoryHandle('piper');
-      for await (const name of dir.keys()) if(name.startsWith(g.ids[0])) await dir.removeEntry(name);
-    }
-  }catch(e){ console.error(e); }
-  g.ids.forEach(id => readyVoices.delete(id));
-  store.set('readyVoices', [...readyVoices]);
-  store.set('dlPending', dlPending().filter(x => x.key !== g.key));
-  // se era la voce in uso passo a una voce già pronta
-  if(state.engine === 'piper' && g.ids.includes(state.piperVoice)){
-    const alt = PIPER_VOICES.find(v => voiceReady(v.id));
-    const sys = systemVoices()[0];
-    if(store.get('gemKey')) selectVoice('piper', GEM_VOICES[0].id);
-    else if(alt) selectVoice('piper', alt.id);
-    else selectVoice('sys', sys ? sys.voiceURI : '');
-  }
-  setStatus(`${g.title} rimossa dal telefono.`);
-  refreshVoiceUI();
+// le voci scaricabili sul telefono sono state tolte: una volta sola cancello i file scaricati in passato
+async function cleanLocalVoices(){
+  if(store.get('localVoicesCleaned')) return;
+  try{ for(const n of ['kokoro-voices', 'supertonic-3', 'transformers-cache']) await caches.delete(n); }catch(e){}
+  try{ const root = await navigator.storage.getDirectory(); await root.removeEntry('piper', { recursive: true }); }catch(e){}
+  store.del('readyVoices'); store.del('dlPending');
+  store.set('localVoicesCleaned', 1);
 }
 // riga con interruttore Attivo / Spento
 function switchRow(title, sub, on, onChange){
@@ -3592,6 +3543,59 @@ function openGemSetup(voiceId, step){
   }
 }
 
+/* ---------- procedura guidata: attivare Fish Audio ---------- */
+let fishFrom = 'voice';
+function openFishSetup(){
+  const body = openSheet('fishSetup', 'Attiva Fish Audio', true);
+  body.appendChild(el('h3', 'stepTitle', 'Una voce in più, gratis e senza carta'));
+  body.appendChild(el('p', 'stepText', 'Fish Audio è un servizio online che legge il testo con una voce naturale. Serve un account su fish.audio e una chiave personale, che incolli qui una volta sola.'));
+  const ul = el('ul', 'stepList');
+  ['Gratis, senza carta di credito: usa il modello gratuito del servizio', 'Non è un account Google: registrati con email e password', 'La chiave resta solo su questo telefono'].forEach(t => ul.appendChild(el('li', null, t)));
+  body.appendChild(ul);
+  body.appendChild(el('p', 'stepText muted', 'Da sapere: il testo del libro viene inviato a Fish Audio, che può usarlo per migliorare i suoi modelli. L\'accesso gratuito è in prova e il sito indica due date di fine diverse (31 agosto e 30 novembre 2026): potrebbe finire senza preavviso. Non so se il servizio accetta chiamate dirette dall\'app: lo scopriamo con la prova qui sotto.'));
+  const ol = el('ol', 'stepList');
+  ['Apri fish.audio e crea l\'account con email e password.', 'Nella sezione per sviluppatori (API) crea una chiave e copiala.', 'Torna qui e incollala.'].forEach(t => ol.appendChild(el('li', null, t)));
+  body.appendChild(ol);
+  const open = el('a', 'wideBtn', 'Apri fish.audio'); open.href = 'https://fish.audio'; open.target = '_blank'; open.rel = 'noopener';
+  body.appendChild(open);
+  const paste = el('button', 'wideBtn alt', 'Incolla la chiave');
+  const lab = el('label', 'sr', 'Chiave di Fish Audio'); lab.htmlFor = 'fishKeyIn';
+  const inp = el('input', 'keyIn'); inp.id = 'fishKeyIn'; inp.type = 'text'; inp.autocomplete = 'off'; inp.spellcheck = false;
+  inp.setAttribute('autocapitalize', 'off'); inp.placeholder = 'Oppure tieni premuto qui e scegli Incolla';
+  const lab2 = el('label', 'stepText', 'ID della voce (facoltativo). Senza ID la voce può cambiare da un pezzo all\'altro: scegline una italiana nella libreria di Fish Audio e incolla qui il suo ID.'); lab2.htmlFor = 'fishRefIn';
+  const ref = el('input', 'keyIn'); ref.id = 'fishRefIn'; ref.type = 'text'; ref.autocomplete = 'off'; ref.spellcheck = false;
+  ref.setAttribute('autocapitalize', 'off'); ref.placeholder = 'ID della voce'; ref.value = store.get('fishRef') || '';
+  const msg = el('p', 'stepText'); msg.id = 'fishMsg';
+  const verify = el('button', 'wideBtn', 'Verifica e attiva (1 richiesta)');
+  paste.onclick = async () => {
+    try{ inp.value = (await navigator.clipboard.readText()).trim(); msg.className = 'stepText'; msg.textContent = inp.value ? 'Chiave incollata: tocca Verifica e attiva.' : ''; }
+    catch(e){ msg.textContent = 'Non riesco a leggere gli appunti: tieni premuto nel campo qui sotto e scegli Incolla.'; inp.focus(); }
+  };
+  verify.onclick = async () => {
+    const k = inp.value.trim();
+    if(!k){ msg.className = 'stepText warn'; msg.textContent = 'Prima incolla la chiave.'; return; }
+    verify.disabled = true; paste.disabled = true;
+    msg.className = 'stepText'; msg.textContent = 'Controllo la chiave: una sola richiesta, può volerci qualche secondo...';
+    unlockAudio();
+    try{
+      const blob = await fishTTS('Ciao, questa è la voce che leggerà il tuo libro.', k, ref.value);
+      store.set('fishKey', k); store.set('fishRef', ref.value.trim()); fishHold = false;
+      msg.className = 'stepText ok'; msg.textContent = 'Fatto, Fish Audio è attivo.';
+      state.gen++; if(state.playing) stop();
+      audio.src = URL.createObjectURL(blob); audio.dataset.key = 'gem-setup'; audio.playbackRate = state.rate;
+      audio.play().catch(() => {});
+      selectVoice('piper', FISH_VOICES[0].id);
+      setTimeout(() => { if(sheetKind === 'fishSetup'){ if(fishFrom === 'settings'){ closeSheet(); openSettings('voices'); } else openVoiceSheet(); } }, 2500);
+    }catch(e){
+      msg.className = 'stepText warn'; msg.textContent = fishErrorText(e.message || '');
+      verify.disabled = false; paste.disabled = false;
+    }
+  };
+  body.append(paste, lab, inp, lab2, ref, msg, verify);
+  const back = el('button', 'smallBtn', 'Indietro'); back.onclick = () => fishFrom === 'settings' ? (closeSheet(), openSettings('voices')) : openVoiceSheet();
+  body.appendChild(back);
+}
+
 function openText(){
   const body = openSheet('text', chapterLabel(), true);
   const wrap = el('div', 'readText');
@@ -3623,7 +3627,7 @@ function markTextSentence(scroll){
 /* ---------- backup: libri, posizioni, note e impostazioni in un solo file ---------- */
 // formato: riga "SIMA-BACKUP 1", riga con la lunghezza dell'intestazione, intestazione JSON, poi i file dei libri in fila
 const BK_MAGIC = 'SIMA-BACKUP 1\n';
-const BK_SKIP = k => k === 'gemKey' || k === 'audioBytes' || k === 'readyVoices' || k === 'lastBackup' || /^gemDone:/.test(k);
+const BK_SKIP = k => k === 'gemKey' || k === 'fishKey' || k === 'audioBytes' || k === 'readyVoices' || k === 'lastBackup' || /^gemDone:/.test(k);
 async function makeBackup(){
   const bins = [], parts = []; let off = 0;
   const pack = async v => {
@@ -3700,7 +3704,7 @@ const STATS_KEEP_DAYS = 400;
 let statsPending = [], statsLast = 0;
 function localDay(d){ d = d || new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
 function statsVoiceId(){ return state.engine === 'sys' ? 'sys:' + (state.sysVoice ? state.sysVoice.voiceURI : 'iphone') : (state.piperVoice || 'nessuna'); }
-function statsVoiceCat(vid){ return vid === 'legacy' ? 'none' : vid.startsWith('sys:') ? 'sys' : isGemId(vid) ? 'gem' : 'piper'; }
+function statsVoiceCat(vid){ return vid === 'legacy' ? 'none' : vid.startsWith('sys:') ? 'sys' : isGemId(vid) ? 'gem' : isFishId(vid) ? 'fish' : 'piper'; }
 function statsAdd(key, title, secs){
   const day = localDay(), hr = new Date().getHours(), vid = statsVoiceId(), vname = voiceName() || 'Voce';
   const p = statsPending.find(x => x.day === day && x.key === key && x.vid === vid && x.h === hr);
@@ -3885,7 +3889,7 @@ function renderStats(){
   // voci e libri presenti nei dati salvati
   const used = new Set(), usedBooks = new Set();
   Object.values(st).forEach(r => { Object.keys(r.v || {}).forEach(v => used.add(v)); Object.keys(r.b || {}).forEach(k => usedBooks.add(k)); });
-  const cats = [['gem', 'Voci Google', 'Tutte le voci Google'], ['piper', 'Voci sul telefono', 'Tutte le voci sul telefono'], ['sys', 'Voci di sistema', 'Tutte le voci di sistema']].filter(([c]) => [...used].some(v => statsVoiceCat(v) === c));
+  const cats = [['gem', 'Voci Google', 'Tutte le voci Google'], ['fish', 'Voce Fish Audio', 'Tutte le voci Fish Audio'], ['sys', 'Voci di sistema', 'Tutte le voci di sistema']].filter(([c]) => [...used].some(v => statsVoiceCat(v) === c));
   if(statsVoice !== 'all' && !(statsVoice.startsWith('cat:') ? cats.some(([c]) => 'cat:' + c === statsVoice) : used.has(statsVoice.slice(2)))) statsVoice = 'all';
   if(statsBook !== 'all' && !usedBooks.has(statsBook)) statsBook = 'all';
   const sp = statsSpan(), today = dOnly(new Date());
@@ -4168,38 +4172,59 @@ function openSettings(focus, keepScroll){
         const pref = prefs.fallbackVoice || '';
         ca.appendChild(el('div', 'innerLabel', 'Voce da usare dopo Google'));
         const pick = v => { prefs.fallbackVoice = v; save(); };
-        ca.appendChild(option('Automatica', `La prima voce scaricata sul telefono, se no quella dell'iPhone. Ora: ${fb ? fb.name : 'nessuna'}`, !pref, () => pick('')));
-        const ready = PIPER_VOICES.filter(v => readyVoices.has(v.id));
-        ready.forEach(v => ca.appendChild(option(v.name, 'Scaricata sul telefono' + speedNote(v.id), pref === 'piper:' + v.id, () => pick('piper:' + v.id))));
+        ca.appendChild(option('Automatica', `La voce dell'iPhone. Ora: ${fb ? fb.name : 'nessuna'}`, !pref, () => pick('')));
         const sv = bestSysVoice();
         if(sv) ca.appendChild(option('Voce dell\'iPhone', sv.name + ' · a schermo bloccato potrebbe fermarsi', pref === 'sys', () => pick('sys')));
-        if(!ready.length) ca.appendChild(el('p', 'cardNote inCardNote', 'Per una voce più naturale dopo Google, scaricane una qui sotto in Voci sul telefono: comparirà in questo elenco.'));
       }
       const out = el('button', 'textBtn', 'Scollega account Google');
       out.onclick = () => {
         if(!confirm('Scollegare le voci Google da questo telefono? Potrai riattivarle quando vuoi.')) return;
         store.del('gemKey');
-        if(isGem()){ const alt = PIPER_VOICES.find(v => voiceReady(v.id)); const sys = systemVoices()[0]; if(alt) selectVoice('piper', alt.id); else selectVoice('sys', sys ? sys.voiceURI : ''); }
+        if(isGem()){ const sys = systemVoices()[0]; if(store.get('fishKey')) selectVoice('piper', FISH_VOICES[0].id); else selectVoice('sys', sys ? sys.voiceURI : ''); }
         refreshVoiceUI();
       };
       out.classList.add('sectionEnd');
       section.appendChild(out);
     }
 
-    // sul telefono
-    const cp = card('Voci sul telefono', 'Funzionano anche offline, dopo il download.');
-    PHONE_GROUPS.forEach(g => {
-      const ready = voiceReady(g.ids[0]);
-      const dl = downloading.has(g.key);
-      cp.appendChild(famRow(g.title, ready ? 'Pronta' : dl ? 'Download in corso...' : g.size,
-        ready ? 'Rimuovi' : dl ? 'Attendi' : 'Scarica', () => ready ? removeGroup(g) : downloadGroup(g), dl && !ready));
-      if(ready) g.ids.forEach(id => {
-        const v = PIPER_VOICES.find(x => x.id === id);
-        const sel = state.engine === 'piper' && state.piperVoice === id;
-        const r = voiceRow(v.name, speedNote(id).replace(/^ · /, '') || v.engine, sel, () => selectVoice('piper', id), b => previewVoice('piper', id, b), 'piper:' + id);
-        r.classList.add('sub'); cp.appendChild(r);
-      });
-    });
+    // Fish Audio
+    {
+      const hasFish = !!store.get('fishKey');
+      if(!hasFish){
+        const c = card('Fish Audio', 'Voce gratuita, senza carta di credito, serve internet. In prova: il sito può cambiare o chiudere l\'accesso gratuito.', 'Nuova');
+        const go = el('button', 'wideBtn inCard', 'Attiva Fish Audio');
+        go.onclick = () => { fishFrom = 'settings'; openFishSetup(); };
+        c.appendChild(go);
+      } else {
+        const cf = card('Fish Audio', 'Attiva, serve internet. In prova: il sito può cambiare o chiudere l\'accesso gratuito.', 'Nuova');
+        FISH_VOICES.forEach(v => {
+          const sel = state.engine === 'piper' && state.piperVoice === v.id;
+          cf.appendChild(voiceRow(v.name, 'Voce ' + v.desc, sel, () => selectVoice('piper', v.id), b => previewVoice('piper', v.id, b), 'piper:' + v.id));
+        });
+        const ref = store.get('fishRef') || '';
+        const refRow = famRow('ID della voce', ref ? ref : 'Nessuno: la voce può cambiare da un pezzo all\'altro.', 'Cambia', () => {
+          const v = prompt('ID della voce di Fish Audio (lascia vuoto per nessuno):', ref);
+          if(v === null) return;
+          store.set('fishRef', v.trim()); setStatus(v.trim() ? 'ID voce salvato: vale per i pezzi non ancora preparati.' : 'ID voce tolto.'); openSettings(null, true);
+        });
+        cf.appendChild(refRow);
+        const use = store.get('fishUse') || {}, thisMonth = localDay().slice(0, 7) === use.m;
+        cf.appendChild(famRow('Questo mese', thisMonth ? `${use.req} ${use.req === 1 ? 'richiesta' : 'richieste'}, ${use.chars.toLocaleString('it-IT')} caratteri inviati, circa ${use.chars < 1000 ? 'meno di 1 min' : fmtMin(Math.round(use.chars / 1000))} di audio. Il conteggio vero è nel tuo account su fish.audio.` : 'Nessuna richiesta ancora.', null));
+        cf.appendChild(famRow('Come lavora', 'Una richiesta alla volta (circa 3 minuti e mezzo di libro), prepara solo la parte successiva e non ripete mai da sola una richiesta fallita: dopo un errore si ferma e aspetta che tocchi play.', null));
+        const lg = (store.get('fishLog') || []).slice(-5).reverse();
+        if(lg.length) cf.appendChild(el('div', 'innerLabel', 'Ultime richieste'));
+        lg.forEach(r => cf.appendChild(famRow(new Date(r.t).toLocaleString('it-IT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }), r.err ? `${r.c} caratteri inviati, non riuscita (${r.err}).` : `${r.c} caratteri inviati, risposta in ${Math.round((r.ms || 0) / 1000)} s.`, null)));
+        const out = el('button', 'textBtn', 'Scollega Fish Audio');
+        out.onclick = () => {
+          if(!confirm('Scollegare Fish Audio da questo telefono? Potrai riattivarlo quando vuoi.')) return;
+          store.del('fishKey');
+          if(isFish()){ const sys = systemVoices()[0]; if(store.get('gemKey')) selectVoice('piper', GEM_VOICES[0].id); else selectVoice('sys', sys ? sys.voiceURI : ''); }
+          refreshVoiceUI();
+        };
+        out.classList.add('sectionEnd');
+        section.appendChild(out);
+      }
+    }
 
     // iPhone
     const it = systemVoices();
@@ -4231,7 +4256,7 @@ function openSettings(focus, keepScroll){
     // spazio
     const cs = card('Spazio');
     const audioMb = Math.round((store.get('audioBytes') || 0) / 1048576);
-    const aheadMin = isGem() ? readyAheadMinutes() : 0;
+    const aheadMin = isChunked() ? readyAheadMinutes() : 0;
     cs.appendChild(famRow('Audio già preparato', audioMb + ' MB' + (aheadMin ? ` · circa ${fmtMin(aheadMin)} pronti da ascoltare nel libro aperto` : '') + '. Quello già ascoltato si cancella per primo quando serve spazio.', audioMb ? 'Svuota' : null, clearAudioCache));
     const sb = Math.round(statsSize() / 1024);
     cs.appendChild(famRow('Statistiche di ascolto', (sb < 1 ? 'Meno di 1 KB' : sb + ' KB') + '. Servono per la scheda Statistiche.', sb ? 'Svuota' : null, clearStats));
@@ -4249,7 +4274,7 @@ function openMore(){
   bookCardEl().then(c => body.insertBefore(c, body.firstChild));
   const g1 = el('div', 'group');
   // con le voci Google non c'è: l'app prepara già da sola circa mezz'ora mentre ascolti, senza spendere richieste in blocco
-  if(state.engine === 'piper' && !isGem()){
+  if(state.engine === 'piper' && !isChunked()){
     const chaps = state.pages ? 20 : 2;
     const lastSec = Math.min(state.sections.length - 1, state.sec + chaps);
     const until = state.offsets[lastSec] + state.sections[lastSec].sentences.length - 1;
@@ -4362,12 +4387,11 @@ function restoreVoice(){
   const sysList = systemVoices();
   if(pv.startsWith('sys:')){
     state.engine = 'sys'; state.sysVoice = sysList.find(x => x.voiceURI === pv.slice(4)) || state.sysVoice || sysList[0] || null;
-  } else if(id && ((isGemId(id) && store.get('gemKey')) || (PIPER_VOICES.some(v => v.id === id) && (voiceReady(id) || downloading.has(familyKey(id)))))){
+  } else if(id && ((isGemId(id) && store.get('gemKey')) || (isFishId(id) && store.get('fishKey')))){
     state.engine = 'piper'; state.piperVoice = id;
   } else {
-    const alt = PIPER_VOICES.find(v => voiceReady(v.id));
     if(store.get('gemKey')){ state.engine = 'piper'; state.piperVoice = GEM_VOICES[0].id; }
-    else if(alt){ state.engine = 'piper'; state.piperVoice = alt.id; }
+    else if(store.get('fishKey')){ state.engine = 'piper'; state.piperVoice = FISH_VOICES[0].id; }
     else { state.engine = 'sys'; state.sysVoice = sysList[0] || null; }
   }
   $('voiceLabel').textContent = voiceName();
@@ -4387,18 +4411,10 @@ try{ if(navigator.storage && navigator.storage.persist) navigator.storage.persis
 (async () => {
   const gs = store.get('gemSetup');
   if(gs && !store.get('gemKey')){ gemSetup.voice = gs.voice; gemSetup.step = gs.step; }
-  const before = state.engine === 'piper' ? state.piperVoice : null;
-  const lost = await verifyVoices();
-  restoreVoice();
-  if(before && lost.includes(before)){
-    const v = PIPER_VOICES.find(x => x.id === before);
-    setStatus(`${v ? v.name : 'La voce scelta'} non è più sul telefono, quindi uso ${voiceName() || 'la voce dell\'iPhone'}. Puoi riscaricarla da Impostazioni > Voci.`, true);
-  }
+  cleanLocalVoices();
   const last = store.get('lastBook');
   if(last) await loadBook(last);
   await renderLibrary();
-  // preparo in memoria la voce scelta, solo se è già sul telefono e non è troppo pesante
-  if(state.engine === 'piper' && !isGem() && familyOf(state.piperVoice) !== 'supertonic' && voiceReady(state.piperVoice)) wk(state.piperVoice).postMessage({ type: 'prepare', voiceId: state.piperVoice });
   if(gs && !store.get('gemKey') && gs.step >= 3){ openPlayer(); openGemSetup(gs.voice, gs.step); }
 })();
 </script>
