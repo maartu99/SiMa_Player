@@ -34,6 +34,7 @@ audio{width:100%;margin:10px 0 0}
 </head>
 <body>
 <main>
+  <p><a href="./index.html" style="color:var(--acc);font-weight:600">Torna all'app</a></p>
   <h1>Prova Gemini Live</h1>
   <p class="muted">Pagina di prova, separata dall'app. Usa la chiave Google già salvata nell'app, che non viene mostrata e va solo a Google. Ogni tocco fa una sola richiesta e non ne ripete mai da solo.</p>
 
@@ -74,7 +75,7 @@ let chosen = '', busy = false;
 
 if(!KEY){
   $('logList').className = 'log warn';
-  $('logList').textContent = 'Nell\'app non c\'è nessuna chiave Google. Aprila e attiva le voci Google, poi torna qui.';
+  $('logList').textContent = 'Questa pagina non trova la chiave Google. Se usi l\'app dalla schermata Home, la chiave sta solo lì: apri questa pagina da dentro l\'app (Impostazioni > Voci > Prova Gemini Live).';
   $('btnList').disabled = true;
 }
 

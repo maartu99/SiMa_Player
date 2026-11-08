@@ -721,7 +721,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 
 <!-- LIBRERIA -->
 <header class="appBar">
-  <div class="brand"><span class="brandMark"><img src="icon-192.png" alt="" width="32" height="32"></span><span>SiMa</span><span class="brandVer" id="brandVer">(90)</span></div>
+  <div class="brand"><span class="brandMark"><img src="icon-192.png" alt="" width="32" height="32"></span><span>SiMa</span><span class="brandVer" id="brandVer">(91)</span></div>
 </header>
 <main id="libView">
   <div class="actRow hidden">
@@ -854,7 +854,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 90;
+const APP_VERSION = 91;
 { const bv = document.getElementById('brandVer'); if(bv) bv.textContent = '(' + APP_VERSION + ')'; }
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
@@ -4185,6 +4185,14 @@ function openSettings(focus, keepScroll){
       };
       out.classList.add('sectionEnd');
       section.appendChild(out);
+    }
+
+    // esperimento: Gemini Live (pagina di prova separata, stessa chiave dell'app)
+    {
+      const cl = card('Prova Gemini Live', 'Esperimento: una pagina di prova per far leggere una frase con le voci Live di Google, che nella tua tabella dei limiti non hanno tetto al giorno. Non cambia niente nell\'app.', 'Prova');
+      const gl = el('button', 'wideBtn inCard', 'Apri la pagina di prova');
+      gl.onclick = () => { location.href = './live-test.html'; };
+      cl.appendChild(gl);
     }
 
     // Fish Audio
