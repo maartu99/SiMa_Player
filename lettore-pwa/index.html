@@ -301,9 +301,6 @@ svg{flex:none}
 .readText .s.on{background:var(--mark-bg);color:var(--mark-ink)}
 .hint{font-size:14px;color:var(--muted);line-height:1.5;margin:4px 0 12px}
 .vgHead{display:flex;align-items:center;gap:8px;margin:22px 2px 2px}
-.fishStep{display:flex;align-items:flex-start;gap:12px;margin:14px 0 8px}
-.fishNum{flex:none;width:26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center}
-.fishTxt{font-size:16px;line-height:1.45;color:var(--ink)}
 .vgSub{font-size:14px;line-height:1.45;color:var(--ink2);margin:0 2px 8px}
 .keyRow{display:flex;gap:8px;margin:0 0 12px}
 .stepDots{display:flex;gap:6px;margin:2px 0 4px}
@@ -726,7 +723,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 
 <!-- LIBRERIA -->
 <header class="appBar">
-  <div class="brand"><span class="brandMark"><img src="icon-192.png" alt="" width="32" height="32"></span><span>SiMa</span><span class="brandVer" id="brandVer">(94)</span></div>
+  <div class="brand"><span class="brandMark"><img src="icon-192.png" alt="" width="32" height="32"></span><span>SiMa</span><span class="brandVer" id="brandVer">(95)</span></div>
 </header>
 <main id="libView">
   <div class="actRow hidden">
@@ -859,7 +856,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 94;
+const APP_VERSION = 95;
 { const bv = document.getElementById('brandVer'); if(bv) bv.textContent = '(' + APP_VERSION + ')'; }
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
@@ -905,8 +902,6 @@ const GEM_VOICES = [
   { id: 'gem-Iapetus', name: 'Iapetus', desc: 'chiara' },
   { id: 'gem-Puck', name: 'Puck', desc: 'vivace' }
 ];
-// voce Fish Audio (online, chiave gratuita personale, senza carta)
-const FISH_VOICES = [{ id: 'fish-main', name: 'Fish Audio', desc: 'italiano' }];
 const LIVE_VOICES = [{ id: 'live-main', name: 'Gemini Live', desc: 'italiano' }];
 const GEM_STYLES = {
   narrativa: { label: 'Narrativa', text: 'Lettura di un audiolibro in italiano: tono naturale e coinvolgente, ritmo pacato, intonazione che segue il senso del testo, le domande e i dialoghi.' },
@@ -2359,7 +2354,7 @@ function updatePlay(){
   updateRowButtons();
 }
 function voiceName(){
-  if(state.engine === 'piper'){ const v = GEM_VOICES.find(x => x.id === state.piperVoice) || FISH_VOICES.find(x => x.id === state.piperVoice) || LIVE_VOICES.find(x => x.id === state.piperVoice); return v ? v.name : ''; }
+  if(state.engine === 'piper'){ const v = GEM_VOICES.find(x => x.id === state.piperVoice) || LIVE_VOICES.find(x => x.id === state.piperVoice); return v ? v.name : ''; }
   return state.sysVoice ? state.sysVoice.name.replace(/\s*\(.*\)\s*/, '') : 'iPhone';
 }
 // tempo stimato, senza costi: caratteri diviso la velocità di lettura misurata della voce e la velocità scelta
@@ -3359,7 +3354,6 @@ async function previewVoice(kind, id, btn){
   if(previewId === kind + ':' + id && previewLabel !== 'Prova'){ stopPreview(); return; }
   if(isGemId(id) && !store.get('gemKey')){ gemFrom = view === 'set' && sheetKind !== 'voice' ? 'settings' : 'voice'; openGemSetup(id, 1); return; }
   if(isLiveId(id) && !store.get('gemKey')){ gemFrom = view === 'set' && sheetKind !== 'voice' ? 'settings' : 'voice'; openGemSetup(GEM_VOICES[0].id, 1); return; }
-  if(isFishOnlyId(id) && !store.get('fishKey')){ fishFrom = view === 'set' && sheetKind !== 'voice' ? 'settings' : 'voice'; openFishSetup(); return; }
   if(isFishId(id)) fishHold = false; // la prova è una tua scelta: una richiesta
   if(state.playing) stop();
   stopPreview();
@@ -3413,7 +3407,6 @@ function selectVoice(kind, id){
   state.fallbackFrom = null; state.fallbackUntil = 0;
   if(kind === 'piper' && isGemId(id) && !store.get('gemKey')){ if(wasPlaying){ unlockAudio(); play(); } gemFrom = view === 'set' && sheetKind !== 'voice' ? 'settings' : 'voice'; openGemSetup(id, 1); return; }
   if(kind === 'piper' && isLiveId(id) && !store.get('gemKey')){ if(wasPlaying){ unlockAudio(); play(); } gemFrom = view === 'set' && sheetKind !== 'voice' ? 'settings' : 'voice'; openGemSetup(GEM_VOICES[0].id, 1); return; }
-  if(kind === 'piper' && isFishOnlyId(id) && !store.get('fishKey')){ if(wasPlaying){ unlockAudio(); play(); } fishFrom = view === 'set' && sheetKind !== 'voice' ? 'settings' : 'voice'; openFishSetup(); return; }
   if(kind === 'piper'){
     state.engine = 'piper'; state.piperVoice = id;
     audio.removeAttribute('data-key');
@@ -3453,7 +3446,7 @@ function openVoiceSheet(){
   const body = sheetKind === 'voice' ? $('sheetBody') : openSheet('voice', 'Voce', true);
   const scroll = body.scrollTop; body.textContent = '';
   body.appendChild(el('p', 'hint', 'Scegli con quale voce ascoltare il libro. Tocca il nome per usarla, Prova per sentirla.'));
-  const hasG = !!store.get('gemKey'), hasF = !!store.get('fishKey');
+  const hasG = !!store.get('gemKey');
   const isSel = id => state.engine === 'piper' && state.piperVoice === id;
   // un gruppo = titolo, due righe che dicono cosa costa e cosa limita, poi le voci (o il pulsante per attivarle)
   const group = (title, tag, sub) => {
@@ -3466,9 +3459,6 @@ function openVoiceSheet(){
 
   group('Gemini Live', 'Consigliata', 'Per ascoltare a lungo. Gratis e senza limite al giorno. Serve internet. È in prova: Google può cambiarla.');
   if(hasG) rows(LIVE_VOICES); else body.appendChild(famRow('Serve la chiave Google', 'Gratis, ci vogliono 2 minuti.', 'Attiva', needGem));
-
-  group('Fish Audio', 'Riserva', 'Gratis, senza carta. Serve internet. È in prova: il sito potrebbe togliere l\'accesso gratuito.');
-  if(hasF) rows(FISH_VOICES); else body.appendChild(famRow('Serve la chiave Fish', 'Gratis, la crei sul sito di Fish.', 'Attiva', () => { fishFrom = 'voice'; openFishSetup(); }));
 
   group('Voci Google', null, 'Le più curate, ma con un limite al giorno basso: quando finisce, si fermano fino alle 9 del mattino.');
   if(hasG) rows(GEM_VOICES); else body.appendChild(famRow('Serve la chiave Google', 'È la stessa di Gemini Live.', 'Attiva', needGem));
@@ -3486,6 +3476,7 @@ function openVoiceSheet(){
 
 /* ---------- gestione delle voci (Impostazioni) ---------- */
 // le voci scaricabili sul telefono sono state tolte: una volta sola cancello i file scaricati in passato
+function cleanFish(){ if(store.get('fishGone')) return; ['fishKey','fishRef','fishUse','fishLog'].forEach(k => store.del(k)); store.set('fishGone', 1); }
 async function cleanLocalVoices(){
   if(store.get('localVoicesCleaned')) return;
   try{ for(const n of ['kokoro-voices', 'supertonic-3', 'transformers-cache']) await caches.delete(n); }catch(e){}
@@ -3625,53 +3616,6 @@ function openGemSetup(voiceId, step){
   }
 }
 
-/* ---------- procedura guidata: attivare Fish Audio ---------- */
-let fishFrom = 'voice';
-function openFishSetup(){
-  const body = openSheet('fishSetup', 'Attiva Fish Audio', true);
-  body.appendChild(el('p', 'stepText', 'Gratis, senza carta. Ti servono due minuti e una chiave, da incollare qui una volta sola.'));
-  const step = (n, t) => { const r = el('div', 'fishStep'); r.append(el('span', 'fishNum', String(n)), el('span', 'fishTxt', t)); return r; };
-  body.appendChild(step(1, 'Apri Fish Audio e accedi (o registrati con email e password).'));
-  const open = el('a', 'wideBtn', 'Apri la pagina della chiave'); open.href = 'https://fish.audio/app/developers/get-started/'; open.target = '_blank'; open.rel = 'noopener';
-  body.appendChild(open);
-  body.appendChild(step(2, 'Tocca il pulsante che crea la chiave e copiala. Si vede una volta sola.'));
-  body.appendChild(step(3, 'Torna qui, tocca Incolla e poi Attiva.'));
-  const paste = el('button', 'wideBtn alt', 'Incolla la chiave');
-  const lab = el('label', 'sr', 'Chiave di Fish Audio'); lab.htmlFor = 'fishKeyIn';
-  const inp = el('input', 'keyIn'); inp.id = 'fishKeyIn'; inp.type = 'text'; inp.autocomplete = 'off'; inp.spellcheck = false;
-  inp.setAttribute('autocapitalize', 'off'); inp.placeholder = 'Incolla qui la chiave';
-  const msg = el('p', 'stepText'); msg.id = 'fishMsg';
-  const verify = el('button', 'wideBtn', 'Attiva (1 richiesta)');
-  paste.onclick = async () => {
-    try{ inp.value = (await navigator.clipboard.readText()).trim(); msg.className = 'stepText'; msg.textContent = inp.value ? 'Chiave incollata: tocca Attiva.' : ''; }
-    catch(e){ msg.textContent = 'Non riesco a leggere gli appunti: tieni premuto nel campo qui sotto e scegli Incolla.'; inp.focus(); }
-  };
-  verify.onclick = async () => {
-    const k = inp.value.trim();
-    if(!k){ msg.className = 'stepText warn'; msg.textContent = 'Prima incolla la chiave.'; return; }
-    verify.disabled = true; paste.disabled = true;
-    msg.className = 'stepText'; msg.textContent = 'Controllo la chiave: una sola richiesta, può volerci qualche secondo...';
-    unlockAudio();
-    try{
-      const blob = await fishTTS('Ciao, questa è la voce che leggerà il tuo libro.', k, store.get('fishRef') || '');
-      store.set('fishKey', k); fishHold = false;
-      msg.className = 'stepText ok'; msg.textContent = 'Fatto, Fish Audio è attivo.';
-      state.gen++; if(state.playing) stop();
-      audio.src = URL.createObjectURL(blob); audio.dataset.key = 'gem-setup'; audio.playbackRate = state.rate;
-      audio.play().catch(() => {});
-      selectVoice('piper', FISH_VOICES[0].id);
-      setTimeout(() => { if(sheetKind === 'fishSetup'){ if(fishFrom === 'settings'){ closeSheet(); openSettings('voices'); } else openVoiceSheet(); } }, 2500);
-    }catch(e){
-      msg.className = 'stepText warn'; msg.textContent = fishErrorText(e.message || '');
-      verify.disabled = false; paste.disabled = false;
-    }
-  };
-  body.append(paste, lab, inp, msg, verify);
-  body.appendChild(el('p', 'stepText muted', 'Da sapere: il testo del libro va a Fish Audio, che può usarlo per migliorare i suoi modelli. L\'accesso gratuito è in prova e potrebbe finire senza preavviso.'));
-  const back = el('button', 'smallBtn', 'Indietro'); back.onclick = () => fishFrom === 'settings' ? (closeSheet(), openSettings('voices')) : openVoiceSheet();
-  body.appendChild(back);
-}
-
 function openText(){
   const body = openSheet('text', chapterLabel(), true);
   const wrap = el('div', 'readText');
@@ -3703,7 +3647,7 @@ function markTextSentence(scroll){
 /* ---------- backup: libri, posizioni, note e impostazioni in un solo file ---------- */
 // formato: riga "SIMA-BACKUP 1", riga con la lunghezza dell'intestazione, intestazione JSON, poi i file dei libri in fila
 const BK_MAGIC = 'SIMA-BACKUP 1\n';
-const BK_SKIP = k => k === 'gemKey' || k === 'fishKey' || k === 'liveModel' || k === 'audioBytes' || k === 'readyVoices' || k === 'lastBackup' || /^gemDone:/.test(k);
+const BK_SKIP = k => k === 'gemKey' || k === 'liveModel' || k === 'audioBytes' || k === 'readyVoices' || k === 'lastBackup' || /^gemDone:/.test(k);
 async function makeBackup(){
   const bins = [], parts = []; let off = 0;
   const pack = async v => {
@@ -3965,7 +3909,7 @@ function renderStats(){
   // voci e libri presenti nei dati salvati
   const used = new Set(), usedBooks = new Set();
   Object.values(st).forEach(r => { Object.keys(r.v || {}).forEach(v => used.add(v)); Object.keys(r.b || {}).forEach(k => usedBooks.add(k)); });
-  const cats = [['gem', 'Voci Google', 'Tutte le voci Google'], ['live', 'Voce Gemini Live', 'Tutte le voci Gemini Live'], ['fish', 'Voce Fish Audio', 'Tutte le voci Fish Audio'], ['sys', 'Voci di sistema', 'Tutte le voci di sistema']].filter(([c]) => [...used].some(v => statsVoiceCat(v) === c));
+  const cats = [['gem', 'Voci Google', 'Tutte le voci Google'], ['live', 'Voce Gemini Live', 'Tutte le voci Gemini Live'], ['sys', 'Voci di sistema', 'Tutte le voci di sistema']].filter(([c]) => [...used].some(v => statsVoiceCat(v) === c));
   if(statsVoice !== 'all' && !(statsVoice.startsWith('cat:') ? cats.some(([c]) => 'cat:' + c === statsVoice) : used.has(statsVoice.slice(2)))) statsVoice = 'all';
   if(statsBook !== 'all' && !usedBooks.has(statsBook)) statsBook = 'all';
   const sp = statsSpan(), today = dOnly(new Date());
@@ -4256,7 +4200,7 @@ function openSettings(focus, keepScroll){
       out.onclick = () => {
         if(!confirm('Scollegare le voci Google da questo telefono? Potrai riattivarle quando vuoi.')) return;
         store.del('gemKey');
-        if(isGem() || isLive()){ const sys = systemVoices()[0]; if(store.get('fishKey')) selectVoice('piper', FISH_VOICES[0].id); else selectVoice('sys', sys ? sys.voiceURI : ''); }
+        if(isGem() || isLive()){ const sys = systemVoices()[0]; selectVoice('sys', sys ? sys.voiceURI : ''); }
         refreshVoiceUI();
       };
       out.classList.add('sectionEnd');
@@ -4288,45 +4232,6 @@ function openSettings(focus, keepScroll){
           rs.onclick = () => { store.del('liveModel'); refreshVoiceUI(); };
           cl.appendChild(rs);
         }
-      }
-    }
-
-    // Fish Audio
-    {
-      const hasFish = !!store.get('fishKey');
-      if(!hasFish){
-        const c = card('Fish Audio', 'Voce gratuita, senza carta di credito, serve internet. In prova: il sito può cambiare o chiudere l\'accesso gratuito.', 'Nuova');
-        const go = el('button', 'wideBtn inCard', 'Attiva Fish Audio');
-        go.onclick = () => { fishFrom = 'settings'; openFishSetup(); };
-        c.appendChild(go);
-      } else {
-        const cf = card('Fish Audio', 'Attiva, serve internet. In prova: il sito può cambiare o chiudere l\'accesso gratuito.', 'Nuova');
-        FISH_VOICES.forEach(v => {
-          const sel = state.engine === 'piper' && state.piperVoice === v.id;
-          cf.appendChild(voiceRow(v.name, 'Voce ' + v.desc, sel, () => selectVoice('piper', v.id), b => previewVoice('piper', v.id, b), 'piper:' + v.id));
-        });
-        const ref = store.get('fishRef') || '';
-        const refRow = famRow('ID della voce', ref ? ref : 'Nessuno: la voce può cambiare da un pezzo all\'altro.', 'Cambia', () => {
-          const v = prompt('ID della voce di Fish Audio (lascia vuoto per nessuno):', ref);
-          if(v === null) return;
-          store.set('fishRef', v.trim()); setStatus(v.trim() ? 'ID voce salvato: vale per i pezzi non ancora preparati.' : 'ID voce tolto.'); openSettings(null, true);
-        });
-        cf.appendChild(refRow);
-        const use = store.get('fishUse') || {}, thisMonth = localDay().slice(0, 7) === use.m;
-        cf.appendChild(famRow('Questo mese', thisMonth ? `${use.req} ${use.req === 1 ? 'richiesta' : 'richieste'}, ${use.chars.toLocaleString('it-IT')} caratteri inviati, circa ${use.chars < 1000 ? 'meno di 1 min' : fmtMin(Math.round(use.chars / 1000))} di audio. Il conteggio vero è nel tuo account su fish.audio.` : 'Nessuna richiesta ancora.', null));
-        cf.appendChild(famRow('Come lavora', 'Una richiesta alla volta (circa 3 minuti e mezzo di libro), prepara solo la parte successiva e non ripete mai da sola una richiesta fallita: dopo un errore si ferma e aspetta che tocchi play.', null));
-        const lg = (store.get('fishLog') || []).slice(-5).reverse();
-        if(lg.length) cf.appendChild(el('div', 'innerLabel', 'Ultime richieste'));
-        lg.forEach(r => cf.appendChild(famRow(new Date(r.t).toLocaleString('it-IT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }), r.err ? `${r.c} caratteri inviati, non riuscita (${r.err}).` : `${r.c} caratteri inviati, risposta in ${Math.round((r.ms || 0) / 1000)} s.`, null)));
-        const out = el('button', 'textBtn', 'Scollega Fish Audio');
-        out.onclick = () => {
-          if(!confirm('Scollegare Fish Audio da questo telefono? Potrai riattivarlo quando vuoi.')) return;
-          store.del('fishKey');
-          if(isFish() && isFishOnlyId(state.piperVoice)){ const sys = systemVoices()[0]; if(store.get('gemKey')) selectVoice('piper', GEM_VOICES[0].id); else selectVoice('sys', sys ? sys.voiceURI : ''); }
-          refreshVoiceUI();
-        };
-        out.classList.add('sectionEnd');
-        section.appendChild(out);
       }
     }
 
@@ -4491,11 +4396,10 @@ function restoreVoice(){
   const sysList = systemVoices();
   if(pv.startsWith('sys:')){
     state.engine = 'sys'; state.sysVoice = sysList.find(x => x.voiceURI === pv.slice(4)) || state.sysVoice || sysList[0] || null;
-  } else if(id && ((isGemId(id) && store.get('gemKey')) || (isFishOnlyId(id) && store.get('fishKey')) || (isLiveId(id) && store.get('gemKey')))){
+  } else if(id && ((isGemId(id) && store.get('gemKey')) || (isLiveId(id) && store.get('gemKey')))){
     state.engine = 'piper'; state.piperVoice = id;
   } else {
     if(store.get('gemKey')){ state.engine = 'piper'; state.piperVoice = GEM_VOICES[0].id; }
-    else if(store.get('fishKey')){ state.engine = 'piper'; state.piperVoice = FISH_VOICES[0].id; }
     else { state.engine = 'sys'; state.sysVoice = sysList[0] || null; }
   }
   $('voiceLabel').textContent = voiceName();
@@ -4515,7 +4419,7 @@ try{ if(navigator.storage && navigator.storage.persist) navigator.storage.persis
 (async () => {
   const gs = store.get('gemSetup');
   if(gs && !store.get('gemKey')){ gemSetup.voice = gs.voice; gemSetup.step = gs.step; }
-  cleanLocalVoices();
+  cleanFish(); cleanLocalVoices();
   const last = store.get('lastBook');
   if(last) await loadBook(last);
   await renderLibrary();
