@@ -1,7 +1,7 @@
 // Service worker: rende l'app installabile e utilizzabile offline.
 // File dell'app: sempre la versione più nuova se c'è connessione, la copia salvata se sei offline.
 // Librerie e voci: salvate dopo il primo download.
-const VERSION = 92;
+const VERSION = 93;
 const CORE = 'lettore-core-v' + VERSION;
 const RUNTIME = 'lettore-runtime-v1';
 const CORE_FILES = ['./', './index.html', './manifest.webmanifest',

@@ -300,6 +300,8 @@ svg{flex:none}
 .readText .s{border-radius:3px;-webkit-box-decoration-break:clone;box-decoration-break:clone;cursor:pointer}
 .readText .s.on{background:var(--mark-bg);color:var(--mark-ink)}
 .hint{font-size:14px;color:var(--muted);line-height:1.5;margin:4px 0 12px}
+.vgHead{display:flex;align-items:center;gap:8px;margin:22px 2px 2px}
+.vgSub{font-size:14px;line-height:1.45;color:var(--ink2);margin:0 2px 8px}
 .keyRow{display:flex;gap:8px;margin:0 0 12px}
 .stepDots{display:flex;gap:6px;margin:2px 0 4px}
 .stepDots span{flex:1;height:4px;border-radius:2px;background:var(--track)}
@@ -721,7 +723,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 
 <!-- LIBRERIA -->
 <header class="appBar">
-  <div class="brand"><span class="brandMark"><img src="icon-192.png" alt="" width="32" height="32"></span><span>SiMa</span><span class="brandVer" id="brandVer">(92)</span></div>
+  <div class="brand"><span class="brandMark"><img src="icon-192.png" alt="" width="32" height="32"></span><span>SiMa</span><span class="brandVer" id="brandVer">(93)</span></div>
 </header>
 <main id="libView">
   <div class="actRow hidden">
@@ -854,7 +856,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 92;
+const APP_VERSION = 93;
 { const bv = document.getElementById('brandVer'); if(bv) bv.textContent = '(' + APP_VERSION + ')'; }
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
@@ -3447,51 +3449,35 @@ function systemVoices(){ return 'speechSynthesis' in window ? speechSynthesis.ge
 function openVoiceSheet(){
   const body = sheetKind === 'voice' ? $('sheetBody') : openSheet('voice', 'Voce', true);
   const scroll = body.scrollTop; body.textContent = '';
-  body.appendChild(el('p', 'hint', 'Tocca una voce per usarla, oppure Prova per sentirla.'));
-  if(!store.get('gemKey')){
-    // in cima, il consiglio: le voci Google sono le uniche che leggono davvero bene l'italiano
-    const rec = el('button', 'recCard');
-    const top = el('span', 'recTop'); top.append(el('span', 'recTitle', 'Voci Google'), el('span', 'badge', 'Consigliate'));
-    rec.append(top, el('span', 'recText', 'Le più naturali: leggono l\'italiano con gli accenti e l\'intonazione giusti. Gratis con il tuo account Google.'), el('span', 'recCta', 'Attiva in 2 minuti'));
-    rec.onclick = () => { gemFrom = 'voice'; openGemSetup(GEM_VOICES[0].id, 1); };
-    body.appendChild(rec);
-  }
-  if(store.get('gemKey')){
-    const gl = el('div', 'groupLabel', 'Voci Google '); gl.appendChild(el('span', 'badge', 'Consigliate')); body.appendChild(gl);
-    GEM_VOICES.forEach(v => {
-      const sel = state.engine === 'piper' && state.piperVoice === v.id;
-      body.appendChild(voiceRow(v.name, 'Voce ' + v.desc + ' · serve internet', sel, () => selectVoice('piper', v.id), b => previewVoice('piper', v.id, b), 'piper:' + v.id));
-    });
-  }
-  if(store.get('gemKey')){
-    body.appendChild(el('div', 'groupLabel', 'Voce Gemini Live'));
-    LIVE_VOICES.forEach(v => {
-      const sel = state.engine === 'piper' && state.piperVoice === v.id;
-      body.appendChild(voiceRow(v.name, 'Voce ' + v.desc + ' · senza tetto al giorno · in prova', sel, () => selectVoice('piper', v.id), b => previewVoice('piper', v.id, b), 'piper:' + v.id));
-    });
-  }
-  if(store.get('fishKey')){
-    body.appendChild(el('div', 'groupLabel', 'Voce Fish Audio'));
-    FISH_VOICES.forEach(v => {
-      const sel = state.engine === 'piper' && state.piperVoice === v.id;
-      body.appendChild(voiceRow(v.name, 'Voce ' + v.desc + ' · serve internet · in prova', sel, () => selectVoice('piper', v.id), b => previewVoice('piper', v.id, b), 'piper:' + v.id));
-    });
-  }
+  body.appendChild(el('p', 'hint', 'Scegli con quale voce ascoltare il libro. Tocca il nome per usarla, Prova per sentirla.'));
+  const hasG = !!store.get('gemKey'), hasF = !!store.get('fishKey');
+  const isSel = id => state.engine === 'piper' && state.piperVoice === id;
+  // un gruppo = titolo, due righe che dicono cosa costa e cosa limita, poi le voci (o il pulsante per attivarle)
+  const group = (title, tag, sub) => {
+    const g = el('div', 'groupLabel vgHead'); g.appendChild(document.createTextNode(title));
+    if(tag) g.appendChild(el('span', 'badge', tag));
+    body.appendChild(g); body.appendChild(el('p', 'vgSub', sub));
+  };
+  const rows = (list, label) => list.forEach(v => body.appendChild(voiceRow(v.name, cap(v.desc), isSel(v.id), () => selectVoice('piper', v.id), b => previewVoice('piper', v.id, b), 'piper:' + v.id)));
+  const needGem = () => { gemFrom = 'voice'; openGemSetup(GEM_VOICES[0].id, 1); };
+
+  group('Gemini Live', 'Consigliata', 'Per ascoltare a lungo. Gratis e senza limite al giorno. Serve internet. È in prova: Google può cambiarla.');
+  if(hasG) rows(LIVE_VOICES); else body.appendChild(famRow('Serve la chiave Google', 'Gratis, ci vogliono 2 minuti.', 'Attiva', needGem));
+
+  group('Fish Audio', 'Riserva', 'Gratis, senza carta. Serve internet. È in prova: il sito potrebbe togliere l\'accesso gratuito.');
+  if(hasF) rows(FISH_VOICES); else body.appendChild(famRow('Serve la chiave Fish', 'Gratis, la crei sul sito di Fish.', 'Attiva', () => { fishFrom = 'voice'; openFishSetup(); }));
+
+  group('Voci Google', null, 'Le più curate, ma con un limite al giorno basso: quando finisce, si fermano fino alle 9 del mattino.');
+  if(hasG) rows(GEM_VOICES); else body.appendChild(famRow('Serve la chiave Google', 'È la stessa di Gemini Live.', 'Attiva', needGem));
+
   const it = systemVoices();
   if(it.length){
-    body.appendChild(el('div', 'groupLabel', 'Voci di sistema'));
+    group('Voce del telefono', null, 'Sempre disponibile, senza limiti e senza chiavi. Suona meno naturale.');
     it.forEach(v => {
       const sel = state.engine === 'sys' && state.sysVoice && state.sysVoice.voiceURI === v.voiceURI;
       body.appendChild(voiceRow(v.name, /enhanced|premium|avanzat|migliorat/i.test(v.name) ? 'Avanzata' : 'Di sistema', sel, () => selectVoice('sys', v.voiceURI), b => previewVoice('sys', v.voiceURI, b), 'sys:' + v.voiceURI));
     });
   }
-  // la voce in uso non ancora pronta (es. download in corso) resta visibile
-  const more = el('button', 'moreVoices');
-  more.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
-  const mt = el('span', 'ot', 'Scopri altre voci'); mt.appendChild(el('span', null, 'Voci Google e Fish Audio, nelle Impostazioni'));
-  more.appendChild(mt);
-  more.onclick = () => openSettings('voices');
-  body.appendChild(more);
   body.scrollTop = scroll;
 }
 
