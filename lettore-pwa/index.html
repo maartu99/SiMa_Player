@@ -301,6 +301,9 @@ svg{flex:none}
 .readText .s.on{background:var(--mark-bg);color:var(--mark-ink)}
 .hint{font-size:14px;color:var(--muted);line-height:1.5;margin:4px 0 12px}
 .vgHead{display:flex;align-items:center;gap:8px;margin:22px 2px 2px}
+.fishStep{display:flex;align-items:flex-start;gap:12px;margin:14px 0 8px}
+.fishNum{flex:none;width:26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center}
+.fishTxt{font-size:16px;line-height:1.45;color:var(--ink)}
 .vgSub{font-size:14px;line-height:1.45;color:var(--ink2);margin:0 2px 8px}
 .keyRow{display:flex;gap:8px;margin:0 0 12px}
 .stepDots{display:flex;gap:6px;margin:2px 0 4px}
@@ -723,7 +726,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 
 <!-- LIBRERIA -->
 <header class="appBar">
-  <div class="brand"><span class="brandMark"><img src="icon-192.png" alt="" width="32" height="32"></span><span>SiMa</span><span class="brandVer" id="brandVer">(93)</span></div>
+  <div class="brand"><span class="brandMark"><img src="icon-192.png" alt="" width="32" height="32"></span><span>SiMa</span><span class="brandVer" id="brandVer">(94)</span></div>
 </header>
 <main id="libView">
   <div class="actRow hidden">
@@ -856,7 +859,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 93;
+const APP_VERSION = 94;
 { const bv = document.getElementById('brandVer'); if(bv) bv.textContent = '(' + APP_VERSION + ')'; }
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
@@ -3626,28 +3629,21 @@ function openGemSetup(voiceId, step){
 let fishFrom = 'voice';
 function openFishSetup(){
   const body = openSheet('fishSetup', 'Attiva Fish Audio', true);
-  body.appendChild(el('h3', 'stepTitle', 'Una voce in più, gratis e senza carta'));
-  body.appendChild(el('p', 'stepText', 'Fish Audio è un servizio online che legge il testo con una voce naturale. Serve un account su fish.audio e una chiave personale, che incolli qui una volta sola.'));
-  const ul = el('ul', 'stepList');
-  ['Gratis, senza carta di credito: usa il modello gratuito del servizio', 'Non è un account Google: registrati con email e password', 'La chiave resta solo su questo telefono'].forEach(t => ul.appendChild(el('li', null, t)));
-  body.appendChild(ul);
-  body.appendChild(el('p', 'stepText muted', 'Da sapere: il testo del libro viene inviato a Fish Audio, che può usarlo per migliorare i suoi modelli. L\'accesso gratuito è in prova e il sito indica due date di fine diverse (31 agosto e 30 novembre 2026): potrebbe finire senza preavviso. Non so se il servizio accetta chiamate dirette dall\'app: lo scopriamo con la prova qui sotto.'));
-  const ol = el('ol', 'stepList');
-  ['Apri fish.audio e crea l\'account con email e password.', 'Nella sezione per sviluppatori (API) crea una chiave e copiala.', 'Torna qui e incollala.'].forEach(t => ol.appendChild(el('li', null, t)));
-  body.appendChild(ol);
-  const open = el('a', 'wideBtn', 'Apri fish.audio'); open.href = 'https://fish.audio'; open.target = '_blank'; open.rel = 'noopener';
+  body.appendChild(el('p', 'stepText', 'Gratis, senza carta. Ti servono due minuti e una chiave, da incollare qui una volta sola.'));
+  const step = (n, t) => { const r = el('div', 'fishStep'); r.append(el('span', 'fishNum', String(n)), el('span', 'fishTxt', t)); return r; };
+  body.appendChild(step(1, 'Apri Fish Audio e accedi (o registrati con email e password).'));
+  const open = el('a', 'wideBtn', 'Apri la pagina della chiave'); open.href = 'https://fish.audio/app/developers/get-started/'; open.target = '_blank'; open.rel = 'noopener';
   body.appendChild(open);
+  body.appendChild(step(2, 'Tocca il pulsante che crea la chiave e copiala. Si vede una volta sola.'));
+  body.appendChild(step(3, 'Torna qui, tocca Incolla e poi Attiva.'));
   const paste = el('button', 'wideBtn alt', 'Incolla la chiave');
   const lab = el('label', 'sr', 'Chiave di Fish Audio'); lab.htmlFor = 'fishKeyIn';
   const inp = el('input', 'keyIn'); inp.id = 'fishKeyIn'; inp.type = 'text'; inp.autocomplete = 'off'; inp.spellcheck = false;
-  inp.setAttribute('autocapitalize', 'off'); inp.placeholder = 'Oppure tieni premuto qui e scegli Incolla';
-  const lab2 = el('label', 'stepText', 'ID della voce (facoltativo). Senza ID la voce può cambiare da un pezzo all\'altro: scegline una italiana nella libreria di Fish Audio e incolla qui il suo ID.'); lab2.htmlFor = 'fishRefIn';
-  const ref = el('input', 'keyIn'); ref.id = 'fishRefIn'; ref.type = 'text'; ref.autocomplete = 'off'; ref.spellcheck = false;
-  ref.setAttribute('autocapitalize', 'off'); ref.placeholder = 'ID della voce'; ref.value = store.get('fishRef') || '';
+  inp.setAttribute('autocapitalize', 'off'); inp.placeholder = 'Incolla qui la chiave';
   const msg = el('p', 'stepText'); msg.id = 'fishMsg';
-  const verify = el('button', 'wideBtn', 'Verifica e attiva (1 richiesta)');
+  const verify = el('button', 'wideBtn', 'Attiva (1 richiesta)');
   paste.onclick = async () => {
-    try{ inp.value = (await navigator.clipboard.readText()).trim(); msg.className = 'stepText'; msg.textContent = inp.value ? 'Chiave incollata: tocca Verifica e attiva.' : ''; }
+    try{ inp.value = (await navigator.clipboard.readText()).trim(); msg.className = 'stepText'; msg.textContent = inp.value ? 'Chiave incollata: tocca Attiva.' : ''; }
     catch(e){ msg.textContent = 'Non riesco a leggere gli appunti: tieni premuto nel campo qui sotto e scegli Incolla.'; inp.focus(); }
   };
   verify.onclick = async () => {
@@ -3657,8 +3653,8 @@ function openFishSetup(){
     msg.className = 'stepText'; msg.textContent = 'Controllo la chiave: una sola richiesta, può volerci qualche secondo...';
     unlockAudio();
     try{
-      const blob = await fishTTS('Ciao, questa è la voce che leggerà il tuo libro.', k, ref.value);
-      store.set('fishKey', k); store.set('fishRef', ref.value.trim()); fishHold = false;
+      const blob = await fishTTS('Ciao, questa è la voce che leggerà il tuo libro.', k, store.get('fishRef') || '');
+      store.set('fishKey', k); fishHold = false;
       msg.className = 'stepText ok'; msg.textContent = 'Fatto, Fish Audio è attivo.';
       state.gen++; if(state.playing) stop();
       audio.src = URL.createObjectURL(blob); audio.dataset.key = 'gem-setup'; audio.playbackRate = state.rate;
@@ -3670,7 +3666,8 @@ function openFishSetup(){
       verify.disabled = false; paste.disabled = false;
     }
   };
-  body.append(paste, lab, inp, lab2, ref, msg, verify);
+  body.append(paste, lab, inp, msg, verify);
+  body.appendChild(el('p', 'stepText muted', 'Da sapere: il testo del libro va a Fish Audio, che può usarlo per migliorare i suoi modelli. L\'accesso gratuito è in prova e potrebbe finire senza preavviso.'));
   const back = el('button', 'smallBtn', 'Indietro'); back.onclick = () => fishFrom === 'settings' ? (closeSheet(), openSettings('voices')) : openVoiceSheet();
   body.appendChild(back);
 }
