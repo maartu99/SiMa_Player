@@ -723,7 +723,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 
 <!-- LIBRERIA -->
 <header class="appBar">
-  <div class="brand"><span class="brandMark"><img src="icon-192.png" alt="" width="32" height="32"></span><span>SiMa</span><span class="brandVer" id="brandVer">(95)</span></div>
+  <div class="brand"><span class="brandMark"><img src="icon-192.png" alt="" width="32" height="32"></span><span>SiMa</span><span class="brandVer" id="brandVer">(96)</span></div>
 </header>
 <main id="libView">
   <div class="actRow hidden">
@@ -856,7 +856,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 95;
+const APP_VERSION = 96;
 { const bv = document.getElementById('brandVer'); if(bv) bv.textContent = '(' + APP_VERSION + ')'; }
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
@@ -1687,6 +1687,9 @@ function fishErrorText(msg, vid){
   if(/credito/.test(msg)) return N + ' dice che il piano gratuito non basta più (errore 402). Non ho riprovato.';
   if(/limite/.test(msg)) return N + ' chiede di rallentare (troppe richieste). Non ho riprovato: aspetta qualche minuto, poi tocca play (1 richiesta).';
   if(/rete/.test(msg)) return 'Non arriva la risposta di ' + N + ': o manca la connessione, o il servizio non accetta chiamate dall\'app. Non ho riprovato. Tocca play per riprovare (1 richiesta).';
+  if(/scaduto:modelli/.test(msg)) return N + ' non risponde all\'elenco dei modelli (nessuna risposta in 20 secondi). Controlla internet. Non ho riprovato. Tocca play per riprovare (1 richiesta).';
+  if(/scaduto:apertura/.test(msg)) return N + ' non apre la sessione (nessuna risposta in 20 secondi): il telefono o la rete potrebbe bloccare la connessione. Non ho riprovato. Tocca play per riprovare (1 richiesta).';
+  if(/scaduto:audio/.test(msg)) return N + ' ha aperto la sessione ma non manda audio da 90 secondi. Non ho riprovato. Tocca play per riprovare (1 richiesta).';
   if(/scaduto/.test(msg)) return N + ' non ha risposto in ' + (live ? '4 minuti' : '2 minuti') + ' e mi sono fermato. Tocca play per riprovare (1 richiesta).';
   if(/vuoto/.test(msg)) return N + ' ha risposto senza audio. Non ho riprovato. Tocca play per riprovare (1 richiesta).';
   if(/chiuso/.test(msg)) return N + ' ha chiuso la sessione a metà (' + msg + '). Non uso l\'audio incompleto. Non ho riprovato. Tocca play per riprovare (1 richiesta).';
@@ -1694,14 +1697,17 @@ function fishErrorText(msg, vid){
 }
 /* ---------- Gemini Live: voce nativa di Google, richieste senza tetto al giorno ---------- */
 const LIVE_HOST = 'generativelanguage.googleapis.com';
+const liveSay = m => { try{ if(audio && !audio.paused && !audio.ended) return; setStatus('Gemini Live: ' + m, false, true); }catch(e){} };
+const liveSayDone = () => { try{ const t = $('toast'); if(t && /^Gemini Live: /.test(t.textContent)) setStatus(''); }catch(e){} };
 // trovo il modello Live con voce nativa disponibile per la tua chiave (una sola richiesta di elenco, poi lo ricordo)
 async function liveModelName(){
   const saved = store.get('liveModel'); if(saved) return saved;
   const key = store.get('gemKey'); if(!key) throw new Error('chiave');
-  const t0 = performance.now();
+  const t0 = performance.now(), ctl = new AbortController(), to = setTimeout(() => ctl.abort(), 20000);
   let r;
-  try{ r = await fetch('https://' + LIVE_HOST + '/v1beta/models?pageSize=1000&key=' + encodeURIComponent(key)); }
-  catch(e){ fishNote(0, Math.round(performance.now() - t0), 'rete', 'live'); throw new Error('rete'); }
+  liveSay('cerco il modello (passo 1 di 3)...');
+  try{ r = await fetch('https://' + LIVE_HOST + '/v1beta/models?pageSize=1000&key=' + encodeURIComponent(key), { signal: ctl.signal }); clearTimeout(to); }
+  catch(e){ clearTimeout(to); const ab = ctl.signal.aborted; fishNote(0, Math.round(performance.now() - t0), ab ? 'scaduto:modelli' : 'rete', 'live'); throw new Error(ab ? 'scaduto:modelli' : 'rete'); }
   if(!r.ok){ fishNote(0, Math.round(performance.now() - t0), String(r.status), 'live'); throw new Error(r.status === 400 || r.status === 401 || r.status === 403 ? 'chiave' : r.status === 429 ? 'limite' : 'http ' + r.status); }
   const j = await r.json();
   const c = (j.models || []).filter(m => (m.supportedGenerationMethods || []).includes('bidiGenerateContent') && /native-audio/i.test(m.name)).map(m => m.name).sort().reverse();
@@ -1725,14 +1731,16 @@ async function liveTTS(text){
   const model = await liveModelName();
   const t0 = performance.now();
   return new Promise((resolve, reject) => {
-    const chunks = [], said = []; let rate = 24000, finished = false, ws;
+    const chunks = [], said = []; let rate = 24000, finished = false, ws, tOpen = 0, tAudio = 0;
     const end = (err, blob) => {
-      if(finished) return; finished = true; clearTimeout(timer);
+      if(finished) return; finished = true; clearTimeout(timer); clearTimeout(tOpen); clearTimeout(tAudio);
       try{ ws && ws.close(); }catch(e){}
       fishNote(text.length, Math.round(performance.now() - t0), err ? err.message.slice(0, 40) : '', 'live');
       err ? reject(err) : resolve(blob);
     };
     const timer = setTimeout(() => end(new Error('scaduto')), 240000);
+    liveSay('apro la sessione (passo 2 di 3)...');
+    tOpen = setTimeout(() => end(new Error('scaduto:apertura')), 20000);
     try{ ws = new WebSocket('wss://' + LIVE_HOST + '/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=' + encodeURIComponent(key)); }
     catch(e){ end(new Error('rete')); return; }
     ws.onopen = () => ws.send(JSON.stringify({ setup: {
@@ -1743,14 +1751,14 @@ async function liveTTS(text){
     } }));
     ws.onmessage = async ev => {
       let m; try{ m = JSON.parse(typeof ev.data === 'string' ? ev.data : await ev.data.text()); }catch(e){ return; }
-      if(m.setupComplete){ ws.send(JSON.stringify({ clientContent: { turns: [{ role: 'user', parts: [{ text }] }], turnComplete: true } })); return; }
+      if(m.setupComplete){ clearTimeout(tOpen); liveSay('invio il testo e aspetto l\'audio (passo 3 di 3)...'); tAudio = setTimeout(() => end(new Error('scaduto:audio')), 90000); ws.send(JSON.stringify({ clientContent: { turns: [{ role: 'user', parts: [{ text }] }], turnComplete: true } })); return; }
       const sc = m.serverContent; if(!sc) return;
       (sc.modelTurn && sc.modelTurn.parts || []).forEach(p => {
         if(p.inlineData && p.inlineData.data){
           const mm = /rate=(\d+)/.exec(p.inlineData.mimeType || ''); if(mm) rate = +mm[1];
           const bin = atob(p.inlineData.data), u = new Uint8Array(bin.length);
           for(let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
-          chunks.push(u);
+          chunks.push(u); if(chunks.length === 1){ clearTimeout(tAudio); liveSay('sto ricevendo l\'audio...'); }
         }
       });
       if(sc.outputTranscription && sc.outputTranscription.text) said.push(sc.outputTranscription.text);
@@ -1758,7 +1766,7 @@ async function liveTTS(text){
         if(!chunks.length) return end(new Error('vuoto'));
         const sent = wordsOf(text), got = wordsOf(said.join(''));
         if(said.length && (got < sent * 0.93 || got > sent * 1.12)) return end(new Error('diverso:' + got + '/' + sent));
-        end(null, pcmChunksToWav(chunks, rate));
+        liveSayDone(); end(null, pcmChunksToWav(chunks, rate));
       }
     };
     ws.onerror = () => {};
