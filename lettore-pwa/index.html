@@ -723,7 +723,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 
 <!-- LIBRERIA -->
 <header class="appBar">
-  <div class="brand"><span class="brandMark"><img src="icon-192.png" alt="" width="32" height="32"></span><span>SiMa</span><span class="brandVer" id="brandVer">(96)</span></div>
+  <div class="brand"><span class="brandMark"><img src="icon-192.png" alt="" width="32" height="32"></span><span>SiMa</span><span class="brandVer" id="brandVer">(97)</span></div>
 </header>
 <main id="libView">
   <div class="actRow hidden">
@@ -856,7 +856,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 96;
+const APP_VERSION = 97;
 { const bv = document.getElementById('brandVer'); if(bv) bv.textContent = '(' + APP_VERSION + ')'; }
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
@@ -1697,7 +1697,8 @@ function fishErrorText(msg, vid){
 }
 /* ---------- Gemini Live: voce nativa di Google, richieste senza tetto al giorno ---------- */
 const LIVE_HOST = 'generativelanguage.googleapis.com';
-const liveSay = m => { try{ if(audio && !audio.paused && !audio.ended) return; setStatus('Gemini Live: ' + m, false, true); }catch(e){} };
+let liveCalls = 0, liveLastStep = '', liveDiagT = 0;
+const liveSay = m => { liveLastStep = m; try{ if(audio && !audio.paused && !audio.ended) return; setStatus('Gemini Live: ' + m, false, true); }catch(e){} };
 const liveSayDone = () => { try{ const t = $('toast'); if(t && /^Gemini Live: /.test(t.textContent)) setStatus(''); }catch(e){} };
 // trovo il modello Live con voce nativa disponibile per la tua chiave (una sola richiesta di elenco, poi lo ricordo)
 async function liveModelName(){
@@ -1727,6 +1728,7 @@ function pcmChunksToWav(chunks, rate){
 }
 // una sessione per ogni pezzo, mai ripetuta da sola; se il testo detto non corrisponde, il pezzo non viene usato
 async function liveTTS(text){
+  liveCalls++; liveLastStep = 'avviata';
   const key = store.get('gemKey'); if(!key) throw new Error('chiave');
   const model = await liveModelName();
   const t0 = performance.now();
@@ -2022,7 +2024,9 @@ async function piperSpeakCurrent(fromAdvance){
   try{
     if(isGem() && gemHold){ const e0 = entries.get(key); if(e0 && e0.st === 'queued'){ stop(); showGemProblem('bloccato', state.curChunk || chunkAt(state.sec, state.idx), 'bloccato'); return; } }
     if(isFish() && fishHold){ const e0 = entries.get(key); if(e0 && e0.st !== 'ready' && e0.st !== 'stored'){ stop(); setStatus(fishErrorText(fishLastErr), true); return; } } // fermo dopo un errore: questa parte non arriverà, non resto in attesa
+    if(isLive()){ clearTimeout(liveDiagT); liveDiagT = setTimeout(() => { if(g === state.gen && state.playing && !isReady(key)){ const e = entries.get(key); setStatus('Gemini Live non ha ancora risposto dopo 10 secondi. Diagnosi: parte ' + (e ? e.st : 'assente') + ', occupato ' + (busy ? 'sì' : 'no') + ', richieste in corso ' + inflight.size + ', sessioni avviate ' + liveCalls + ', ultimo passo: ' + (liveLastStep || 'nessuno') + '.', true, true); } }, 10000); }
     const url = await waitFor(key);
+    clearTimeout(liveDiagT);
     // dopo un'interruzione riparto solo con qualche frase già pronta, così non si ferma a ogni frase
     if(stalled && fromAdvance && list.length > 1){
       if(!isChunked()) try{ await waitFor(list[Math.min(3, list.length - 1)].key); }catch(e){}
