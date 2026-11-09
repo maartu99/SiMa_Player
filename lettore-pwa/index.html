@@ -723,7 +723,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 
 <!-- LIBRERIA -->
 <header class="appBar">
-  <div class="brand"><span class="brandMark"><img src="icon-192.png" alt="" width="32" height="32"></span><span>SiMa</span><span class="brandVer" id="brandVer">(98)</span></div>
+  <div class="brand"><span class="brandMark"><img src="icon-192.png" alt="" width="32" height="32"></span><span>SiMa</span><span class="brandVer" id="brandVer">(99)</span></div>
 </header>
 <main id="libView">
   <div class="actRow hidden">
@@ -856,7 +856,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 98;
+const APP_VERSION = 99;
 { const bv = document.getElementById('brandVer'); if(bv) bv.textContent = '(' + APP_VERSION + ')'; }
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
@@ -1641,7 +1641,7 @@ function gemTypicalText(){
 }
 /* ---------- Fish Audio: voce gratuita, senza carta ---------- */
 const FISH_URL = 'https://api.fish.audio/v1/tts';
-const FISH_CHUNK = 3500; // circa 3 minuti e mezzo di ascolto per richiesta
+const FISH_CHUNK = 1300; // circa 80 secondi di ascolto per sessione: Google chiude le sessioni lunghe ("client inactivity"), 1400 caratteri sono stati provati
 let fishHold = false, fishLastErr = '', fishLastStart = 0;
 function fishNote(c, ms, err, kind){
   kind = kind || 'fish';
@@ -4233,7 +4233,7 @@ function openSettings(focus, keepScroll){
         cl.appendChild(famRow('Modello in uso', lm ? lm.replace('models/', '') : 'Lo scelgo alla prima lettura (1 richiesta di elenco).', null));
         const use = store.get('liveUse') || {}, thisMonth = localDay().slice(0, 7) === use.m;
         cl.appendChild(famRow('Questo mese', thisMonth ? `${use.req} ${use.req === 1 ? 'sessione' : 'sessioni'}, ${use.chars.toLocaleString('it-IT')} caratteri inviati. Il conteggio vero è in AI Studio.` : 'Nessuna sessione ancora.', null));
-        cl.appendChild(famRow('Come lavora', 'Una sessione alla volta (circa 3 minuti e mezzo di libro), prepara solo la parte successiva e non ripete mai da sola. Se il testo detto non corrisponde a quello del libro, scarta la parte e si ferma: aspetta che tocchi play.', null));
+        cl.appendChild(famRow('Come lavora', 'Una sessione alla volta (circa un minuto e mezzo di libro), prepara solo la parte successiva e non ripete mai da sola. Se il testo detto non corrisponde a quello del libro, scarta la parte e si ferma: aspetta che tocchi play.', null));
         const lg = (store.get('liveLog') || []).slice(-5).reverse();
         if(lg.length) cl.appendChild(el('div', 'innerLabel', 'Ultime sessioni'));
         lg.forEach(r => cl.appendChild(famRow(new Date(r.t).toLocaleString('it-IT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }), r.err ? `${r.c} caratteri inviati, non riuscita (${r.err}).` : `${r.c} caratteri inviati, risposta in ${Math.round((r.ms || 0) / 1000)} s.`, null)));
