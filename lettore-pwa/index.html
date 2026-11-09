@@ -723,7 +723,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 
 <!-- LIBRERIA -->
 <header class="appBar">
-  <div class="brand"><span class="brandMark"><img src="icon-192.png" alt="" width="32" height="32"></span><span>SiMa</span><span class="brandVer" id="brandVer">(99)</span></div>
+  <div class="brand"><span class="brandMark"><img src="icon-192.png" alt="" width="32" height="32"></span><span>SiMa</span><span class="brandVer" id="brandVer">(100)</span></div>
 </header>
 <main id="libView">
   <div class="actRow hidden">
@@ -856,7 +856,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 99;
+const APP_VERSION = 100;
 { const bv = document.getElementById('brandVer'); if(bv) bv.textContent = '(' + APP_VERSION + ')'; }
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
@@ -1733,9 +1733,9 @@ async function liveTTS(text){
   const model = await liveModelName();
   const t0 = performance.now();
   return new Promise((resolve, reject) => {
-    const chunks = [], said = []; let rate = 24000, finished = false, ws, tOpen = 0, tAudio = 0, recv = 0;
+    const chunks = [], said = []; let rate = 24000, finished = false, ws, tOpen = 0, tAudio = 0, tGen = 0, recv = 0, genDone = false;
     const end = (err, blob) => {
-      if(finished) return; finished = true; clearTimeout(timer); clearTimeout(tOpen); clearTimeout(tAudio);
+      if(finished) return; finished = true; clearTimeout(timer); clearTimeout(tOpen); clearTimeout(tAudio); clearTimeout(tGen);
       try{ ws && ws.close(); }catch(e){}
       fishNote(text.length, Math.round(performance.now() - t0), err ? err.message.slice(0, 40) : '', 'live');
       err ? reject(err) : resolve(blob);
@@ -1743,6 +1743,13 @@ async function liveTTS(text){
     const timer = setTimeout(() => end(new Error('scaduto')), 240000);
     liveSay('apro la sessione (passo 2 di 3)...');
     tOpen = setTimeout(() => end(new Error('scaduto:apertura')), 20000);
+    const finishUp = () => {
+      if(finished) return;
+      if(!chunks.length) return end(new Error('vuoto'));
+      const sent = wordsOf(text), got = wordsOf(said.join(''));
+      if(said.length && (got < sent * 0.93 || got > sent * 1.12)) return end(new Error('diverso:' + got + '/' + sent));
+      liveSayDone(); end(null, pcmChunksToWav(chunks, rate));
+    };
     try{ ws = new WebSocket('wss://' + LIVE_HOST + '/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=' + encodeURIComponent(key)); }
     catch(e){ end(new Error('rete')); return; }
     ws.onopen = () => ws.send(JSON.stringify({ setup: {
@@ -1764,15 +1771,11 @@ async function liveTTS(text){
         }
       });
       if(sc.outputTranscription && sc.outputTranscription.text) said.push(sc.outputTranscription.text);
-      if(sc.turnComplete){
-        if(!chunks.length) return end(new Error('vuoto'));
-        const sent = wordsOf(text), got = wordsOf(said.join(''));
-        if(said.length && (got < sent * 0.93 || got > sent * 1.12)) return end(new Error('diverso:' + got + '/' + sent));
-        liveSayDone(); end(null, pcmChunksToWav(chunks, rate));
-      }
+      if(sc.generationComplete && !genDone){ genDone = true; tGen = setTimeout(finishUp, 3000); }
+      if(sc.turnComplete) finishUp();
     };
     ws.onerror = () => {};
-    ws.onclose = ev => end(new Error((ev.code === 1008 || ev.code === 1007) && /api key|api_key|key not valid|permission|unauthenticated/i.test(ev.reason || '') ? 'chiave' : ev.code === 1011 || /quota|exhaust|rate/i.test(ev.reason || '') ? 'limite' : 'chiuso ' + ev.code + (ev.reason ? ': ' + String(ev.reason).slice(0, 80) : '')));
+    ws.onclose = ev => { if(genDone && !finished) return finishUp(); end(new Error((ev.code === 1008 || ev.code === 1007) && /api key|api_key|key not valid|permission|unauthenticated/i.test(ev.reason || '') ? 'chiave' : ev.code === 1011 || /quota|exhaust|rate/i.test(ev.reason || '') ? 'limite' : 'chiuso ' + ev.code + (ev.reason ? ': ' + String(ev.reason).slice(0, 80) : ''))); };
   });
 }
 function gemErrorText(msg){
