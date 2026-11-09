@@ -723,7 +723,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 
 <!-- LIBRERIA -->
 <header class="appBar">
-  <div class="brand"><span class="brandMark"><img src="icon-192.png" alt="" width="32" height="32"></span><span>SiMa</span><span class="brandVer" id="brandVer">(97)</span></div>
+  <div class="brand"><span class="brandMark"><img src="icon-192.png" alt="" width="32" height="32"></span><span>SiMa</span><span class="brandVer" id="brandVer">(98)</span></div>
 </header>
 <main id="libView">
   <div class="actRow hidden">
@@ -856,7 +856,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 97;
+const APP_VERSION = 98;
 { const bv = document.getElementById('brandVer'); if(bv) bv.textContent = '(' + APP_VERSION + ')'; }
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
@@ -1692,7 +1692,7 @@ function fishErrorText(msg, vid){
   if(/scaduto:audio/.test(msg)) return N + ' ha aperto la sessione ma non manda audio da 90 secondi. Non ho riprovato. Tocca play per riprovare (1 richiesta).';
   if(/scaduto/.test(msg)) return N + ' non ha risposto in ' + (live ? '4 minuti' : '2 minuti') + ' e mi sono fermato. Tocca play per riprovare (1 richiesta).';
   if(/vuoto/.test(msg)) return N + ' ha risposto senza audio. Non ho riprovato. Tocca play per riprovare (1 richiesta).';
-  if(/chiuso/.test(msg)) return N + ' ha chiuso la sessione a metà (' + msg + '). Non uso l\'audio incompleto. Non ho riprovato. Tocca play per riprovare (1 richiesta).';
+  if(/chiuso/.test(msg)) return N + ' ha chiuso la sessione (' + msg.replace(/^chiuso\s*/, 'codice ') + '). Se è un rifiuto per il contenuto, quel testo non si può leggere con Google. Non uso l\'audio incompleto. Non ho riprovato. Tocca play per riprovare (1 richiesta).';
   return N + ' ha risposto con un errore (' + msg + '). Non ho riprovato. Tocca play per riprovare (1 richiesta).';
 }
 /* ---------- Gemini Live: voce nativa di Google, richieste senza tetto al giorno ---------- */
@@ -1733,7 +1733,7 @@ async function liveTTS(text){
   const model = await liveModelName();
   const t0 = performance.now();
   return new Promise((resolve, reject) => {
-    const chunks = [], said = []; let rate = 24000, finished = false, ws, tOpen = 0, tAudio = 0;
+    const chunks = [], said = []; let rate = 24000, finished = false, ws, tOpen = 0, tAudio = 0, recv = 0;
     const end = (err, blob) => {
       if(finished) return; finished = true; clearTimeout(timer); clearTimeout(tOpen); clearTimeout(tAudio);
       try{ ws && ws.close(); }catch(e){}
@@ -1760,7 +1760,7 @@ async function liveTTS(text){
           const mm = /rate=(\d+)/.exec(p.inlineData.mimeType || ''); if(mm) rate = +mm[1];
           const bin = atob(p.inlineData.data), u = new Uint8Array(bin.length);
           for(let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
-          chunks.push(u); if(chunks.length === 1){ clearTimeout(tAudio); liveSay('sto ricevendo l\'audio...'); }
+          chunks.push(u); recv += u.length; if(chunks.length === 1) clearTimeout(tAudio); if(chunks.length % 20 === 1) liveSay('sto ricevendo l\'audio: ' + Math.round(recv / (rate * 2)) + ' secondi finora...');
         }
       });
       if(sc.outputTranscription && sc.outputTranscription.text) said.push(sc.outputTranscription.text);
@@ -1772,7 +1772,7 @@ async function liveTTS(text){
       }
     };
     ws.onerror = () => {};
-    ws.onclose = ev => end(new Error(ev.code === 1008 || ev.code === 1007 ? 'chiave' : ev.code === 1011 || /quota|exhaust|rate/i.test(ev.reason || '') ? 'limite' : 'chiuso ' + ev.code + (ev.reason ? ': ' + String(ev.reason).slice(0, 80) : '')));
+    ws.onclose = ev => end(new Error((ev.code === 1008 || ev.code === 1007) && /api key|api_key|key not valid|permission|unauthenticated/i.test(ev.reason || '') ? 'chiave' : ev.code === 1011 || /quota|exhaust|rate/i.test(ev.reason || '') ? 'limite' : 'chiuso ' + ev.code + (ev.reason ? ': ' + String(ev.reason).slice(0, 80) : '')));
   });
 }
 function gemErrorText(msg){
@@ -2023,10 +2023,8 @@ async function piperSpeakCurrent(fromAdvance){
   }
   try{
     if(isGem() && gemHold){ const e0 = entries.get(key); if(e0 && e0.st === 'queued'){ stop(); showGemProblem('bloccato', state.curChunk || chunkAt(state.sec, state.idx), 'bloccato'); return; } }
-    if(isFish() && fishHold){ const e0 = entries.get(key); if(e0 && e0.st !== 'ready' && e0.st !== 'stored'){ stop(); setStatus(fishErrorText(fishLastErr), true); return; } } // fermo dopo un errore: questa parte non arriverà, non resto in attesa
-    if(isLive()){ clearTimeout(liveDiagT); liveDiagT = setTimeout(() => { if(g === state.gen && state.playing && !isReady(key)){ const e = entries.get(key); setStatus('Gemini Live non ha ancora risposto dopo 10 secondi. Diagnosi: parte ' + (e ? e.st : 'assente') + ', occupato ' + (busy ? 'sì' : 'no') + ', richieste in corso ' + inflight.size + ', sessioni avviate ' + liveCalls + ', ultimo passo: ' + (liveLastStep || 'nessuno') + '.', true, true); } }, 10000); }
+    if(isFish() && fishHold){ const e0 = entries.get(key); if(e0 && e0.st !== 'ready' && e0.st !== 'stored'){ stop(); setStatus(fishErrorText(fishLastErr), true, true); return; } } // fermo dopo un errore: questa parte non arriverà, non resto in attesa
     const url = await waitFor(key);
-    clearTimeout(liveDiagT);
     // dopo un'interruzione riparto solo con qualche frase già pronta, così non si ferma a ogni frase
     if(stalled && fromAdvance && list.length > 1){
       if(!isChunked()) try{ await waitFor(list[Math.min(3, list.length - 1)].key); }catch(e){}
@@ -2052,7 +2050,7 @@ async function piperSpeakCurrent(fromAdvance){
     }
     if(err.name === 'NotAllowedError'){ stop(); setStatus('Tocca play per continuare.'); return; }
     stop();
-    if(isFish()){ setStatus(fishErrorText(err.message || ''), true); return; }
+    if(isFish()){ setStatus(fishErrorText(err.message || ''), true, true); return; }
     if(isGem() && (/tagliato/.test(err.message || '') || (/richiesta/.test(err.message || '') && gemTarget() > 1500))){
       if(/richiesta/.test(err.message || '')) shrinkGemChunks();
       setStatus('Il blocco era troppo lungo per Google: riprovo con blocchi più corti...', false, true);
