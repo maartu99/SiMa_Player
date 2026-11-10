@@ -723,7 +723,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 
 <!-- LIBRERIA -->
 <header class="appBar">
-  <div class="brand"><span class="brandMark"><img src="icon-192.png" alt="" width="32" height="32"></span><span>SiMa</span><span class="brandVer" id="brandVer">(101)</span></div>
+  <div class="brand"><span class="brandMark"><img src="icon-192.png" alt="" width="32" height="32"></span><span>SiMa</span><span class="brandVer" id="brandVer">(102)</span></div>
 </header>
 <main id="libView">
   <div class="actRow hidden">
@@ -856,7 +856,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 101;
+const APP_VERSION = 102;
 { const bv = document.getElementById('brandVer'); if(bv) bv.textContent = '(' + APP_VERSION + ')'; }
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
@@ -1165,6 +1165,8 @@ function onWorkerMessage(e){
         else { en.st = 'ready'; en.url = URL.createObjectURL(m.blob); en.res.forEach(r => r.resolve(en.url)); en.res = []; }
       } else {
         en.st = 'error'; en.err = m.message;
+        if(m.message === 'skip' && isGemId((key || '').split('|')[0])) en.st = 'queued'; // non spedita: resta in coda
+        if(isGemId((key || '').split('|')[0]) && m.message !== 'skip'){ gemFail = m.message || 'errore'; store.set('gemFail', gemFail); }
         if(isFishId((key || '').split('|')[0])){ fishHold = true; fishLastErr = m.message || ''; } // un errore ferma ogni altra richiesta a Fish Audio finché non tocchi play
         if(/^bloccato/.test(m.message || '')){
           const mm = /^gem-[^|]+\|([^|]+)\|(\d+)\|c(\d+)-(\d+)$/.exec(key || '');
@@ -1223,7 +1225,8 @@ async function pump(){
     else { en.st = 'ready'; en.url = URL.createObjectURL(c.blob); en.res.forEach(r => r.resolve(en.url)); en.res = []; }
     busy = false; updateBuf(); return pump();
   }
-  if(gemHold && isGemId(next.key.split('|')[0])){ en.st = 'queued'; busy = false; return; } // fermo: nessuna richiesta a Google finché non tocchi play
+  if(isGemId(next.key.split('|')[0]) && !state.playing && !next.key.includes('|anteprima|')){ en.st = 'queued'; busy = false; return; } // in pausa non chiedo nulla a Google: le richieste partono solo quando tocchi play
+  if((gemHold || gemFail) && isGemId(next.key.split('|')[0])){ en.st = 'queued'; busy = false; return; } // fermo: nessuna richiesta a Google finché non tocchi play
   if(fishHold && isFishId(next.key.split('|')[0])){ en.st = 'queued'; busy = false; return; } // fermo: nessuna richiesta a Fish Audio finché non tocchi play
   const id = ++reqId; inflight.set(id, { key: next.key, t: performance.now() });
   const vid = next.key.split('|')[0];
@@ -1233,7 +1236,7 @@ async function pump(){
     let gap = Math.max(0, gemLastStart + 21000 - Date.now());
     if(sent.length && sent.reduce((a, x) => a + x.c, 0) + en.text.length > 24000) gap = Math.max(gap, sent[0].t + 61000 - Date.now());
     const t0 = performance.now() + gap, redo = isDoneKey(next.key);
-    (gap ? (gemWait = { phase: 'gap', until: Date.now() + gap }, new Promise(r => setTimeout(r, gap))) : Promise.resolve()).then(() => { gemLastStart = Date.now(); gemSent = gemSent.filter(x => Date.now() - x.t < 60000).concat({ t: Date.now(), c: en.text.length }); return geminiTTS(en.text, vid); })
+    (gap ? (gemWait = { phase: 'gap', until: Date.now() + gap }, new Promise(r => setTimeout(r, gap))) : Promise.resolve()).then(() => { if(gemFail || gemHold || entries.get(next.key) !== en){ const e = new Error('skip'); e.skip = true; throw e; } gemLastStart = Date.now(); gemSent = gemSent.filter(x => Date.now() - x.t < 60000).concat({ t: Date.now(), c: en.text.length }); return geminiTTS(en.text, vid); })
       .then(async blob => {
         const chunky = /\|c\d+-\d+$/.test(next.key);
         const secs = await wavSeconds(blob);
@@ -1245,7 +1248,7 @@ async function pump(){
         return blob;
       })
       .then(blob => onWorkerMessage({ data: { type: 'result', id, blob } }))
-      .catch(err => { gemWait = null; onWorkerMessage({ data: { type: 'error', id, message: String(err && err.message || err) } }); });
+      .catch(err => { gemWait = null; if(!(err && err.skip)){ gemFail = String(err && err.message || err) || 'errore'; store.set('gemFail', gemFail); } onWorkerMessage({ data: { type: 'error', id, message: String(err && err.message || err) } }); });
     return;
   }
   if(isFishId(vid)){
@@ -1430,6 +1433,7 @@ async function gemCall(model, api, text, voice, style, key){
     ? { contents: [{ parts: [{ text }] }], generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } } } }
     : { model, input: [{ type: 'user_input', content: [{ type: 'text', text, annotations: [{ type: 'speech_metadata', style }] }] }], response_format: { type: 'audio' }, generation_config: { speech_config: [{ voice }] } };
   // nessun tempo massimo: una richiesta interrotta Google la conta lo stesso, quindi aspetto sempre la risposta
+  gemNoteSent(model);
   const ac = new AbortController(); gemAbort = ac;
   // oltre 6 minuti senza risposta il modello è fermo: smetto di aspettarlo (Google l'ha già contata) e passo al successivo
   let slow = false, tm = null; const t0 = Date.now();
@@ -1477,6 +1481,8 @@ function gemStats(){
 let gemLastModel = '', gemLastStart = 0;
 // cosa sta aspettando l'app in questo momento, per dirlo a chi ascolta: richiesta in corso, attesa chiesta da Google, distanza tra richieste
 let gemWait = null, gemSusp = 0, gemSent = [], gemAbort = null;
+function gemSentToday(model){ const st = gemStats(); return (st.sent && st.sent[model]) || 0; }
+function gemNoteSent(model){ const st = gemStats(); st.sent = st.sent || {}; st.sent[model] = (st.sent[model] || 0) + 1; store.set('gemStats', st); }
 function gemStatReq(model){ gemLastModel = model; const st = gemStats(); st.req[model] = (st.req[model] || 0) + 1; store.set('gemStats', st); }
 function gemLogFail(model, status, chars, ms, msg){
   const lg = store.get('gemLog') || []; lg.push({ t: Date.now(), m: model, c: chars || 0, s: 0, cut: false, ms: Math.round(ms || 0), err: String(status), x: String(msg || '').replace(/\s+/g, ' ').slice(0, 300) }); store.set('gemLog', lg.slice(-40));
@@ -1513,18 +1519,8 @@ async function geminiTTS(text, voiceId, keyOverride, retry = 0, noRetry = false)
     const best = GEM_MODELS.find(m => !(b[m] > now) || b[m] - now < 90000);
     if(best && b[best] > now){ gemWait = { phase: 'wait', until: b[best] + 500 }; await new Promise(r => setTimeout(r, b[best] - now + 500)); }
   }
-  try{ return await geminiTTSOnce(text, voiceId, keyOverride, noRetry); }
-  catch(e){
-    // un solo nuovo tentativo sullo stesso modello dopo un rifiuto al minuto
-    if(e.temp && !noRetry) return geminiTTS(text, voiceId, keyOverride, retry, true);
-    if(keyOverride || !/limite/.test(e.message || '') || retry >= 8) throw e;
-    const b = store.get('gemBlocked') || {}, now = Date.now();
-    const soon = Math.min(...GEM_MODELS.map(m => b[m] || 0).filter(t => t > now));
-    if(!isFinite(soon) || soon - now > 400000) throw e;
-    gemWait = { phase: 'wait', until: soon + 500 };
-    await new Promise(r => setTimeout(r, soon - now + 500));
-    return geminiTTS(text, voiceId, keyOverride, retry + 1, true);
-  }
+  // una sola richiesta per tentativo: se Google rifiuta non ne mando una seconda da solo (l'avviso resta finché non tocchi play)
+  return await geminiTTSOnce(text, voiceId, keyOverride, true);
 }
 async function geminiTTSOnce(text, voiceId, keyOverride, noRetry){
   const key = keyOverride || store.get('gemKey');
@@ -1543,6 +1539,7 @@ async function geminiTTSOnce(text, voiceId, keyOverride, noRetry){
   // la verifica della chiave non deve spendere una richiesta dei modelli migliori: prova prima Flash Lite (veloce), poi gli altri
   for(const model of (keyOverride ? [GEM_MODELS[2], GEM_MODELS[1], GEM_MODELS[0], GEM_MODELS[3]] : gemModelOrder())){
     if(blocked.includes(model)) continue;
+    if(gemSentToday(model) >= GEM_RPD){ lastErr = lastErr || new Error('limite'); continue; } // tetto: Google conta ogni richiesta, anche rifiutata
     tried++;
     const order = apis[model] === 'generate' ? ['generate', 'interactions'] : ['interactions', 'generate'];
     let r = null, t = '', usedApi = null;
@@ -1563,14 +1560,14 @@ async function geminiTTSOnce(text, voiceId, keyOverride, noRetry){
       noteGemErr(model, r.status + ' ' + api, t);
       gemLogFail(model, r.status, text.length, performance.now() - tq, t);
       // con l'altro metodo ha senso riprovare solo se questo non è supportato per il modello
-      if(!(r.status === 404 || (r.status === 400 && isUnsupported(t)))) break;
-      // me lo ricordo subito: senza questo, finché l'altro metodo non riesce, ogni pezzo spenderebbe una richiesta inutile su questo
-      { const other = order[order.indexOf(api) + 1]; if(other && apis[model] !== other){ apis[model] = other; store.set('gemApi', apis); } }
+      // il metodo non è supportato: me lo ricordo per la prossima volta, ma non ripeto da solo la richiesta
+      if(r.status === 404 || (r.status === 400 && isUnsupported(t))){ const other = order[order.indexOf(api) + 1]; if(other && apis[model] !== other){ apis[model] = other; store.set('gemApi', apis); } }
+      break;
     }
-    if(!r) continue;
+    if(!r) break;
     if(r.ok){
       const blob = audioFrom(await r.json().catch(() => null));
-      if(!blob){ noteGemErr(model, '200 ' + usedApi, 'nessun audio nella risposta'); lastErr = new Error('nessun audio nella risposta'); continue; }
+      if(!blob){ noteGemErr(model, '200 ' + usedApi, 'nessun audio nella risposta'); lastErr = new Error('nessun audio nella risposta'); break; }
       if(apis[model] !== usedApi){ apis[model] = usedApi; store.set('gemApi', apis); }
       clearGemErr(model); gemStatReq(model);
       { const bb = store.get('gemBlocked') || {}; if(bb[model]){ delete bb[model]; store.set('gemBlocked', bb); } }
@@ -1578,7 +1575,7 @@ async function geminiTTSOnce(text, voiceId, keyOverride, noRetry){
     }
     if(r.status === 429 && /limit:\s*0\b/i.test(t)){
       // modello non incluso nel piano gratuito di questo account: lo riprovo domani
-      blockModel(model, gemResetDate().getTime()); lastErr = lastErr || new Error('limite'); continue;
+      blockModel(model, gemResetDate().getTime()); lastErr = lastErr || new Error('limite'); break;
     }
     if(r.status === 429){
       // limite al minuto: fermo un minuto; altrimenti fino all'azzeramento giornaliero
@@ -1599,18 +1596,19 @@ async function geminiTTSOnce(text, voiceId, keyOverride, noRetry){
       blockModel(model, perDay && !perMin ? Date.now() + (dayMs ? Math.min(dayMs + 30000, dayCap) : gemResetDate().getTime() - Date.now()) : temp ? Date.now() + (noRetry ? 5 * 60000 : wait) : Date.now() + 30 * 60000);
       lastErr = new Error('limite');
       // primo rifiuto al minuto: invece di passare a un modello più lento, aspetto e lo riprovo una sola volta
-      if(temp && !keyOverride && !noRetry){ lastErr.temp = true; break; }
-      continue;
+      if(temp && !keyOverride && !noRetry) lastErr.temp = true;
+      break;
     }
     if(r.status === 401 || /API[_ ]?key not valid|API_KEY_INVALID|invalid api key/i.test(t)) throw new Error('chiave');
     if(r.status === 400 && /content_blocked|blocked for an unspecified policy/i.test(t)) throw new Error('bloccato');
     if(r.status === 400 && isTooLong(t) && !isUnsupported(t)) throw new Error('richiesta: ' + t.slice(0, 160));
     if(r.status === 404 || r.status === 403 || (r.status === 400 && isUnsupported(t))){
       // modello non disponibile per questo account con nessuno dei due metodi: lo riprovo domani
-      blockModel(model, gemResetDate().getTime()); lastErr = lastErr || new Error('servizio ' + r.status); continue;
+      blockModel(model, gemResetDate().getTime()); lastErr = lastErr || new Error('servizio ' + r.status); break;
     }
     // altro errore su questo modello: provo il successivo, senza fermarlo
     lastErr = new Error(r.status === 400 ? 'richiesta: ' + t.slice(0, 160) : 'servizio ' + r.status);
+    break;
   }
   if(!tried) throw new Error('limite');
   throw lastErr || new Error('servizio');
@@ -1817,6 +1815,7 @@ function growGemChunks(okLen){
 // dopo un allungamento, le parti in coda non ancora iniziate vengono ripianificate con la nuova lunghezza
 let gemReplan = false, gemWeakPrev = 0;
 const GEM_HOLD_MSG = 'Google non vuole leggere questo passaggio del libro. Mi fermo qui e non salto niente. Tocca play: ti chiedo se vuoi saltarlo. Oppure riprovalo da Opzioni > Passaggi non letti (1 richiesta).';
+let gemFail = store.get('gemFail') || ''; // dopo un errore di Google non parte nessuna richiesta finché non tocchi play (resta anche se chiudi l'app)
 let gemBlkRun = 0, gemHold = false; // rifiuti 'content_blocked' di fila: dopo 2 mi fermo e non mando altro finché non tocchi play
 // i blocchi già generati restano validi anche se cambia la lunghezza: ne ricordo i confini
 // passaggi che Google non ha voluto leggere (blocco "content_blocked"): messi da parte, mai persi. Salvati con il libro, senza scadenza
@@ -2026,6 +2025,7 @@ async function piperSpeakCurrent(fromAdvance){
   }
   try{
     if(isGem() && gemHold){ const e0 = entries.get(key); if(e0 && e0.st === 'queued'){ stop(); showGemProblem('bloccato', state.curChunk || chunkAt(state.sec, state.idx), 'bloccato'); return; } }
+    if(isGem() && gemFail){ const e0 = entries.get(key); if(e0 && e0.st === 'queued'){ e0.st = 'error'; e0.err = gemFail; } } // un errore di Google è già successo: questa parte non è stata chiesta, mostro lo stesso errore senza altre richieste
     if(isFish() && fishHold){ const e0 = entries.get(key); if(e0 && e0.st !== 'ready' && e0.st !== 'stored'){ stop(); setStatus(fishErrorText(fishLastErr), true, true); return; } } // fermo dopo un errore: questa parte non arriverà, non resto in attesa
     const url = await waitFor(key);
     // dopo un'interruzione riparto solo con qualche frase già pronta, così non si ferma a ogni frase
@@ -2059,9 +2059,10 @@ async function piperSpeakCurrent(fromAdvance){
       setStatus(fishErrorText(err.message || ''), true, true); return;
     }
     if(isGem() && (/tagliato/.test(err.message || '') || (/richiesta/.test(err.message || '') && gemTarget() > 1500))){
+      // la prossima volta uso blocchi più corti, ma non ripeto da solo la richiesta: la tocchi tu con play
       if(/richiesta/.test(err.message || '')) shrinkGemChunks();
-      setStatus('Il blocco era troppo lungo per Google: riprovo con blocchi più corti...', false, true);
-      state.playing = true; updatePlay(); return piperSpeakCurrent(fromAdvance);
+      setStatus('Il blocco era troppo lungo per Google. Tocca play per riprovare con blocchi più corti (1 richiesta).', true, true);
+      return;
     }
     if(isGem() && /limite/.test(err.message || '') && prefs.gemFallback && enterFallback()) return;
     if(isGem() && !/chiave/.test(err.message || '')) showGemProblem(gemProblemKind(err.message), state.curChunk, err.message || '');
@@ -2172,6 +2173,7 @@ function stop(){
 function play(){
   if(!state.total) return;
   if(previewBtn) stopPreview();
+  if(gemFail){ gemFail = ''; store.del('gemFail'); } // il tocco su play è la tua scelta di riprovare dopo un errore di Google
   fishHold = false; // il tocco su play è la tua scelta di riprovare dopo un errore di Fish Audio o Gemini Live
   state.playing = true; updatePlay(); requestWake();
   const ch = isChunked() ? chunkAt(state.sec, state.idx) : null;
