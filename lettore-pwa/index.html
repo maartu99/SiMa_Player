@@ -723,7 +723,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 
 <!-- LIBRERIA -->
 <header class="appBar">
-  <div class="brand"><span class="brandMark"><img src="icon-192.png" alt="" width="32" height="32"></span><span>SiMa</span><span class="brandVer" id="brandVer">(100)</span></div>
+  <div class="brand"><span class="brandMark"><img src="icon-192.png" alt="" width="32" height="32"></span><span>SiMa</span><span class="brandVer" id="brandVer">(101)</span></div>
 </header>
 <main id="libView">
   <div class="actRow hidden">
@@ -856,7 +856,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 100;
+const APP_VERSION = 101;
 { const bv = document.getElementById('brandVer'); if(bv) bv.textContent = '(' + APP_VERSION + ')'; }
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
@@ -2053,7 +2053,11 @@ async function piperSpeakCurrent(fromAdvance){
     }
     if(err.name === 'NotAllowedError'){ stop(); setStatus('Tocca play per continuare.'); return; }
     stop();
-    if(isFish()){ setStatus(fishErrorText(err.message || ''), true, true); return; }
+    if(isFish()){
+      // Gemini Live non ha dato audio: la lettura non si ferma, continua con la voce dell'iPhone e non ritenta da sola
+      if(!/chiave/.test(err.message || '') && enterFallback('live', fishErrorText(err.message || ''))) return;
+      setStatus(fishErrorText(err.message || ''), true, true); return;
+    }
     if(isGem() && (/tagliato/.test(err.message || '') || (/richiesta/.test(err.message || '') && gemTarget() > 1500))){
       if(/richiesta/.test(err.message || '')) shrinkGemChunks();
       setStatus('Il blocco era troppo lungo per Google: riprovo con blocchi più corti...', false, true);
@@ -2091,18 +2095,20 @@ function fallbackVoice(){
   const sys = bestSysVoice();
   return sys ? { kind: 'sys', voice: sys, name: sys.name } : null;
 }
-function enterFallback(){
+function enterFallback(kind, why){
   const fb = fallbackVoice(); if(!fb) return false;
+  state.fallbackLive = kind === 'live';
   const b = store.get('gemBlocked') || {};
   const times = GEM_MODELS.map(m => b[m]).filter(t => t && t > Date.now());
   state.fallbackFrom = state.piperVoice;
-  state.fallbackUntil = times.length ? Math.min(...times) : Date.now() + 60000; state.fallbackAt = Date.now();
+  state.fallbackUntil = kind === 'live' ? Infinity : (times.length ? Math.min(...times) : Date.now() + 60000); state.fallbackAt = Date.now();
   if(fb.kind === 'piper'){ state.engine = 'piper'; state.piperVoice = fb.id; }
   else { state.engine = 'sys'; state.sysVoice = fb.voice; }
   audio.removeAttribute('data-key');
   syncMediaHandlers();
   $('voiceLabel').textContent = voiceName();
-  setStatus(`Limite Google di oggi finito: continuo con ${fb.name}${fb.kind === 'sys' ? ' dell\'iPhone' : ''}. Torno alla voce Google da sola quando il limite si azzera.`, false);
+  if(kind === 'live') setStatus(`${String(why).replace(/ Non ho riprovato\..*$/, '')} Continuo con ${fb.name}. Non riprovo Gemini Live da sola: per riprovarlo scegli di nuovo la voce, oppure riapri l'app.`, true, true);
+  else setStatus(`Limite Google di oggi finito: continuo con ${fb.name}${fb.kind === 'sys' ? ' dell\'iPhone' : ''}. Torno alla voce Google da sola quando il limite si azzera.`, false);
   state.playing = true; updatePlay();
   speakCurrent();
   return true;
@@ -2110,7 +2116,7 @@ function enterFallback(){
 function leaveFallback(){
   if(!state.fallbackFrom) return;
   state.engine = 'piper'; state.piperVoice = state.fallbackFrom;
-  state.fallbackFrom = null; state.fallbackUntil = 0;
+  state.fallbackFrom = null; state.fallbackUntil = 0; state.fallbackLive = false;
   if('speechSynthesis' in window) speechSynthesis.cancel();
   syncMediaHandlers();
   $('voiceLabel').textContent = voiceName();
@@ -2118,6 +2124,7 @@ function leaveFallback(){
 }
 // a ogni nuova frase controllo se si può tornare alla voce Google
 function maybeLeaveFallback(){
+  if(state.fallbackLive) return;
   if(state.fallbackFrom && ((Date.now() >= state.fallbackUntil && gemModelsLeft()) || (Date.now() - (state.fallbackAt || 0) > 180000 && GEM_MODELS.some(m => !gemConfirmedDaily(m))))){ leaveFallback(); setStatus('Riprovo con la voce Google.'); }
 }
 
@@ -3417,7 +3424,7 @@ function selectVoice(kind, id){
   const wasPlaying = state.playing;
   if(wasPlaying) stop();
   state.prepareTo = null;
-  state.fallbackFrom = null; state.fallbackUntil = 0;
+  state.fallbackFrom = null; state.fallbackUntil = 0; state.fallbackLive = false;
   if(kind === 'piper' && isGemId(id) && !store.get('gemKey')){ if(wasPlaying){ unlockAudio(); play(); } gemFrom = view === 'set' && sheetKind !== 'voice' ? 'settings' : 'voice'; openGemSetup(id, 1); return; }
   if(kind === 'piper' && isLiveId(id) && !store.get('gemKey')){ if(wasPlaying){ unlockAudio(); play(); } gemFrom = view === 'set' && sheetKind !== 'voice' ? 'settings' : 'voice'; openGemSetup(GEM_VOICES[0].id, 1); return; }
   if(kind === 'piper'){
