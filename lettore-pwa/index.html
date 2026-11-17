@@ -723,7 +723,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 
 <!-- LIBRERIA -->
 <header class="appBar">
-  <div class="brand"><span class="brandMark"><img src="icon-192.png" alt="" width="32" height="32"></span><span>SiMa</span><span class="brandVer" id="brandVer">(102)</span></div>
+  <div class="brand"><span class="brandMark"><img src="icon-192.png" alt="" width="32" height="32"></span><span>SiMa</span><span class="brandVer" id="brandVer">(103)</span></div>
 </header>
 <main id="libView">
   <div class="actRow hidden">
@@ -856,7 +856,7 @@ body.noMini #toast{bottom:calc(max(calc(env(safe-area-inset-bottom) - 14px), 8px
 <script>
 // se la libreria PDF non si carica (es. offline al primo avvio) il resto dell'app funziona lo stesso
 if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const APP_VERSION = 102;
+const APP_VERSION = 103;
 { const bv = document.getElementById('brandVer'); if(bv) bv.textContent = '(' + APP_VERSION + ')'; }
 if('serviceWorker' in navigator){
   // quando arriva una versione nuova dell'app la carico subito, se non stai ascoltando
@@ -972,9 +972,9 @@ const lib = {
   del(k){ return this.tx('readwrite', st => st.delete(k)); }
 };
 // audio già generato, salvato sul telefono: ogni frase si genera una volta sola
-// fino a 1 GB (circa 6 ore di voce Google), meno se il telefono concede poco spazio
-let AUDIO_CAP = 1024 * 1024 * 1024;
-try{ if(navigator.storage && navigator.storage.estimate) navigator.storage.estimate().then(e => { if(e && e.quota) AUDIO_CAP = Math.max(300 * 1048576, Math.min(AUDIO_CAP, e.quota * 0.4)); }).catch(() => {}); }catch(e){}
+// lo spazio che concede il telefono (80%); il libro aperto non viene mai toccato
+let AUDIO_CAP = 8 * 1024 * 1024 * 1024;
+try{ if(navigator.storage && navigator.storage.estimate) navigator.storage.estimate().then(e => { if(e && e.quota) AUDIO_CAP = Math.max(300 * 1048576, Math.min(AUDIO_CAP, e.quota * 0.8)); }).catch(() => {}); }catch(e){}
 // la parte di un audio salvato: libro, capitolo e ultima frase che contiene
 function audioSpot(k){
   const m = /^([^|]+)\|([^|]+)\|(\d+)\|(?:c\d+-)?(\d+)$/.exec(k || '');
@@ -1020,7 +1020,8 @@ const acache = {
     items.forEach(x => x.r = rank(x));
     items.sort((a, b) => a.r - b.r || a.at - b.at);
     let excess = total - AUDIO_CAP * frac;
-    for(const x of items){ if(excess <= 0) break; st.delete(x.k); excess -= x.size; total -= x.size; }
+    // l'audio del libro aperto non si cancella mai: si libera solo spazio di altri libri o di altre voci
+    for(const x of items){ if(excess <= 0) break; if(x.book === state.key) continue; st.delete(x.k); excess -= x.size; total -= x.size; }
     await new Promise(res => { t.oncomplete = res; t.onerror = res; t.onabort = res; });
     store.set('audioBytes', Math.max(0, total));
   },
@@ -1155,7 +1156,7 @@ function onWorkerMessage(e){
     if(m.type === 'result' && key){
       const [vid, book] = key.split('|');
       if(isGemId(vid)) noteRtf(vid, performance.now() - inf.t, m.blob);
-      if(book !== 'anteprima') en ? (en.saving = acache.put(key, m.blob, book)) : acache.put(key, m.blob, book);
+      if(book !== 'anteprima') en ? (en.saving = acache.put(key, m.blob, book).then(ok => { if(!ok) audioNotSaved(key); return ok; })) : acache.put(key, m.blob, book).then(ok => { if(!ok) audioNotSaved(key); return ok; });
     }
     if(en){
       if(m.type === 'result'){
@@ -1226,6 +1227,15 @@ async function pump(){
     busy = false; updateBuf(); return pump();
   }
   if(isGemId(next.key.split('|')[0]) && !state.playing && !next.key.includes('|anteprima|')){ en.st = 'queued'; busy = false; return; } // in pausa non chiedo nulla a Google: le richieste partono solo quando tocchi play
+  { // sto riascoltando un pezzo già fatto: il testo nuovo lo chiedo solo quando manca un pezzo alla fine, non prima (niente richieste in anticipo)
+    const cur = audio.dataset.key, vv = next.key.split('|')[0];
+    const mc = /^[^|]+\|[^|]+\|(\d+)\|c(\d+)-\d+$/.exec(cur || ''), mh = store.get('maxHeard:' + state.key);
+    const replay = !!(mc && mh && (+mc[1] < mh.sec || (+mc[1] === mh.sec && +mc[2] < mh.idx)));
+    if(isGemId(vv) && state.playing && replay && isDoneKey(cur) && !isDoneKey(next.key)){
+      const ci = wanted.findIndex(w => w.key === cur), nf = wanted.findIndex(w => !isDoneKey(w.key));
+      if(nf - ci > 1){ en.st = 'queued'; busy = false; return; } // tra il pezzo che ascolto e il primo nuovo ce ne sono già di fatti
+    }
+  }
   if((gemHold || gemFail) && isGemId(next.key.split('|')[0])){ en.st = 'queued'; busy = false; return; } // fermo: nessuna richiesta a Google finché non tocchi play
   if(fishHold && isFishId(next.key.split('|')[0])){ en.st = 'queued'; busy = false; return; } // fermo: nessuna richiesta a Fish Audio finché non tocchi play
   const id = ++reqId; inflight.set(id, { key: next.key, t: performance.now() });
@@ -1492,7 +1502,7 @@ let gemHeardPending = 0;
 function gemHeardFlush(){ if(gemHeardPending < 1) return; const st = gemStats(); st.heard = (st.heard || 0) + gemHeardPending; gemHeardPending = 0; store.set('gemStats', st); }
 // un pezzo già scaricato in passato e richiesto di nuovo: lo segno come spreco
 function isDoneKey(key){
-  const m = /^(gem-[^|]+)\|([^|]+)\|(\d+)\|c(\d+)-(\d+)$/.exec(key); if(!m) return false;
+  const m = /^((?:gem|fish|live)-[^|]+)\|([^|]+)\|(\d+)\|c(\d+)-(\d+)$/.exec(key); if(!m) return false;
   const arr = ((store.get('gemDone:' + m[1] + '|' + m[2]) || {})[m[3]]) || [];
   return arr.some(([a, b]) => a === +m[4] && b === +m[5]);
 }
@@ -1837,11 +1847,19 @@ async function recallChunks(book){
   try{
     const db = await lib.open();
     const keys = await new Promise(res => { const r = db.transaction('audio').objectStore('audio').getAllKeys(); r.onsuccess = () => res(r.result || []); r.onerror = () => res([]); });
-    keys.filter(k => /^(gem|fish)-/.test(String(k)) && String(k).includes('|' + book + '|')).forEach(k => rememberChunk(String(k)));
+    keys.filter(k => /^(gem|fish|live)-/.test(String(k)) && String(k).includes('|' + book + '|')).forEach(k => rememberChunk(String(k)));
   }catch(e){}
 }
+function audioNotSaved(key){
+  // il telefono non ha salvato il pezzo: non lo segno come già fatto, e te lo dico (tornare qui costerà 1 richiesta)
+  const m = /^((?:gem|fish|live)-[^|]+)\|([^|]+)\|(\d+)\|c(\d+)-(\d+)$/.exec(key || ''); if(!m) return;
+  const sk = 'gemDone:' + m[1] + '|' + m[2], d = store.get(sk) || {};
+  if(d[m[3]]){ d[m[3]] = d[m[3]].filter(([a, b]) => !(a === +m[4] && b === +m[5])); store.set(sk, d); }
+  chunkCache.delete(m[1] + '|' + m[2] + '|' + m[3]);
+  try{ setStatus('Il telefono non è riuscito a salvare questo pezzo (spazio pieno o limite del browser): per riascoltarlo servirà una nuova richiesta.', true, true); }catch(e){}
+}
 function rememberChunk(key){
-  const m = /^((?:gem|fish)-[^|]+)\|([^|]+)\|(\d+)\|c(\d+)-(\d+)$/.exec(key); if(!m) return;
+  const m = /^((?:gem|fish|live)-[^|]+)\|([^|]+)\|(\d+)\|c(\d+)-(\d+)$/.exec(key); if(!m) return;
   const sk = 'gemDone:' + m[1] + '|' + m[2], d = store.get(sk) || {};
   const arr = d[m[3]] = d[m[3]] || [];
   if(!arr.some(([a, b]) => a === +m[4] && b === +m[5])){ arr.push([+m[4], +m[5]]); arr.sort((x, y) => x[0] - y[0]); store.set(sk, d); }
@@ -2036,6 +2054,10 @@ async function piperSpeakCurrent(fromAdvance){
     setStatus('');
     audio.loop = false;
     audio.src = url; audio.dataset.key = key;
+    { // il punto più avanti che hai davvero ascoltato in questo libro (serve a capire quando riascolti qualcosa di già fatto)
+      const mh = /^[^|]+\|[^|]+\|(\d+)\|c(\d+)-\d+$/.exec(key);
+      if(mh && isGem()){ const hk = 'maxHeard:' + state.key, o = store.get(hk) || { sec: -1, idx: -1 }, sc = +mh[1], ix = +mh[2]; if(sc > o.sec || (sc === o.sec && ix > o.idx)) store.set(hk, { sec: sc, idx: ix }); }
+    }
     audio.playbackRate = state.rate;
     audio.preservesPitch = true; audio.webkitPreservesPitch = true;
     if(isChunked() && state.idx > state.curChunk.start){
@@ -4288,7 +4310,7 @@ function openSettings(focus, keepScroll){
     const cs = card('Spazio');
     const audioMb = Math.round((store.get('audioBytes') || 0) / 1048576);
     const aheadMin = isChunked() ? readyAheadMinutes() : 0;
-    cs.appendChild(famRow('Audio già preparato', audioMb + ' MB' + (aheadMin ? ` · circa ${fmtMin(aheadMin)} pronti da ascoltare nel libro aperto` : '') + '. Quello già ascoltato si cancella per primo quando serve spazio.', audioMb ? 'Svuota' : null, clearAudioCache));
+    cs.appendChild(famRow('Audio già preparato', audioMb + ' MB' + (aheadMin ? ` · circa ${fmtMin(aheadMin)} pronti da ascoltare nel libro aperto` : '') + '. L\'audio del libro aperto resta sempre sul telefono; si libera spazio solo togliendo quello di altri libri.', audioMb ? 'Svuota' : null, clearAudioCache));
     const sb = Math.round(statsSize() / 1024);
     cs.appendChild(famRow('Statistiche di ascolto', (sb < 1 ? 'Meno di 1 KB' : sb + ' KB') + '. Servono per la scheda Statistiche.', sb ? 'Svuota' : null, clearStats));
     const tot = famRow('Spazio usato dall\'app', '...', null);
